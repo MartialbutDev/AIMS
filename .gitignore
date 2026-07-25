@@ -1,0 +1,40 @@
+# Backend 
+backend/venv/ 
+backend/__pycache__/ 
+backend/*.pyc 
+backend/.env 
+backend/alembic/versions/*.pyc 
+backend/logs/ 
+*.log 
+ 
+# Mobile 
+mobile/node_modules/ 
+mobile/.expo/ 
+mobile/dist/ 
+mobile/npm-debug.* 
+mobile/*.jks 
+mobile/*.p8 
+mobile/*.p12 
+mobile/*.key 
+mobile/*.mobileprovision 
+mobile/*.orig.* 
+ 
+# IDE 
+.vscode/ 
+.idea/ 
+*.swp 
+*.swo 
+*~ 
+ 
+# OS 
+.DS_Store 
+Thumbs.db 
+ 
+# Environment 
+.env 
+.env.local 
+.env.*.local 
+ 
+# Docker 
+*.pid 
+docker-compose.override.yml 
