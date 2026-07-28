@@ -64,7 +64,26 @@ export const authService = {
         last_name: data.last_name,
         password: '***' 
       });
-      
+
+      const response = await fetch(
+        'http://192.168.100.9:8000/api/v1/auth/register/student',{
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: data.email,
+            password: data.password,
+            first_name: data.first_name,
+            last_name: data.last_name,
+            student_id: data.student_id,
+          }),
+        }
+      );
+      console.log("Status:", response.status);
+      console.log("Response:", await response.text());
+      return{};
+      /*
       const response = await api.post('/auth/register/student', {
         email: data.email,
         password: data.password,
@@ -75,6 +94,7 @@ export const authService = {
       
       console.log('✅ Registration successful:', response.data);
       return response.data;
+       */
     } catch (error: any) {
       console.error('❌ Registration error:', error.response?.data || error.message);
       
