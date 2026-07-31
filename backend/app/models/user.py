@@ -3,7 +3,7 @@ from sqlalchemy.sql import func
 import enum
 import uuid
 
-from app.core.database import Base
+from app.db.database import Base
 
 
 class UserRole(str, enum.Enum):
@@ -30,3 +30,4 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
+

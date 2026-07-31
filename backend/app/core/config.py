@@ -5,12 +5,17 @@ import os
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "AIMS API"
+    APP_NAME: str = "AIMS"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
+    API_PREFIX: str = "/api"
+
     # Database
     DATABASE_URL: str = "postgresql://aims:aims_password@localhost:5432/aims_db"
+
+    #ocr
+    ASSET_DIR: str = os.path.join(os.path.dirname(__file__), "app/static")
 
     # Security
     SECRET_KEY: str = "your-super-secret-key-change-in-production"
@@ -18,7 +23,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:19000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:19000", "http://localhost:5173"]
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
