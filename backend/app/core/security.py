@@ -3,7 +3,7 @@ from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 import uuid
 
@@ -74,6 +74,55 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive",
         )
+    return user
+
+
+# ✅ ADD THIS NEW FUNCTION
+async def get_current_user_from_token(
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Get current user from either Authorization header OR query param token.
+    This allows the Image component to load images by passing token as query param.
+    """
+    user = None
+    
+    # Try to get user from query param token first (for Image component)
+    if token:
+        try:
+            payload = decode_token(token)
+            user_id = payload.get("sub")
+            if user_id:
+                user = db.query(User).filter(User.id == user_id).first()
+                if user and user.is_active:
+                    return user
+        except Exception as e:
+            print(f"Token query param auth failed: {e}")
+    
+    # Fallback to standard Authorization header
+    try:
+        # Get token from OAuth2 scheme
+        token_from_header = await oauth2_scheme.__call__()
+        if token_from_header:
+            # Try to decode using the existing function
+            payload = decode_token(token_from_header)
+            user_id = payload.get("sub")
+            if user_id:
+                user = db.query(User).filter(User.id == user_id).first()
+                if user and user.is_active:
+                    return user
+    except Exception as e:
+        print(f"Header auth failed: {e}")
+    
+    # If no user found, raise 401
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     return user
 
 

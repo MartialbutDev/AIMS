@@ -2,215 +2,203 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Alert,
 } from "react-native";
 
-import Colors from "../../../src/theme/colors";
+import { useTheme } from "../../../src/context/ThemeContext";
+import api from "../../../src/services/api";
 
-const getApplicationDetail = (id: string) => ({
-  id,
-  company: "TechCorp Inc.",
-  position: "Software Engineering Intern",
-  location: "Makati, Philippines",
-  dateApplied: "2026-03-15",
-  status: "reviewing" as const,
-  description: "We are looking for a passionate software engineering intern to join our team. You will work on real-world projects and learn from experienced engineers.",
-  requirements: [
-    "Currently pursuing BS in Computer Science or related field",
-    "Knowledge of JavaScript/TypeScript",
-    "Familiarity with React or React Native",
-    "Good problem-solving skills",
-    "Ability to work in a team environment",
-  ],
-  contact: {
-    name: "Maria Santos",
-    email: "maria@techcorp.com",
-    phone: "+63 912 3456 789",
-  },
-  timeline: [
-    { event: "Application Submitted", date: "2026-03-15", completed: true },
-    { event: "Application Reviewed", date: "2026-03-18", completed: true },
-    { event: "Interview Scheduled", date: "2026-03-22", completed: false },
-    { event: "Decision", date: "2026-03-29", completed: false },
-  ],
-});
+interface ApplicationDetail {
+  id: string;
+  company_id: string;
+  company_name: string;
+  position: string;
+  status: "pending" | "reviewing" | "interview" | "accepted" | "rejected" | "withdrawn";
+  applied_date: string;
+  cover_letter?: string;
+  feedback?: string;
+}
 
 export default function ApplicationDetailScreen() {
+  const { colors, isDark } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [loading, setLoading] = useState(false);
-  const application = getApplicationDetail(id);
+  const [loading, setLoading] = useState(true);
+  const [application, setApplication] = useState<ApplicationDetail | null>(null);
 
-  const statusColors = {
-    pending: "#F59E0B",
-    reviewing: "#3B82F6",
-    interview: "#8B5CF6",
-    accepted: "#10B981",
-    rejected: "#EF4444",
+  useEffect(() => {
+    fetchApplicationDetail();
+  }, [id]);
+
+  const fetchApplicationDetail = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/applications/${id}`);
+      setApplication(response.data);
+    } catch (error) {
+      console.error("Error fetching application detail:", error);
+      Alert.alert("Error", "Failed to load application details");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const statusIcons = {
-    pending: "time-outline",
-    reviewing: "sync-outline",
-    interview: "people-outline",
-    accepted: "checkmark-circle-outline",
-    rejected: "close-circle-outline",
+  const getStatusColor = (status: string) => {
+    const statusColors: Record<string, string> = {
+      pending: "#F59E0B",
+      reviewing: "#3B82F6",
+      interview: "#8B5CF6",
+      accepted: "#10B981",
+      rejected: "#EF4444",
+      withdrawn: "#6B7280",
+    };
+    return statusColors[status] || "#6B7280";
   };
 
-  const handleWithdraw = () => {
-    console.log("Withdraw application");
+  const getStatusIcon = (status: string): keyof typeof Ionicons.glyphMap => {
+    const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
+      pending: "time-outline",
+      reviewing: "sync-outline",
+      interview: "people-outline",
+      accepted: "checkmark-circle-outline",
+      rejected: "close-circle-outline",
+      withdrawn: "ban-outline",
+    };
+    return icons[status] || "ellipse-outline";
   };
 
-  const handleContact = () => {
-    console.log("Contact employer");
+  const getStatusLabel = (status: string) => {
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
-  const handleTrackStatus = () => {
-    console.log("Track status");
+  const handleWithdraw = async () => {
+    Alert.alert(
+      "Withdraw Application",
+      "Are you sure you want to withdraw this application?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Withdraw",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.post(`/applications/${id}/withdraw`);
+              Alert.alert("Success", "Application withdrawn successfully");
+              router.back();
+            } catch (error) {
+              Alert.alert("Error", "Failed to withdraw application");
+            }
+          },
+        },
+      ]
+    );
   };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading application...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!application) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
+        <Ionicons name="document-text-outline" size={64} color={colors.border} />
+        <Text style={[styles.errorText, { color: colors.textSecondary }]}>Application not found</Text>
+        <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchApplicationDetail}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  const statusColor = getStatusColor(application.status);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back-outline" size={24} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Application Details</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Application Details</Text>
         <View style={styles.headerRight} />
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <View style={[styles.statusHeader, { backgroundColor: colors.card }]}>
+          <View style={styles.companySection}>
+            <View style={[styles.companyAvatar, { backgroundColor: `${colors.primary}10` }]}>
+              <Text style={[styles.companyInitial, { color: colors.primary }]}>{application.company_name.charAt(0)}</Text>
+            </View>
+            <View>
+              <Text style={[styles.companyName, { color: colors.textPrimary }]}>{application.company_name}</Text>
+              <Text style={[styles.positionName, { color: colors.textSecondary }]}>{application.position}</Text>
+            </View>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
+            <Ionicons
+              name={getStatusIcon(application.status)}
+              size={16}
+              color={statusColor}
+              style={styles.statusIcon}
+            />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {getStatusLabel(application.status)}
+            </Text>
+          </View>
         </View>
-      ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-          <View style={styles.statusHeader}>
-            <View style={styles.companySection}>
-              <View style={styles.companyAvatar}>
-                <Text style={styles.companyInitial}>{application.company.charAt(0)}</Text>
-              </View>
-              <View>
-                <Text style={styles.companyName}>{application.company}</Text>
-                <Text style={styles.positionName}>{application.position}</Text>
-              </View>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: `${statusColors[application.status]}15` }]}>
-              <Ionicons
-                name={statusIcons[application.status]}
-                size={16}
-                color={statusColors[application.status]}
-                style={styles.statusIcon}
-              />
-              <Text style={[styles.statusText, { color: statusColors[application.status] }]}>
-                {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
-              </Text>
-            </View>
-          </View>
 
-          <View style={styles.infoRow}>
-            <View style={styles.infoItem}>
-              <Ionicons name="location-outline" size={18} color={Colors.textSecondary} />
-              <Text style={styles.infoText}>{application.location}</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="calendar-outline" size={18} color={Colors.textSecondary} />
-              <Text style={styles.infoText}>Applied on {application.dateApplied}</Text>
-            </View>
+        <View style={[styles.infoRow, { backgroundColor: colors.card }]}>
+          <View style={styles.infoItem}>
+            <Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>Applied on {formatDate(application.applied_date)}</Text>
           </View>
+        </View>
 
+        {application.cover_letter && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.descriptionText}>{application.description}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Cover Letter</Text>
+            <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>{application.cover_letter}</Text>
           </View>
+        )}
 
+        {application.feedback && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Requirements</Text>
-            {application.requirements.map((req, index) => (
-              <View key={index} style={styles.requirementItem}>
-                <Ionicons name="checkmark-circle" size={18} color={Colors.primary} style={styles.requirementIcon} />
-                <Text style={styles.requirementText}>{req}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Application Timeline</Text>
-            {application.timeline.map((item, index) => (
-              <View key={index} style={styles.timelineItem}>
-                <View style={styles.timelineLeft}>
-                  <View style={[styles.timelineDot, item.completed && styles.timelineDotCompleted]} />
-                  {index < application.timeline.length - 1 && <View style={styles.timelineLine} />}
-                </View>
-                <View style={styles.timelineContent}>
-                  <Text style={[styles.timelineEvent, item.completed && styles.timelineEventCompleted]}>
-                    {item.event}
-                  </Text>
-                  <Text style={styles.timelineDate}>{item.date}</Text>
-                </View>
-                {item.completed && (
-                  <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                )}
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact Person</Text>
-            <View style={styles.contactCard}>
-              <View style={styles.contactAvatar}>
-                <Text style={styles.contactInitial}>
-                  {application.contact.name.charAt(0)}
-                </Text>
-              </View>
-              <View style={styles.contactInfo}>
-                <Text style={styles.contactName}>{application.contact.name}</Text>
-                <View style={styles.contactDetail}>
-                  <Ionicons name="mail-outline" size={14} color={Colors.textSecondary} />
-                  <Text style={styles.contactDetailText}>{application.contact.email}</Text>
-                </View>
-                <View style={styles.contactDetail}>
-                  <Ionicons name="call-outline" size={14} color={Colors.textSecondary} />
-                  <Text style={styles.contactDetailText}>{application.contact.phone}</Text>
-                </View>
-              </View>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Feedback</Text>
+            <View style={[styles.feedbackCard, { backgroundColor: `${colors.primary}05`, borderColor: `${colors.primary}20` }]}>
+              <Text style={[styles.feedbackText, { color: colors.textPrimary }]}>{application.feedback}</Text>
             </View>
           </View>
+        )}
 
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity
-              style={styles.primaryAction}
-              onPress={handleTrackStatus}
-            >
-              <Ionicons name="trending-up-outline" size={20} color={Colors.white} />
-              <Text style={styles.primaryActionText}>Track Status</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.secondaryAction}
-              onPress={handleContact}
-            >
-              <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primary} />
-              <Text style={styles.secondaryActionText}>Contact</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={styles.withdrawButton}
-            onPress={handleWithdraw}
-          >
+        {application.status !== "withdrawn" && application.status !== "accepted" && application.status !== "rejected" && (
+          <TouchableOpacity style={styles.withdrawButton} onPress={handleWithdraw}>
             <Text style={styles.withdrawButtonText}>Withdraw Application</Text>
           </TouchableOpacity>
-        </ScrollView>
-      )}
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -218,9 +206,30 @@ export default function ApplicationDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
-
+  centerContent: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 16,
+  },
+  retryButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -229,80 +238,54 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
   },
-
   backButton: {
     padding: 4,
   },
-
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: Colors.textPrimary,
   },
-
   headerRight: {
     width: 32,
   },
-
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
   content: {
     paddingHorizontal: 20,
     paddingBottom: 30,
   },
-
   statusHeader: {
-    backgroundColor: Colors.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     shadowColor: "#000000",
     shadowOpacity: 0.04,
     shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-
   companySection: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 12,
   },
-
   companyAvatar: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: `${Colors.primary}10`,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
-
   companyInitial: {
     fontSize: 20,
     fontWeight: "700",
-    color: Colors.primary,
   },
-
   companyName: {
     fontSize: 18,
     fontWeight: "700",
-    color: Colors.textPrimary,
   },
-
   positionName: {
     fontSize: 14,
-    color: Colors.textSecondary,
   },
-
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -311,218 +294,54 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 12,
   },
-
   statusIcon: {
     marginRight: 4,
   },
-
   statusText: {
     fontSize: 13,
     fontWeight: "600",
   },
-
   infoRow: {
     flexDirection: "row",
-    backgroundColor: Colors.white,
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
   },
-
   infoItem: {
     flexDirection: "row",
     alignItems: "center",
     marginRight: 20,
   },
-
   infoText: {
     fontSize: 13,
-    color: Colors.textSecondary,
     marginLeft: 6,
   },
-
   section: {
     marginBottom: 20,
   },
-
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: Colors.textPrimary,
     marginBottom: 12,
   },
-
   descriptionText: {
     fontSize: 14,
-    color: Colors.textSecondary,
     lineHeight: 22,
   },
-
-  requirementItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-
-  requirementIcon: {
-    marginRight: 10,
-  },
-
-  requirementText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-
-  timelineItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-
-  timelineLeft: {
-    alignItems: "center",
-    marginRight: 12,
-    width: 20,
-  },
-
-  timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.border,
-    marginTop: 4,
-  },
-
-  timelineDotCompleted: {
-    backgroundColor: "#10B981",
-  },
-
-  timelineLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: Colors.border,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-
-  timelineContent: {
-    flex: 1,
-  },
-
-  timelineEvent: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-
-  timelineEventCompleted: {
-    color: Colors.textPrimary,
-    fontWeight: "600",
-  },
-
-  timelineDate: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    opacity: 0.7,
-    marginTop: 2,
-  },
-
-  contactCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.white,
-    borderRadius: 12,
+  feedbackCard: {
     padding: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-
-  contactAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: `${Colors.primary}10`,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-
-  contactInitial: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.primary,
-  },
-
-  contactInfo: {
-    flex: 1,
-  },
-
-  contactName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: 2,
-  },
-
-  contactDetail: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 2,
-  },
-
-  contactDetailText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginLeft: 6,
-  },
-
-  actionsContainer: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 12,
-  },
-
-  primaryAction: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: Colors.primary,
-    paddingVertical: 14,
     borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  primaryActionText: {
-    color: Colors.white,
-    fontSize: 15,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-
-  secondaryAction: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: Colors.white,
-    paddingVertical: 14,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.primary,
   },
-
-  secondaryActionText: {
-    color: Colors.primary,
-    fontSize: 15,
-    fontWeight: "600",
-    marginLeft: 8,
+  feedbackText: {
+    fontSize: 14,
+    lineHeight: 22,
   },
-
   withdrawButton: {
     paddingVertical: 12,
     alignItems: "center",
+    marginTop: 8,
   },
-
   withdrawButtonText: {
     fontSize: 14,
     color: "#EF4444",

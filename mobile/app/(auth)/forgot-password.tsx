@@ -4,26 +4,27 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import AppLogo from "../../src/components/common/AppLogo";
 import { APP_NAME, APP_VERSION } from "../../src/constants/app";
-import Colors from "../../src/theme/colors";
+import { useTheme } from "../../src/context/ThemeContext";
 
 const { height } = Dimensions.get("window");
 
 export default function ForgotPasswordScreen() {
+  const { colors } = useTheme();
   const [studentId, setStudentId] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -52,7 +53,6 @@ export default function ForgotPasswordScreen() {
     setSuccess(false);
 
     try {
-      // API call to send reset link
       console.log({ studentId: studentId.trim() });
       await new Promise((resolve) => setTimeout(resolve, 1500));
       setSuccess(true);
@@ -70,16 +70,12 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
 
-      {/* Navy Blue Background - Top Section (Absolute) */}
-      <View style={styles.navySection}>
-        {/* Decorative circles */}
+      <View style={[styles.navySection, { backgroundColor: colors.primary }]}>
         <View style={styles.circleTopLeft} pointerEvents="none" />
         <View style={styles.circleBottomRight} pointerEvents="none" />
-
-        {/* Decorative dot grids */}
         <View style={styles.dotGridTopRight} pointerEvents="none">
           {Array.from({ length: 16 }).map((_, i) => (
             <View key={`dot-tr-${i}`} style={styles.dot} />
@@ -92,8 +88,7 @@ export default function ForgotPasswordScreen() {
         </View>
       </View>
 
-      {/* Content on top of everything */}
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -104,38 +99,37 @@ export default function ForgotPasswordScreen() {
             bounces={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Header Content - on Navy Background */}
             <View style={styles.headerContent}>
               <View style={styles.logoWrapper}>
                 <AppLogo size={100} decorative={true} variant="login" />
               </View>
-              <Text style={styles.brandTitle}>
-                A<Text style={styles.brandTitleAccent}>I</Text>MS
+              <Text style={[styles.brandTitle, { color: '#FFFFFF' }]}>
+                A<Text style={[styles.brandTitleAccent, { color: "#F5A623" }]}>I</Text>MS
               </Text>
-              <Text style={styles.systemTitle}>Academic Internship Management System</Text>
+              <Text style={[styles.systemTitle, { color: '#FFFFFF', opacity: 0.9 }]}>
+                Academic Internship Management System
+              </Text>
             </View>
 
-            {/* Floating Card - Overlaps the navy section */}
             <View style={styles.cardWrapper}>
-              <View style={styles.card}>
+              <View style={[styles.card, { backgroundColor: colors.card }]}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.welcomeText}>Reset Password</Text>
-                  <Text style={styles.subtitleText}>
+                  <Text style={[styles.welcomeText, { color: colors.textPrimary }]}>Reset Password</Text>
+                  <Text style={[styles.subtitleText, { color: colors.textSecondary }]}>
                     Enter your student ID to receive a password reset link
                   </Text>
                 </View>
 
                 <View style={styles.formContainer}>
-                  {/* Success Message */}
                   {success && (
-                    <View style={styles.successContainer}>
+                    <View style={[styles.successContainer, { backgroundColor: `${colors.success}15`, borderColor: `${colors.success}30` }]}>
                       <Ionicons
                         name="checkmark-circle-outline"
                         size={24}
-                        color={Colors.success}
+                        color={colors.success}
                         style={styles.successIcon}
                       />
-                      <Text style={styles.successText}>
+                      <Text style={[styles.successText, { color: colors.textPrimary }]}>
                         Reset link sent successfully!{'\n'}
                         Please check your email for instructions.
                       </Text>
@@ -143,22 +137,23 @@ export default function ForgotPasswordScreen() {
                   )}
 
                   <View style={styles.fieldWrapper}>
-                    <Text style={styles.fieldLabel}>Student ID</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Student ID</Text>
                     <View
                       style={[
                         styles.inputWrapper,
-                        isFocused && styles.inputWrapperFocused,
-                        error ? styles.inputWrapperError : null,
+                        { backgroundColor: colors.background, borderColor: colors.border },
+                        isFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        error ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
                       ]}
                     >
                       <Ionicons
                         name="person-outline"
                         size={20}
-                        color={isFocused ? Colors.primary : "#8A8A8A"}
+                        color={isFocused ? colors.primary : "#8A8A8A"}
                         style={styles.inputIcon}
                       />
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your student ID"
                         placeholderTextColor="#A0A0A0"
                         value={studentId}
@@ -177,11 +172,11 @@ export default function ForgotPasswordScreen() {
                         accessibilityLabel="Student ID"
                       />
                     </View>
-                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                    {error ? <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text> : null}
                   </View>
 
                   <TouchableOpacity
-                    style={[styles.resetButton, loading && styles.resetButtonDisabled]}
+                    style={[styles.resetButton, loading && styles.resetButtonDisabled, { backgroundColor: colors.primary }]}
                     onPress={handleSendResetLink}
                     disabled={loading}
                     activeOpacity={0.8}
@@ -189,16 +184,16 @@ export default function ForgotPasswordScreen() {
                     accessibilityState={{ disabled: loading, busy: loading }}
                   >
                     {loading ? (
-                      <ActivityIndicator color={Colors.white} />
+                      <ActivityIndicator color="#FFFFFF" />
                     ) : (
                       <View style={styles.resetButtonContent}>
                         <Ionicons
                           name="send-outline"
                           size={20}
-                          color={Colors.white}
+                          color="#FFFFFF"
                           style={styles.resetButtonIcon}
                         />
-                        <Text style={styles.resetButtonText}>Send Reset Link</Text>
+                        <Text style={[styles.resetButtonText, { color: '#FFFFFF' }]}>Send Reset Link</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -211,20 +206,20 @@ export default function ForgotPasswordScreen() {
                     <Ionicons
                       name="arrow-back-outline"
                       size={18}
-                      color={Colors.primary}
+                      color={colors.primary}
                       style={styles.backIcon}
                     />
-                    <Text style={styles.backText}>Back to Login</Text>
+                    <Text style={[styles.backText, { color: colors.primary }]}>Back to Login</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
 
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>
+            <View style={[styles.footer, { backgroundColor: colors.background }]}>
+              <Text style={[styles.footerText, { color: colors.textSecondary }]}>
                 © {new Date().getFullYear()} {APP_NAME}
               </Text>
-              <Text style={styles.versionText}>{APP_VERSION}</Text>
+              <Text style={[styles.versionText, { color: colors.textSecondary }]}>{APP_VERSION}</Text>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -236,7 +231,6 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
 
   navySection: {
@@ -245,7 +239,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: height * 0.40,
-    backgroundColor: Colors.primary,
     overflow: 'hidden',
   },
 
@@ -324,7 +317,6 @@ const styles = StyleSheet.create({
   },
 
   brandTitle: {
-    color: Colors.white,
     fontSize: 30,
     fontWeight: "800",
     letterSpacing: 2,
@@ -336,12 +328,10 @@ const styles = StyleSheet.create({
   },
 
   systemTitle: {
-    color: Colors.white,
     fontSize: 14,
     fontWeight: "500",
     textAlign: "center",
     letterSpacing: 0.5,
-    opacity: 0.9,
     marginBottom: 10,
   },
 
@@ -351,7 +341,6 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: Colors.white,
     borderRadius: 24,
     paddingHorizontal: 24,
     paddingVertical: 28,
@@ -372,14 +361,12 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 26,
     fontWeight: "700",
-    color: Colors.textPrimary,
     letterSpacing: -0.3,
     marginBottom: 4,
   },
 
   subtitleText: {
     fontSize: 14,
-    color: Colors.textSecondary,
     lineHeight: 20,
     letterSpacing: 0.2,
   },
@@ -391,12 +378,10 @@ const styles = StyleSheet.create({
   successContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: `${Colors.success}15`,
     padding: 14,
     borderRadius: 12,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: `${Colors.success}30`,
   },
 
   successIcon: {
@@ -406,7 +391,6 @@ const styles = StyleSheet.create({
   successText: {
     flex: 1,
     fontSize: 13,
-    color: Colors.textPrimary,
     lineHeight: 18,
   },
 
@@ -417,28 +401,24 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.textPrimary,
     marginBottom: 6,
   },
 
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.background,
     borderWidth: 1,
-    borderColor: Colors.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 50,
   },
 
   inputWrapperFocused: {
-    borderColor: Colors.primary,
     borderWidth: 1.5,
   },
 
   inputWrapperError: {
-    borderColor: Colors.error,
+    borderColor: '#EF4444',
   },
 
   inputIcon: {
@@ -448,23 +428,19 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: Colors.textPrimary,
   },
 
   errorText: {
-    color: Colors.error,
     fontSize: 12,
     marginTop: 4,
     marginLeft: 4,
   },
 
   resetButton: {
-    backgroundColor: Colors.primary,
     height: 52,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: Colors.primary,
     shadowOpacity: 0.25,
     shadowRadius: 10,
     shadowOffset: {
@@ -491,7 +467,6 @@ const styles = StyleSheet.create({
   },
 
   resetButtonText: {
-    color: Colors.white,
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 0.5,
@@ -509,14 +484,12 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: Colors.primary,
     fontSize: 14,
     fontWeight: "600",
     letterSpacing: 0.2,
   },
 
   footer: {
-    backgroundColor: Colors.background,
     paddingHorizontal: 24,
     paddingBottom: 16,
     paddingTop: 16,
@@ -526,7 +499,6 @@ const styles = StyleSheet.create({
 
   footerText: {
     fontSize: 11,
-    color: Colors.textSecondary,
     fontWeight: "400",
     letterSpacing: 0.2,
     textAlign: "center",
@@ -535,7 +507,6 @@ const styles = StyleSheet.create({
 
   versionText: {
     fontSize: 10,
-    color: "#9CA3AF",
     letterSpacing: 0.2,
     opacity: 0.7,
   },

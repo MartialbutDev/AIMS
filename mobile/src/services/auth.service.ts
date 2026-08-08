@@ -12,6 +12,7 @@ export interface LoginResponse {
     last_name: string;
     role: string;
     student_id: string;
+    avatar?: string;
   };
 }
 
@@ -27,8 +28,6 @@ export const authService = {
   // Student Login (Mobile)
   async login(studentId: string, password: string): Promise<LoginResponse> {
     try {
-      // For mobile, students login with student_id
-      // The backend expects email, so we use student_id as email (without @aims.edu)
       const email = studentId;
       
       console.log('🔐 Login attempt:', { email, password: '***' });
@@ -47,8 +46,6 @@ export const authService = {
       return response.data;
     } catch (error: any) {
       console.error('❌ Login error:', error.response?.data || error.message);
-      
-      // Throw a user-friendly error message
       const errorMessage = error.response?.data?.detail || 'Network error. Please try again.';
       throw new Error(errorMessage);
     }
@@ -65,25 +62,6 @@ export const authService = {
         password: '***' 
       });
 
-      const response = await fetch(
-        'http://192.168.100.9:8000/api/v1/auth/register/student',{
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: data.email,
-            password: data.password,
-            first_name: data.first_name,
-            last_name: data.last_name,
-            student_id: data.student_id,
-          }),
-        }
-      );
-      console.log("Status:", response.status);
-      console.log("Response:", await response.text());
-      return{};
-      /*
       const response = await api.post('/auth/register/student', {
         email: data.email,
         password: data.password,
@@ -94,17 +72,15 @@ export const authService = {
       
       console.log('✅ Registration successful:', response.data);
       return response.data;
-       */
+      
     } catch (error: any) {
       console.error('❌ Registration error:', error.response?.data || error.message);
-      
-      // Throw a user-friendly error message
       const errorMessage = error.response?.data?.detail || 'Registration failed. Please try again.';
       throw new Error(errorMessage);
     }
   },
 
-  // Logout
+  // ✅ UPDATED: Logout - Keep avatar
   async logout(): Promise<void> {
     try {
       await SecureStore.deleteItemAsync('access_token');
@@ -115,14 +91,93 @@ export const authService = {
     }
   },
 
-  // Get current user
+  // ✅ UPDATED: Get current user with avatar
   async getCurrentUser(): Promise<any> {
     try {
       const response = await api.get('/auth/me');
+      
+      // Load saved avatar if exists
+      const savedAvatar = await SecureStore.getItemAsync('user_avatar');
+      if (savedAvatar) {
+        response.data.avatar = savedAvatar;
+      }
+      
       return response.data;
     } catch (error: any) {
       console.error('❌ Get user error:', error.response?.data || error.message);
       throw error;
+    }
+  },
+
+  // ✅ UPDATED: Update Profile with Avatar Support
+  async updateProfile(data: { 
+    first_name?: string; 
+    last_name?: string; 
+    phone?: string;
+    avatar?: string;
+  }): Promise<any> {
+    try {
+      console.log('📝 Updating profile:', data);
+      
+      // Save avatar to SecureStore if provided
+      if (data.avatar) {
+        await SecureStore.setItemAsync('user_avatar', data.avatar);
+      }
+      
+      // Only send text fields to backend
+      const updateData: any = {};
+      if (data.first_name) updateData.first_name = data.first_name;
+      if (data.last_name) updateData.last_name = data.last_name;
+      if (data.phone) updateData.phone = data.phone;
+      
+      const response = await api.put('/auth/me', updateData);
+      
+      // Update stored user data with avatar
+      const storedUser = await SecureStore.getItemAsync('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        const updatedUser = { ...user, ...response.data };
+        if (data.avatar) {
+          updatedUser.avatar = data.avatar;
+        }
+        await SecureStore.setItemAsync('user', JSON.stringify(updatedUser));
+      }
+      
+      console.log('✅ Profile updated successfully:', response.data);
+      return { ...response.data, avatar: data.avatar };
+    } catch (error: any) {
+      console.error('❌ Update profile error:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // ✅ NEW: Save Avatar
+  async saveAvatar(avatarUri: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync('user_avatar', avatarUri);
+      console.log('✅ Avatar saved successfully');
+    } catch (error) {
+      console.error('❌ Save avatar error:', error);
+    }
+  },
+
+  // ✅ NEW: Get Avatar
+  async getAvatar(): Promise<string | null> {
+    try {
+      return await SecureStore.getItemAsync('user_avatar');
+    } catch (error) {
+      console.error('❌ Get avatar error:', error);
+      return null;
+    }
+  },
+
+  // ✅ NEW: Delete Avatar
+  async deleteAvatar(): Promise<void> {
+    try {
+      await SecureStore.deleteItemAsync('user_avatar');
+      console.log('✅ Avatar deleted successfully');
+    } catch (error) {
+      console.error('❌ Delete avatar error:', error);
     }
   },
 

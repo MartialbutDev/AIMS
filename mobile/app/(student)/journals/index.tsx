@@ -2,87 +2,26 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-    Dimensions,
-    FlatList,
-    RefreshControl,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  FlatList,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
 } from "react-native";
 
-import Colors from "../../../src/theme/colors";
+import { useTheme } from "../../../src/context/ThemeContext";
+import { journalService, Journal, JournalSummary } from "../../../src/services/journal.service";
 
 const { width } = Dimensions.get("window");
 
-type JournalStatus = "draft" | "submitted" | "reviewing" | "approved" | "rejected";
-
-interface Journal {
-  id: string;
-  week: number;
-  title: string;
-  date: string;
-  status: JournalStatus;
-  summary: string;
-  feedback?: string;
-  createdAt: string;
-}
-
-const mockJournals: Journal[] = [
-  {
-    id: "1",
-    week: 3,
-    title: "Week 3 - Learning React Native",
-    date: "2026-03-15",
-    status: "approved",
-    summary: "This week I focused on learning React Native fundamentals...",
-    feedback: "Great progress! Keep up the good work.",
-    createdAt: "2026-03-15T10:30:00",
-  },
-  {
-    id: "2",
-    week: 2,
-    title: "Week 2 - UI/UX Design Principles",
-    date: "2026-03-08",
-    status: "reviewing",
-    summary: "I explored UI/UX design principles and applied them...",
-    createdAt: "2026-03-08T14:20:00",
-  },
-  {
-    id: "3",
-    week: 1,
-    title: "Week 1 - Getting Started with React",
-    date: "2026-03-01",
-    status: "submitted",
-    summary: "My first week at the internship...",
-    createdAt: "2026-03-01T09:15:00",
-  },
-  {
-    id: "4",
-    week: 0,
-    title: "Week 0 - Orientation and Setup",
-    date: "2026-02-22",
-    status: "rejected",
-    summary: "Orientation week - got to know the team...",
-    feedback: "Please provide more details about your tasks.",
-    createdAt: "2026-02-22T11:00:00",
-  },
-  {
-    id: "5",
-    week: 0,
-    title: "Week 0 - Revised Orientation Report",
-    date: "2026-02-23",
-    status: "draft",
-    summary: "Revised version after feedback...",
-    createdAt: "2026-02-23T16:45:00",
-  },
-];
-
-const statusColors: Record<JournalStatus, string> = {
+const statusColors: Record<string, string> = {
   draft: "#6B7280",
   submitted: "#3B82F6",
   reviewing: "#8B5CF6",
@@ -90,7 +29,7 @@ const statusColors: Record<JournalStatus, string> = {
   rejected: "#EF4444",
 };
 
-const statusIcons: Record<JournalStatus, keyof typeof Ionicons.glyphMap> = {
+const statusIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   draft: "create-outline",
   submitted: "send-sharp",
   reviewing: "refresh-circle-outline",
@@ -98,7 +37,7 @@ const statusIcons: Record<JournalStatus, keyof typeof Ionicons.glyphMap> = {
   rejected: "close-circle-outline",
 };
 
-const statusLabels: Record<JournalStatus, string> = {
+const statusLabels: Record<string, string> = {
   draft: "Draft",
   submitted: "Submitted",
   reviewing: "Reviewing",
@@ -107,18 +46,40 @@ const statusLabels: Record<JournalStatus, string> = {
 };
 
 export default function JournalsScreen() {
-  const [journals, setJournals] = useState(mockJournals);
+  const { colors, isDark } = useTheme();
+  const [journals, setJournals] = useState<Journal[]>([]);
+  const [summary, setSummary] = useState<JournalSummary | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
 
   const filters = ["all", "draft", "submitted", "reviewing", "approved", "rejected"];
-  const weeks: (number | "all")[] = ["all", 0, 1, 2, 3, 4, 5, 6, 7, 8];
+  const weeks: (number | "all")[] = ["all", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [journalsData, summaryData] = await Promise.all([
+        journalService.getMyJournals(),
+        journalService.getJournalSummary(),
+      ]);
+      setJournals(journalsData);
+      setSummary(summaryData);
+    } catch (error) {
+      console.error('Error fetching journals:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setRefreshing(false);
+    await fetchData();
   };
 
   const filteredJournals = journals.filter((journal) => {
@@ -127,79 +88,29 @@ export default function JournalsScreen() {
     return matchesFilter && matchesWeek;
   });
 
-  const getStatusText = (status: JournalStatus) => {
-    return statusLabels[status];
-  };
-
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const getWeekLabel = (week: number) => {
-    return week === 0 ? "Week 0" : `Week ${week}`;
-  };
-
-  const renderFilterChip = (filter: string) => (
-    <TouchableOpacity
-      key={filter}
-      style={[
-        styles.filterChip,
-        selectedFilter === filter && styles.filterChipActive,
-      ]}
-      onPress={() => setSelectedFilter(filter)}
-      activeOpacity={0.7}
-    >
-      <Text
-        style={[
-          styles.filterChipText,
-          selectedFilter === filter && styles.filterChipTextActive,
-        ]}
-      >
-        {filter.charAt(0).toUpperCase() + filter.slice(1)}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  // Fixed: Properly typed renderWeekChip function
-  const renderWeekChip = (week: number | "all") => {
-    const label = week === "all" ? "All Weeks" : getWeekLabel(week as number);
-    return (
-      <TouchableOpacity
-        key={String(week)}
-        style={[
-          styles.weekChip,
-          selectedWeek === week && styles.weekChipActive,
-        ]}
-        onPress={() => setSelectedWeek(week)}
-        activeOpacity={0.7}
-      >
-        <Text
-          style={[
-            styles.weekChipText,
-            selectedWeek === week && styles.weekChipTextActive,
-          ]}
-        >
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
+    return `Week ${week}`;
   };
 
   const renderJournalCard = ({ item }: { item: Journal }) => (
     <TouchableOpacity
-      style={styles.journalCard}
+      style={[styles.journalCard, { backgroundColor: colors.card }]}
       onPress={() => router.push(`/(student)/journals/${item.id}` as any)}
       activeOpacity={0.7}
     >
       <View style={styles.cardHeader}>
         <View style={styles.cardLeft}>
-          <View style={styles.weekBadge}>
-            <Text style={styles.weekBadgeText}>{getWeekLabel(item.week)}</Text>
+          <View style={[styles.weekBadge, { backgroundColor: `${colors.primary}10` }]}>
+            <Text style={[styles.weekBadgeText, { color: colors.primary }]}>{getWeekLabel(item.week)}</Text>
           </View>
           <View style={styles.cardContent}>
-            <Text style={styles.journalTitle}>{item.title}</Text>
-            <Text style={styles.journalDate}>{formatDate(item.date)}</Text>
+            <Text style={[styles.journalTitle, { color: colors.textPrimary }]}>{item.title}</Text>
+            <Text style={[styles.journalDate, { color: colors.textSecondary }]}>{formatDate(item.created_at)}</Text>
           </View>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: `${statusColors[item.status]}15` }]}>
@@ -210,19 +121,19 @@ export default function JournalsScreen() {
             style={styles.statusIcon}
           />
           <Text style={[styles.statusText, { color: statusColors[item.status] }]}>
-            {getStatusText(item.status)}
+            {statusLabels[item.status]}
           </Text>
         </View>
       </View>
 
-      <Text style={styles.journalSummary} numberOfLines={2}>
+      <Text style={[styles.journalSummary, { color: colors.textSecondary }]} numberOfLines={2}>
         {item.summary}
       </Text>
 
       {item.feedback && (
-        <View style={styles.feedbackPreview}>
-          <Ionicons name="chatbubble-ellipses-outline" size={14} color={Colors.textSecondary} />
-          <Text style={styles.feedbackPreviewText} numberOfLines={1}>
+        <View style={[styles.feedbackPreview, { borderTopColor: colors.border }]}>
+          <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.textSecondary} />
+          <Text style={[styles.feedbackPreviewText, { color: colors.textSecondary }]} numberOfLines={1}>
             {item.feedback}
           </Text>
         </View>
@@ -230,69 +141,127 @@ export default function JournalsScreen() {
     </TouchableOpacity>
   );
 
-  const getSummaryStats = () => {
-    const total = journals.length;
-    const submitted = journals.filter(j => j.status === "submitted").length;
-    const approved = journals.filter(j => j.status === "approved").length;
-    const rejected = journals.filter(j => j.status === "rejected").length;
-    return { total, submitted, approved, rejected };
+  const renderFilterChip = (filter: string) => (
+    <TouchableOpacity
+      key={filter}
+      style={[
+        styles.filterChip,
+        { 
+          backgroundColor: selectedFilter === filter ? colors.primary : colors.card,
+          borderColor: selectedFilter === filter ? colors.primary : colors.border,
+        }
+      ]}
+      onPress={() => setSelectedFilter(filter)}
+      activeOpacity={0.7}
+    >
+      <Text
+        style={[
+          styles.filterChipText,
+          { 
+            color: selectedFilter === filter ? '#FFFFFF' : colors.textSecondary 
+          }
+        ]}
+      >
+        {filter.charAt(0).toUpperCase() + filter.slice(1)}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderWeekChip = (week: number | "all") => {
+    const label = week === "all" ? "All Weeks" : getWeekLabel(week as number);
+    return (
+      <TouchableOpacity
+        key={String(week)}
+        style={[
+          styles.weekChip,
+          { 
+            backgroundColor: selectedWeek === week ? colors.primary : colors.card,
+            borderColor: selectedWeek === week ? colors.primary : colors.border,
+          }
+        ]}
+        onPress={() => setSelectedWeek(week)}
+        activeOpacity={0.7}
+      >
+        <Text
+          style={[
+            styles.weekChipText,
+            { 
+              color: selectedWeek === week ? '#FFFFFF' : colors.textSecondary 
+            }
+          ]}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
-  const stats = getSummaryStats();
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading journals...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back-outline" size={24} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Weekly Journals</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Weekly Journals</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => router.push("/(student)/journals/new" as any)}
         >
-          <Ionicons name="add-circle-outline" size={28} color={Colors.primary} />
+          <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* Summary Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: Colors.primary }]}>{stats.total}</Text>
-          <Text style={styles.statLabel}>Total</Text>
+      {summary && (
+        <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>{summary.total}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: "#10B981" }]}>{summary.approved}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Approved</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: "#3B82F6" }]}>{summary.submitted}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Submitted</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: "#6B7280" }]}>{summary.draft}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Draft</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: "#EF4444" }]}>{summary.rejected}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Rejected</Text>
+          </View>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: "#3B82F6" }]}>{stats.submitted}</Text>
-          <Text style={styles.statLabel}>Submitted</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: "#10B981" }]}>{stats.approved}</Text>
-          <Text style={styles.statLabel}>Approved</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: "#EF4444" }]}>{stats.rejected}</Text>
-          <Text style={styles.statLabel}>Rejected</Text>
-        </View>
-      </View>
+      )}
 
-      {/* Week Filter */}
       <View style={styles.filtersWrapper}>
-        <Text style={styles.filterLabel}>Week</Text>
+        <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Week</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.filtersContainer}>
-            {weeks.map((week) => renderWeekChip(week))}
+            {weeks.map(renderWeekChip)}
           </View>
         </ScrollView>
       </View>
 
-      {/* Status Filter */}
       <View style={styles.filtersWrapper}>
-        <Text style={styles.filterLabel}>Status</Text>
+        <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Status</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.filtersContainer}>
             {filters.map(renderFilterChip)}
@@ -300,24 +269,23 @@ export default function JournalsScreen() {
         </ScrollView>
       </View>
 
-      {/* Journals List */}
       <FlatList
         data={filteredJournals}
         renderItem={renderJournalCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="book-outline" size={64} color={Colors.border} />
-            <Text style={styles.emptyStateTitle}>No Journals</Text>
-            <Text style={styles.emptyStateDescription}>
+            <Ionicons name="book-outline" size={64} color={colors.border} />
+            <Text style={[styles.emptyStateTitle, { color: colors.textPrimary }]}>No Journals</Text>
+            <Text style={[styles.emptyStateDescription, { color: colors.textSecondary }]}>
               Start writing your weekly internship journals
             </Text>
             <TouchableOpacity
-              style={styles.emptyStateButton}
+              style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
               onPress={() => router.push("/(student)/journals/new" as any)}
             >
               <Text style={styles.emptyStateButtonText}>Write Journal</Text>
@@ -332,9 +300,15 @@ export default function JournalsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
-
+  centerContent: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -343,24 +317,18 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
   },
-
   backButton: {
     padding: 4,
   },
-
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: Colors.textPrimary,
   },
-
   addButton: {
     padding: 4,
   },
-
   statsContainer: {
     flexDirection: "row",
-    backgroundColor: Colors.white,
     marginHorizontal: 20,
     marginBottom: 12,
     borderRadius: 12,
@@ -368,165 +336,106 @@ const styles = StyleSheet.create({
     shadowColor: "#000000",
     shadowOpacity: 0.04,
     shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-
   statItem: {
     flex: 1,
     alignItems: "center",
   },
-
   statValue: {
     fontSize: 18,
     fontWeight: "700",
   },
-
   statLabel: {
     fontSize: 11,
-    color: Colors.textSecondary,
     marginTop: 2,
   },
-
   statDivider: {
     width: 1,
     height: 30,
-    backgroundColor: Colors.border,
   },
-
   filtersWrapper: {
     paddingHorizontal: 20,
     paddingBottom: 8,
   },
-
   filterLabel: {
     fontSize: 13,
     fontWeight: "600",
-    color: Colors.textSecondary,
     marginBottom: 6,
   },
-
   filtersContainer: {
     flexDirection: "row",
     gap: 8,
   },
-
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: Colors.border,
     marginRight: 8,
   },
-
-  filterChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-
   filterChipText: {
     fontSize: 12,
     fontWeight: "500",
-    color: Colors.textSecondary,
   },
-
-  filterChipTextActive: {
-    color: Colors.white,
-  },
-
   weekChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: Colors.border,
     marginRight: 8,
   },
-
-  weekChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-
   weekChipText: {
     fontSize: 12,
     fontWeight: "500",
-    color: Colors.textSecondary,
   },
-
-  weekChipTextActive: {
-    color: Colors.white,
-  },
-
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-
   journalCard: {
-    backgroundColor: Colors.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     shadowColor: "#000000",
     shadowOpacity: 0.04,
     shadowRadius: 12,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 8,
   },
-
   cardLeft: {
     flexDirection: "row",
     alignItems: "center",
     flex: 1,
   },
-
   weekBadge: {
-    backgroundColor: `${Colors.primary}10`,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
     marginRight: 10,
   },
-
   weekBadgeText: {
     fontSize: 11,
     fontWeight: "600",
-    color: Colors.primary,
   },
-
   cardContent: {
     flex: 1,
   },
-
   journalTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: Colors.textPrimary,
   },
-
   journalDate: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginTop: 2,
   },
-
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -535,69 +444,53 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginLeft: 8,
   },
-
   statusIcon: {
     marginRight: 3,
   },
-
   statusText: {
     fontSize: 10,
     fontWeight: "600",
   },
-
   journalSummary: {
     fontSize: 13,
-    color: Colors.textSecondary,
     lineHeight: 18,
     marginTop: 4,
   },
-
   feedbackPreview: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
   },
-
   feedbackPreviewText: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginLeft: 6,
     flex: 1,
   },
-
   emptyState: {
     alignItems: "center",
     paddingVertical: 60,
   },
-
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: Colors.textPrimary,
     marginTop: 16,
   },
-
   emptyStateDescription: {
     fontSize: 14,
-    color: Colors.textSecondary,
     textAlign: "center",
     marginTop: 8,
     paddingHorizontal: 40,
   },
-
   emptyStateButton: {
-    backgroundColor: Colors.primary,
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 20,
   },
-
   emptyStateButtonText: {
-    color: Colors.white,
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
   },

@@ -1,8 +1,8 @@
+// mobile/src/services/api.ts
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
-
-// Use your computer's IP address (192.168.1.64)
-const API_URL = 'http://192.168.100.9:8000/api/v1';
+import { API_URL } from '../config/env';
+import { router } from 'expo-router';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -12,16 +12,40 @@ const api = axios.create({
   timeout: 10000,
 });
 
-// Add token to requests
+// Request interceptor - Add token to every request
 api.interceptors.request.use(
   async (config) => {
-    const token = await SecureStore.getItemAsync('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const token = await SecureStore.getItemAsync('access_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    } catch (error) {
+      console.error('Error getting token:', error);
+      return config;
     }
-    return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor - Handle 401 errors
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid - clear storage and redirect to login
+      try {
+        await SecureStore.deleteItemAsync('access_token');
+        await SecureStore.deleteItemAsync('user');
+        // Navigate to login
+        router.replace('/(auth)/login');
+      } catch (e) {
+        console.error('Error clearing session:', e);
+      }
+    }
     return Promise.reject(error);
   }
 );

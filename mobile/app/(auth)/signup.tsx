@@ -4,28 +4,29 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import AppLogo from "../../src/components/common/AppLogo";
 import { APP_NAME, APP_VERSION } from "../../src/constants/app";
-import Colors from "../../src/theme/colors";
+import { useTheme } from "../../src/context/ThemeContext";
 import { authService } from "../../src/services/auth.service";
 
 const { height } = Dimensions.get("window");
 
 export default function SignUpScreen() {
+  const { colors } = useTheme();
   const [fullName, setFullName] = useState("");
   const [studentId, setStudentId] = useState("");
   const [email, setEmail] = useState("");
@@ -58,7 +59,6 @@ export default function SignUpScreen() {
   const validateForm = (): boolean => {
     let isValid = true;
 
-    // Split full name into first and last name
     const nameParts = fullName.trim().split(' ');
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -124,7 +124,6 @@ export default function SignUpScreen() {
       return;
     }
 
-    // Split full name into first and last name
     const nameParts = fullName.trim().split(' ');
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -133,15 +132,6 @@ export default function SignUpScreen() {
     setSuccess(false);
 
     try {
-      console.log('📝 Registration data:', {
-        email: email.trim(),
-        studentId: studentId.trim(),
-        firstName,
-        lastName,
-        password: '***'
-      });
-
-      // 🔥 REAL BACKEND API CALL
       const response = await authService.register({
         email: email.trim(),
         password: password.trim(),
@@ -151,18 +141,15 @@ export default function SignUpScreen() {
       });
 
       console.log('✅ Registration successful:', response);
-
       setSuccess(true);
-      
-      // Show success message
+
       Alert.alert(
         "Registration Successful!",
         "Your account has been created. Please login to continue.",
         [
-          { 
-            text: "Go to Login", 
+          {
+            text: "Go to Login",
             onPress: () => {
-              // Clear form
               setFullName("");
               setStudentId("");
               setEmail("");
@@ -176,8 +163,6 @@ export default function SignUpScreen() {
       );
     } catch (error: any) {
       console.log('❌ Registration error:', error);
-      
-      // Show error message from backend
       const errorMessage = error.message || "Registration failed. Please try again.";
       Alert.alert("Registration Failed", errorMessage);
     } finally {
@@ -210,11 +195,11 @@ export default function SignUpScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="light" />
 
-      {/* Navy Blue Background - Top Section (Absolute) */}
-      <View style={styles.navySection}>
+      {/* ✅ FIXED: Hardcoded #000080 */}
+      <View style={[styles.navySection, { backgroundColor: '#000080' }]}>
         <View style={styles.circleTopLeft} pointerEvents="none" />
         <View style={styles.circleBottomRight} pointerEvents="none" />
         <View style={styles.dotGridTopRight} pointerEvents="none">
@@ -229,8 +214,7 @@ export default function SignUpScreen() {
         </View>
       </View>
 
-      {/* Content on top of everything */}
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -241,61 +225,61 @@ export default function SignUpScreen() {
             bounces={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Header Content - on Navy Background */}
             <View style={styles.headerContent}>
               <View style={styles.logoWrapper}>
                 <AppLogo size={100} decorative={true} variant="login" />
               </View>
-              <Text style={styles.brandTitle}>
-                A<Text style={styles.brandTitleAccent}>I</Text>MS
+              <Text style={[styles.brandTitle, { color: '#FFFFFF' }]}>
+                A<Text style={[styles.brandTitleAccent, { color: "#F5A623" }]}>I</Text>MS
               </Text>
-              <Text style={styles.systemTitle}>Academic Internship Management System</Text>
+              <Text style={[styles.systemTitle, { color: '#FFFFFF', opacity: 0.9 }]}>
+                Academic Internship Management System
+              </Text>
             </View>
 
-            {/* Floating Card */}
             <View style={styles.cardWrapper}>
-              <View style={styles.card}>
+              <View style={[styles.card, { backgroundColor: colors.card }]}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.welcomeText}>Create Account</Text>
-                  <Text style={styles.subtitleText}>
+                  <Text style={[styles.welcomeText, { color: colors.textPrimary }]}>Create Account</Text>
+                  <Text style={[styles.subtitleText, { color: colors.textSecondary }]}>
                     Sign up to get started with your internship
                   </Text>
                 </View>
 
                 <View style={styles.formContainer}>
                   {success && (
-                    <View style={styles.successContainer}>
+                    <View style={[styles.successContainer, { backgroundColor: `${colors.success}15`, borderColor: `${colors.success}30` }]}>
                       <Ionicons
                         name="checkmark-circle-outline"
                         size={24}
-                        color={Colors.success}
+                        color={colors.success}
                         style={styles.successIcon}
                       />
-                      <Text style={styles.successText}>
+                      <Text style={[styles.successText, { color: colors.textPrimary }]}>
                         Account created successfully!{'\n'}
                         Please login to continue.
                       </Text>
                     </View>
                   )}
 
-                  {/* Full Name */}
                   <View style={styles.fieldWrapper}>
-                    <Text style={styles.fieldLabel}>Full Name</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Full Name</Text>
                     <View
                       style={[
                         styles.inputWrapper,
-                        isFullNameFocused && styles.inputWrapperFocused,
-                        fullNameError ? styles.inputWrapperError : null,
+                        { backgroundColor: colors.background, borderColor: colors.border },
+                        isFullNameFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        fullNameError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
                       ]}
                     >
                       <Ionicons
                         name="person-outline"
                         size={20}
-                        color={isFullNameFocused ? Colors.primary : "#8A8A8A"}
+                        color={isFullNameFocused ? colors.primary : "#8A8A8A"}
                         style={styles.inputIcon}
                       />
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your full name"
                         placeholderTextColor="#A0A0A0"
                         value={fullName}
@@ -312,28 +296,28 @@ export default function SignUpScreen() {
                         accessibilityLabel="Full Name"
                       />
                     </View>
-                    {fullNameError ? <Text style={styles.errorText}>{fullNameError}</Text> : null}
+                    {fullNameError ? <Text style={[styles.errorText, { color: colors.error }]}>{fullNameError}</Text> : null}
                   </View>
 
-                  {/* Student ID */}
                   <View style={styles.fieldWrapper}>
-                    <Text style={styles.fieldLabel}>Student ID</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Student ID</Text>
                     <View
                       style={[
                         styles.inputWrapper,
-                        isStudentIdFocused && styles.inputWrapperFocused,
-                        studentIdError ? styles.inputWrapperError : null,
+                        { backgroundColor: colors.background, borderColor: colors.border },
+                        isStudentIdFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        studentIdError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
                       ]}
                     >
                       <Ionicons
                         name="school-outline"
                         size={20}
-                        color={isStudentIdFocused ? Colors.primary : "#8A8A8A"}
+                        color={isStudentIdFocused ? colors.primary : "#8A8A8A"}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         ref={studentIdRef}
-                        style={styles.input}
+                        style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your student ID"
                         placeholderTextColor="#A0A0A0"
                         value={studentId}
@@ -351,28 +335,28 @@ export default function SignUpScreen() {
                         accessibilityLabel="Student ID"
                       />
                     </View>
-                    {studentIdError ? <Text style={styles.errorText}>{studentIdError}</Text> : null}
+                    {studentIdError ? <Text style={[styles.errorText, { color: colors.error }]}>{studentIdError}</Text> : null}
                   </View>
 
-                  {/* Email */}
                   <View style={styles.fieldWrapper}>
-                    <Text style={styles.fieldLabel}>Email</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Email</Text>
                     <View
                       style={[
                         styles.inputWrapper,
-                        isEmailFocused && styles.inputWrapperFocused,
-                        emailError ? styles.inputWrapperError : null,
+                        { backgroundColor: colors.background, borderColor: colors.border },
+                        isEmailFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        emailError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
                       ]}
                     >
                       <Ionicons
                         name="mail-outline"
                         size={20}
-                        color={isEmailFocused ? Colors.primary : "#8A8A8A"}
+                        color={isEmailFocused ? colors.primary : "#8A8A8A"}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         ref={emailRef}
-                        style={styles.input}
+                        style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your email"
                         placeholderTextColor="#A0A0A0"
                         value={email}
@@ -391,28 +375,28 @@ export default function SignUpScreen() {
                         accessibilityLabel="Email"
                       />
                     </View>
-                    {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+                    {emailError ? <Text style={[styles.errorText, { color: colors.error }]}>{emailError}</Text> : null}
                   </View>
 
-                  {/* Password */}
                   <View style={styles.fieldWrapper}>
-                    <Text style={styles.fieldLabel}>Password</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Password</Text>
                     <View
                       style={[
                         styles.inputWrapper,
-                        isPasswordFocused && styles.inputWrapperFocused,
-                        passwordError ? styles.inputWrapperError : null,
+                        { backgroundColor: colors.background, borderColor: colors.border },
+                        isPasswordFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        passwordError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
                       ]}
                     >
                       <Ionicons
                         name="lock-closed-outline"
                         size={20}
-                        color={isPasswordFocused ? Colors.primary : "#8A8A8A"}
+                        color={isPasswordFocused ? colors.primary : "#8A8A8A"}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         ref={passwordRef}
-                        style={styles.input}
+                        style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your password"
                         placeholderTextColor="#A0A0A0"
                         secureTextEntry={!showPassword}
@@ -445,28 +429,28 @@ export default function SignUpScreen() {
                         />
                       </TouchableOpacity>
                     </View>
-                    {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
+                    {passwordError ? <Text style={[styles.errorText, { color: colors.error }]}>{passwordError}</Text> : null}
                   </View>
 
-                  {/* Confirm Password */}
                   <View style={styles.fieldWrapper}>
-                    <Text style={styles.fieldLabel}>Confirm Password</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Confirm Password</Text>
                     <View
                       style={[
                         styles.inputWrapper,
-                        isConfirmPasswordFocused && styles.inputWrapperFocused,
-                        confirmPasswordError ? styles.inputWrapperError : null,
+                        { backgroundColor: colors.background, borderColor: colors.border },
+                        isConfirmPasswordFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        confirmPasswordError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
                       ]}
                     >
                       <Ionicons
                         name="shield-checkmark-outline"
                         size={20}
-                        color={isConfirmPasswordFocused ? Colors.primary : "#8A8A8A"}
+                        color={isConfirmPasswordFocused ? colors.primary : "#8A8A8A"}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         ref={confirmPasswordRef}
-                        style={styles.input}
+                        style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Confirm your password"
                         placeholderTextColor="#A0A0A0"
                         secureTextEntry={!showConfirmPassword}
@@ -498,11 +482,11 @@ export default function SignUpScreen() {
                         />
                       </TouchableOpacity>
                     </View>
-                    {confirmPasswordError ? <Text style={styles.errorText}>{confirmPasswordError}</Text> : null}
+                    {confirmPasswordError ? <Text style={[styles.errorText, { color: colors.error }]}>{confirmPasswordError}</Text> : null}
                   </View>
 
                   <TouchableOpacity
-                    style={[styles.signUpButton, loading && styles.signUpButtonDisabled]}
+                    style={[styles.signUpButton, loading && styles.signUpButtonDisabled, { backgroundColor: colors.primary }]}
                     onPress={handleSignUp}
                     disabled={loading}
                     activeOpacity={0.8}
@@ -510,40 +494,40 @@ export default function SignUpScreen() {
                     accessibilityState={{ disabled: loading, busy: loading }}
                   >
                     {loading ? (
-                      <ActivityIndicator color={Colors.white} />
+                      <ActivityIndicator color="#FFFFFF" />
                     ) : (
                       <View style={styles.signUpButtonContent}>
                         <Ionicons
                           name="person-add-outline"
                           size={20}
-                          color={Colors.white}
+                          color="#FFFFFF"
                           style={styles.signUpButtonIcon}
                         />
-                        <Text style={styles.signUpButtonText}>Create Account</Text>
+                        <Text style={[styles.signUpButtonText, { color: '#FFFFFF' }]}>Create Account</Text>
                       </View>
                     )}
                   </TouchableOpacity>
 
                   <View style={styles.loginContainer}>
-                    <Text style={styles.loginText}>
+                    <Text style={[styles.loginText, { color: colors.textSecondary }]}>
                       Already have an account?
                     </Text>
                     <TouchableOpacity
                       onPress={handleLogin}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.loginLink}> Login</Text>
+                      <Text style={[styles.loginLink, { color: colors.primary }]}> Login</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               </View>
             </View>
 
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>
+            <View style={[styles.footer, { backgroundColor: colors.background }]}>
+              <Text style={[styles.footerText, { color: colors.textSecondary }]}>
                 © {new Date().getFullYear()} {APP_NAME}
               </Text>
-              <Text style={styles.versionText}>{APP_VERSION}</Text>
+              <Text style={[styles.versionText, { color: colors.textSecondary }]}>{APP_VERSION}</Text>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -553,10 +537,8 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  // ... (all your existing styles remain the same)
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
 
   navySection: {
@@ -565,7 +547,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: height * 0.40,
-    backgroundColor: Colors.primary,
     overflow: 'hidden',
   },
 
@@ -644,7 +625,6 @@ const styles = StyleSheet.create({
   },
 
   brandTitle: {
-    color: Colors.white,
     fontSize: 30,
     fontWeight: "800",
     letterSpacing: 2,
@@ -656,12 +636,10 @@ const styles = StyleSheet.create({
   },
 
   systemTitle: {
-    color: Colors.white,
     fontSize: 14,
     fontWeight: "500",
     textAlign: "center",
     letterSpacing: 0.5,
-    opacity: 0.9,
     marginBottom: 10,
   },
 
@@ -671,7 +649,6 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: Colors.white,
     borderRadius: 24,
     paddingHorizontal: 24,
     paddingVertical: 28,
@@ -692,14 +669,12 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 26,
     fontWeight: "700",
-    color: Colors.textPrimary,
     letterSpacing: -0.3,
     marginBottom: 4,
   },
 
   subtitleText: {
     fontSize: 14,
-    color: Colors.textSecondary,
     lineHeight: 20,
     letterSpacing: 0.2,
   },
@@ -711,12 +686,10 @@ const styles = StyleSheet.create({
   successContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: `${Colors.success}15`,
     padding: 14,
     borderRadius: 12,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: `${Colors.success}30`,
   },
 
   successIcon: {
@@ -726,7 +699,6 @@ const styles = StyleSheet.create({
   successText: {
     flex: 1,
     fontSize: 13,
-    color: Colors.textPrimary,
     lineHeight: 18,
   },
 
@@ -737,28 +709,24 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.textPrimary,
     marginBottom: 6,
   },
 
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.background,
     borderWidth: 1,
-    borderColor: Colors.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 50,
   },
 
   inputWrapperFocused: {
-    borderColor: Colors.primary,
     borderWidth: 1.5,
   },
 
   inputWrapperError: {
-    borderColor: Colors.error,
+    borderColor: '#EF4444',
   },
 
   inputIcon: {
@@ -768,23 +736,19 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: Colors.textPrimary,
   },
 
   errorText: {
-    color: Colors.error,
     fontSize: 12,
     marginTop: 4,
     marginLeft: 4,
   },
 
   signUpButton: {
-    backgroundColor: Colors.primary,
     height: 52,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: Colors.primary,
     shadowOpacity: 0.25,
     shadowRadius: 10,
     shadowOffset: {
@@ -811,7 +775,6 @@ const styles = StyleSheet.create({
   },
 
   signUpButtonText: {
-    color: Colors.white,
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 0.5,
@@ -826,17 +789,14 @@ const styles = StyleSheet.create({
 
   loginText: {
     fontSize: 14,
-    color: Colors.textSecondary,
   },
 
   loginLink: {
     fontSize: 14,
     fontWeight: "700",
-    color: Colors.primary,
   },
 
   footer: {
-    backgroundColor: Colors.background,
     paddingHorizontal: 24,
     paddingBottom: 16,
     paddingTop: 16,
@@ -846,7 +806,6 @@ const styles = StyleSheet.create({
 
   footerText: {
     fontSize: 11,
-    color: Colors.textSecondary,
     fontWeight: "400",
     letterSpacing: 0.2,
     textAlign: "center",
@@ -855,7 +814,6 @@ const styles = StyleSheet.create({
 
   versionText: {
     fontSize: 10,
-    color: "#9CA3AF",
     letterSpacing: 0.2,
     opacity: 0.7,
   },

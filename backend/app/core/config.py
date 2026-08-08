@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql://aims:aims_password@localhost:5432/aims_db"
 
-    #ocr
-    ASSET_DIR: str = os.path.join(os.path.dirname(__file__), "app/static")
+    # OCR - FIXED: Correct path to assets folder
+    ASSET_DIR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "assets")
 
     # Security
     SECRET_KEY: str = "your-super-secret-key-change-in-production"

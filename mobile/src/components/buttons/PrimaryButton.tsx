@@ -1,3 +1,4 @@
+// src/components/buttons/PrimaryButton.tsx
 import { Pressable, StyleSheet, Text } from "react-native";
 import Colors from "../../theme/colors";
 
@@ -31,7 +32,7 @@ export default function PrimaryButton({
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: Colors.white,
+    backgroundColor: '#FFFFFF',
     paddingVertical: 16,
     paddingHorizontal: 60,
     borderRadius: 50,
@@ -48,12 +49,12 @@ const styles = StyleSheet.create({
   },
 
   text: {
-    color: Colors.primary,
+    color: '#000080',
     fontWeight: "700",
     fontSize: 18,
   },
 
   textDisabled: {
-    color: Colors.textSecondary,
+    color: '#64748B',
   },
 });

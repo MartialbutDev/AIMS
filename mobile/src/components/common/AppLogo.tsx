@@ -37,6 +37,6 @@ export default function AppLogo({
 
 const styles = StyleSheet.create({
   logo: {
-    // Size is now dynamic via props
+    // Size is dynamic
   },
 });

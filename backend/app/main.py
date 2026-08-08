@@ -1,19 +1,12 @@
 import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.api.v1 import router as api_v1_router  # ← ADD THIS
-
-from app.routers import ocr
-from fastapi.staticfiles import StaticFiles
-
-from app.routers.ocr import ocr_router
-from app.models.document import Document
-from app.models.user import User
+from app.api.v1 import router as api_v1_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -36,13 +29,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True,)
-
-# Register API routes - ADD THIS SECTION
+# Register API routes (this includes documents router now)
 app.include_router(api_v1_router, prefix="/api/v1")
 
+# Create assets directory if it doesn't exist
+os.makedirs(settings.ASSET_DIR, exist_ok=True)
+os.makedirs(os.path.join(settings.ASSET_DIR, "uploads"), exist_ok=True)
 
+# Static files (for serving uploaded documents)
+app.mount("/static", StaticFiles(directory=settings.ASSET_DIR), name="static")
 
 
 @app.get("/")
@@ -76,5 +71,5 @@ async def db_health_check():
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
 
-#ocr
-app.include_router(ocr_router)
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
