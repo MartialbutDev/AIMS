@@ -2,13 +2,14 @@
 import { router } from "expo-router";
 import { SafeAreaView, ScrollView, StyleSheet, RefreshControl, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as SecureStore from "expo-secure-store";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { dashboardService } from "../../../src/services/dashboard.service";
 import { notificationService } from "../../../src/services/notification.service";
 import { authService } from "../../../src/services/auth.service";
+import { useScrollContext } from "../../../src/context/ScrollContext";
 
 import HeroCard from "../../../src/components/dashboard/HeroCard";
 import InternshipProgressCard from "../../../src/components/dashboard/InternshipProgressCard";
@@ -34,6 +35,7 @@ const mockDeadlines: DeadlineItem[] = [
 
 export default function DashboardScreen() {
   const { colors, isDark } = useTheme();
+  const { setScrollValue } = useScrollContext();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
@@ -43,6 +45,9 @@ export default function DashboardScreen() {
   const [userName, setUserName] = useState("Student");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [currentDate] = useState(formatDate(new Date()));
+  
+  // Track scroll position
+  const lastScrollY = useRef(0);
 
   function getGreeting(): string {
     const hour = new Date().getHours();
@@ -65,16 +70,12 @@ export default function DashboardScreen() {
     fetchNotificationCount();
   }, []);
 
-  // ✅ Load user data from SecureStore
   const loadUserData = async () => {
     try {
-      // Get user data from SecureStore
       const userData = await SecureStore.getItemAsync('user');
       if (userData) {
         const user = JSON.parse(userData);
         setUserName(user.first_name || "Student");
-        
-        // Load avatar
         const avatar = await authService.getAvatar();
         if (avatar) {
           setUserAvatar(avatar);
@@ -114,13 +115,26 @@ export default function DashboardScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // ✅ Reload user data on refresh
     await loadUserData();
     await Promise.all([fetchDashboardData(), fetchNotificationCount()]);
   };
 
   const navigateTo = (route: string) => {
     router.push(route as any);
+  };
+
+  // Handle scroll to hide/show tab bar
+  const handleScroll = (event: any) => {
+    const currentOffsetY = event.nativeEvent.contentOffset.y;
+    const diff = currentOffsetY - lastScrollY.current;
+    
+    if (diff > 5) {
+      setScrollValue(1);
+    } else if (diff < -5) {
+      setScrollValue(0);
+    }
+    
+    lastScrollY.current = currentOffsetY;
   };
 
   if (loading) {
@@ -145,11 +159,13 @@ export default function DashboardScreen() {
           />
         }
         contentContainerStyle={styles.scrollContent}
+        scrollEventThrottle={16}
+        onScroll={handleScroll}
       >
         <HeroCard
           greeting={greeting}
           userName={userName}
-          userAvatar={userAvatar}  // ✅ Pass avatar to HeroCard
+          userAvatar={userAvatar}
           currentDate={currentDate}
           notificationCount={notificationCount}
           onNotificationPress={() => navigateTo("/(student)/notifications")}

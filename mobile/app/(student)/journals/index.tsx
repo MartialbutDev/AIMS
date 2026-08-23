@@ -17,6 +17,7 @@ import {
 } from "react-native";
 
 import { useTheme } from "../../../src/context/ThemeContext";
+import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import { journalService, Journal, JournalSummary } from "../../../src/services/journal.service";
 
 const { width } = Dimensions.get("window");
@@ -47,6 +48,7 @@ const statusLabels: Record<string, string> = {
 
 export default function JournalsScreen() {
   const { colors, isDark } = useTheme();
+  const { handleScroll } = useAutoHideTab();
   const [journals, setJournals] = useState<Journal[]>([]);
   const [summary, setSummary] = useState<JournalSummary | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -277,6 +279,8 @@ export default function JournalsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="book-outline" size={64} color={colors.border} />

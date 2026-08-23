@@ -17,6 +17,7 @@ import {
 } from "react-native";
 
 import { useTheme } from "../../../src/context/ThemeContext";
+import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import { dtrService, DTR, DTRSummary } from "../../../src/services/dtr.service";
 
 const { width } = Dimensions.get("window");
@@ -44,6 +45,7 @@ const statusLabels: Record<string, string> = {
 
 export default function DTRScreen() {
   const { colors, isDark } = useTheme();
+  const { handleScroll } = useAutoHideTab();
   const [dtrs, setDTRs] = useState<DTR[]>([]);
   const [summary, setSummary] = useState<DTRSummary | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -242,6 +244,8 @@ export default function DTRScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={64} color={colors.border} />

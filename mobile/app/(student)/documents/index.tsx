@@ -16,6 +16,7 @@ import {
 import * as SecureStore from 'expo-secure-store';
 
 import { useTheme } from "../../../src/context/ThemeContext";
+import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import api from "../../../src/services/api";
 import DocumentPreview from "../../../src/components/documents/DocumentPreview";
 import { BASE_URL } from "../../../src/config/env";
@@ -31,11 +32,11 @@ interface Document {
 
 export default function DocumentsScreen() {
   const { colors, isDark } = useTheme();
+  const { handleScroll } = useAutoHideTab();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   
-  // Preview state
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewImage, setPreviewImage] = useState<string>("");
   const [previewType, setPreviewType] = useState<string>("");
@@ -86,7 +87,6 @@ export default function DocumentsScreen() {
 
   const handlePreview = async (document: Document) => {
     try {
-      // ✅ Get token and add as query parameter
       const token = await SecureStore.getItemAsync('access_token');
       const imageUrl = `${BASE_URL}/api/v1/documents/${document.id}/image?token=${encodeURIComponent(token || '')}`;
       
@@ -183,6 +183,8 @@ export default function DocumentsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="document-text-outline" size={64} color={colors.border} />
@@ -200,7 +202,6 @@ export default function DocumentsScreen() {
         }
       />
 
-      {/* Document Preview Modal */}
       <DocumentPreview
         visible={previewVisible}
         imageUri={previewImage}

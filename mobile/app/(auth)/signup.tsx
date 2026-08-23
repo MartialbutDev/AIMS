@@ -26,7 +26,7 @@ import { authService } from "../../src/services/auth.service";
 const { height } = Dimensions.get("window");
 
 export default function SignUpScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark, toggleTheme } = useTheme();
   const [fullName, setFullName] = useState("");
   const [studentId, setStudentId] = useState("");
   const [email, setEmail] = useState("");
@@ -196,10 +196,12 @@ export default function SignUpScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? "light" : "dark"} />
 
-      {/* ✅ FIXED: Hardcoded #000080 */}
-      <View style={[styles.navySection, { backgroundColor: '#000080' }]}>
+      <View style={[
+        styles.navySection,
+        { backgroundColor: isDark ? "#000066" : "#000080" }
+      ]}>
         <View style={styles.circleTopLeft} pointerEvents="none" />
         <View style={styles.circleBottomRight} pointerEvents="none" />
         <View style={styles.dotGridTopRight} pointerEvents="none">
@@ -213,6 +215,26 @@ export default function SignUpScreen() {
           ))}
         </View>
       </View>
+
+      {/* ✅ Dark Mode Toggle Button - OUTSIDE the navy section */}
+      <TouchableOpacity
+        style={[
+          styles.themeToggle,
+          {
+            backgroundColor: isDark
+              ? "rgba(0,0,0,0.5)"
+              : "rgba(255,255,255,0.2)",
+          },
+        ]}
+        onPress={toggleTheme}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name={isDark ? "sunny-outline" : "moon-outline"}
+          size={24}
+          color="#FFFFFF"
+        />
+      </TouchableOpacity>
 
       <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
         <KeyboardAvoidingView
@@ -275,13 +297,13 @@ export default function SignUpScreen() {
                       <Ionicons
                         name="person-outline"
                         size={20}
-                        color={isFullNameFocused ? colors.primary : "#8A8A8A"}
+                        color={isFullNameFocused ? colors.primary : colors.textSecondary}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your full name"
-                        placeholderTextColor="#A0A0A0"
+                        placeholderTextColor={colors.textTertiary}
                         value={fullName}
                         onChangeText={(text) => {
                           setFullName(text);
@@ -312,14 +334,14 @@ export default function SignUpScreen() {
                       <Ionicons
                         name="school-outline"
                         size={20}
-                        color={isStudentIdFocused ? colors.primary : "#8A8A8A"}
+                        color={isStudentIdFocused ? colors.primary : colors.textSecondary}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         ref={studentIdRef}
                         style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your student ID"
-                        placeholderTextColor="#A0A0A0"
+                        placeholderTextColor={colors.textTertiary}
                         value={studentId}
                         onChangeText={(text) => {
                           setStudentId(text);
@@ -351,14 +373,14 @@ export default function SignUpScreen() {
                       <Ionicons
                         name="mail-outline"
                         size={20}
-                        color={isEmailFocused ? colors.primary : "#8A8A8A"}
+                        color={isEmailFocused ? colors.primary : colors.textSecondary}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         ref={emailRef}
                         style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your email"
-                        placeholderTextColor="#A0A0A0"
+                        placeholderTextColor={colors.textTertiary}
                         value={email}
                         onChangeText={(text) => {
                           setEmail(text);
@@ -391,14 +413,14 @@ export default function SignUpScreen() {
                       <Ionicons
                         name="lock-closed-outline"
                         size={20}
-                        color={isPasswordFocused ? colors.primary : "#8A8A8A"}
+                        color={isPasswordFocused ? colors.primary : colors.textSecondary}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         ref={passwordRef}
                         style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your password"
-                        placeholderTextColor="#A0A0A0"
+                        placeholderTextColor={colors.textTertiary}
                         secureTextEntry={!showPassword}
                         value={password}
                         onChangeText={(text) => {
@@ -425,7 +447,7 @@ export default function SignUpScreen() {
                         <Ionicons
                           name={showPassword ? "eye-off-outline" : "eye-outline"}
                           size={20}
-                          color="#8A8A8A"
+                          color={colors.textSecondary}
                         />
                       </TouchableOpacity>
                     </View>
@@ -445,14 +467,14 @@ export default function SignUpScreen() {
                       <Ionicons
                         name="shield-checkmark-outline"
                         size={20}
-                        color={isConfirmPasswordFocused ? colors.primary : "#8A8A8A"}
+                        color={isConfirmPasswordFocused ? colors.primary : colors.textSecondary}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         ref={confirmPasswordRef}
                         style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Confirm your password"
-                        placeholderTextColor="#A0A0A0"
+                        placeholderTextColor={colors.textTertiary}
                         secureTextEntry={!showConfirmPassword}
                         value={confirmPassword}
                         onChangeText={(text) => {
@@ -478,7 +500,7 @@ export default function SignUpScreen() {
                         <Ionicons
                           name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
                           size={20}
-                          color="#8A8A8A"
+                          color={colors.textSecondary}
                         />
                       </TouchableOpacity>
                     </View>
@@ -548,6 +570,25 @@ const styles = StyleSheet.create({
     right: 0,
     height: height * 0.40,
     overflow: 'hidden',
+  },
+
+  themeToggle: {
+    position: "absolute",
+    top: 55,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
 
   circleTopLeft: {

@@ -9,7 +9,7 @@ import { useTheme } from "../../context/ThemeContext";
 interface HeroCardProps {
   greeting: string;
   userName: string;
-  userAvatar?: string | null;  // ✅ NEW
+  userAvatar?: string | null;
   currentDate: string;
   notificationCount: number;
   onNotificationPress: () => void;

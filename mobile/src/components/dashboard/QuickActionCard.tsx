@@ -24,6 +24,16 @@ export default function QuickActionCard({
 }: QuickActionCardProps) {
   const { colors, isDark } = useTheme();
 
+  // ✅ Only Apply Internship icon turns white in dark mode
+  const getIconColor = () => {
+    // Apply Internship icon (briefcase-outline) turns white in dark mode
+    if (icon === "briefcase-outline" && isDark) {
+      return "#FFFFFF";
+    }
+    // All other icons keep their original color
+    return color;
+  };
+
   return (
     <MotiView
       from={{ scale: 0.95, opacity: 0 }}
@@ -46,12 +56,12 @@ export default function QuickActionCard({
           <View style={[
             styles.iconContainer,
             {
-              backgroundColor: `${color}15`,  // ← Same as StatisticCard
+              backgroundColor: `${color}15`,
               borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
               borderWidth: 1,
             }
           ]}>
-            <Ionicons name={icon} size={22} color={color} />
+            <Ionicons name={icon} size={22} color={getIconColor()} />
           </View>
           <View style={styles.textContainer}>
             <Text style={[styles.label, { color: colors.textPrimary }]}>{label}</Text>

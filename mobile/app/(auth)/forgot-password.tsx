@@ -24,7 +24,7 @@ import { useTheme } from "../../src/context/ThemeContext";
 const { height } = Dimensions.get("window");
 
 export default function ForgotPasswordScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark, toggleTheme } = useTheme();
   const [studentId, setStudentId] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -71,9 +71,12 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? "light" : "dark"} />
 
-      <View style={[styles.navySection, { backgroundColor: colors.primary }]}>
+      <View style={[
+        styles.navySection,
+        { backgroundColor: isDark ? "#000066" : "#000080" }
+      ]}>
         <View style={styles.circleTopLeft} pointerEvents="none" />
         <View style={styles.circleBottomRight} pointerEvents="none" />
         <View style={styles.dotGridTopRight} pointerEvents="none">
@@ -87,6 +90,26 @@ export default function ForgotPasswordScreen() {
           ))}
         </View>
       </View>
+
+      {/* ✅ Dark Mode Toggle Button - OUTSIDE the navy section */}
+      <TouchableOpacity
+        style={[
+          styles.themeToggle,
+          {
+            backgroundColor: isDark
+              ? "rgba(0,0,0,0.5)"
+              : "rgba(255,255,255,0.2)",
+          },
+        ]}
+        onPress={toggleTheme}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name={isDark ? "sunny-outline" : "moon-outline"}
+          size={24}
+          color="#FFFFFF"
+        />
+      </TouchableOpacity>
 
       <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
         <KeyboardAvoidingView
@@ -149,13 +172,13 @@ export default function ForgotPasswordScreen() {
                       <Ionicons
                         name="person-outline"
                         size={20}
-                        color={isFocused ? colors.primary : "#8A8A8A"}
+                        color={isFocused ? colors.primary : colors.textSecondary}
                         style={styles.inputIcon}
                       />
                       <TextInput
                         style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your student ID"
-                        placeholderTextColor="#A0A0A0"
+                        placeholderTextColor={colors.textTertiary}
                         value={studentId}
                         onChangeText={(text) => {
                           setStudentId(text);
@@ -240,6 +263,25 @@ const styles = StyleSheet.create({
     right: 0,
     height: height * 0.40,
     overflow: 'hidden',
+  },
+
+  themeToggle: {
+    position: "absolute",
+    top: 55,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
 
   circleTopLeft: {

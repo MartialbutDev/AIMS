@@ -71,26 +71,32 @@ export default function SettingsScreen() {
     {
       icon: "information-circle-outline",
       label: "About AIMS",
-      onPress: () => console.log("About"),
+      // ✅ FIXED: Use proper route path with 'as any' to bypass type checking
+      onPress: () => router.push("/(student)/about" as any),
     },
   ];
 
-  const renderSetting = (item: SettingItem, index: number) => (
-    <TouchableOpacity
-      key={index}
-      style={[styles.settingItem, { borderBottomColor: colors.border }]}
-      onPress={item.onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.settingLeft}>
-        <Ionicons name={item.icon} size={22} color={item.color || colors.primary} />
-        <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
-          {item.label}
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward-outline" size={20} color={colors.textSecondary} />
-    </TouchableOpacity>
-  );
+  const renderSetting = (item: SettingItem, index: number) => {
+    // ✅ Only change icon color in dark mode - everything else stays the same
+    const iconColor = isDark ? "#FFFFFF" : (item.color || colors.primary);
+
+    return (
+      <TouchableOpacity
+        key={index}
+        style={[styles.settingItem, { borderBottomColor: colors.border }]}
+        onPress={item.onPress}
+        activeOpacity={0.7}
+      >
+        <View style={styles.settingLeft}>
+          <Ionicons name={item.icon} size={22} color={iconColor} />
+          <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
+            {item.label}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward-outline" size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -108,7 +114,6 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Appearance</Text>
           <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
-            {/* ✅ FIXED: ThemeToggle now takes full width without extra padding */}
             <ThemeToggle />
           </View>
         </View>
@@ -186,7 +191,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
-    // ✅ REMOVED: padding from here - ThemeToggle handles its own padding
   },
   settingItem: {
     flexDirection: 'row',

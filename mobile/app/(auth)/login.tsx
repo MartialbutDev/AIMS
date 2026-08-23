@@ -26,7 +26,7 @@ import { authService } from "../../src/services/auth.service";
 const { height } = Dimensions.get("window");
 
 export default function LoginScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark, toggleTheme } = useTheme();
   const [studentId, setStudentId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -73,11 +73,12 @@ export default function LoginScreen() {
 
     try {
       const response = await authService.login(studentId.trim(), password);
-      console.log('Login successful:', response);
+      console.log("Login successful:", response);
       router.replace("/(student)/dashboard");
     } catch (error: any) {
-      console.log('Login error:', error);
-      const errorMessage = error.response?.data?.detail || "Invalid credentials. Please try again.";
+      console.log("Login error:", error);
+      const errorMessage =
+        error.response?.data?.detail || "Invalid credentials. Please try again.";
       Alert.alert("Login Failed", errorMessage);
       setPassword("");
     } finally {
@@ -103,10 +104,15 @@ export default function LoginScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style="light" />
+      <StatusBar style={isDark ? "light" : "dark"} />
 
-      {/* Navy Blue Background - Top Section (Absolute) - USING #000080 */}
-      <View style={[styles.navySection, { backgroundColor: '#000080' }]}>
+      {/* ✅ Dynamic navy background */}
+      <View
+        style={[
+          styles.navySection,
+          { backgroundColor: isDark ? "#000066" : "#000080" },
+        ]}
+      >
         <View style={styles.circleTopLeft} pointerEvents="none" />
         <View style={styles.circleBottomRight} pointerEvents="none" />
         <View style={styles.dotGridTopRight} pointerEvents="none">
@@ -121,7 +127,30 @@ export default function LoginScreen() {
         </View>
       </View>
 
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
+      {/* ✅ Dark Mode Toggle Button - OUTSIDE the navy section */}
+      <TouchableOpacity
+        style={[
+          styles.themeToggle,
+          {
+            backgroundColor: isDark
+              ? "rgba(0,0,0,0.5)"
+              : "rgba(255,255,255,0.2)",
+          },
+        ]}
+        onPress={() => {
+          console.log("🔄 Toggling theme from:", isDark ? "dark" : "light");
+          toggleTheme();
+        }}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name={isDark ? "sunny-outline" : "moon-outline"}
+          size={24}
+          color="#FFFFFF"
+        />
+      </TouchableOpacity>
+
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: "transparent" }]}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -136,10 +165,15 @@ export default function LoginScreen() {
               <View style={styles.logoWrapper}>
                 <AppLogo size={100} decorative={true} variant="login" />
               </View>
-              <Text style={[styles.brandTitle, { color: '#FFFFFF' }]}>
-                A<Text style={[styles.brandTitleAccent, { color: "#F5A623" }]}>I</Text>MS
+              <Text style={[styles.brandTitle, { color: "#FFFFFF" }]}>
+                A<Text style={[styles.brandTitleAccent, { color: "#F5A623" }]}>
+                  I
+                </Text>
+                MS
               </Text>
-              <Text style={[styles.systemTitle, { color: '#FFFFFF', opacity: 0.9 }]}>
+              <Text
+                style={[styles.systemTitle, { color: "#FFFFFF", opacity: 0.9 }]}
+              >
                 Academic Internship Management System
               </Text>
             </View>
@@ -147,33 +181,56 @@ export default function LoginScreen() {
             <View style={styles.cardWrapper}>
               <View style={[styles.card, { backgroundColor: colors.card }]}>
                 <View style={styles.cardHeader}>
-                  <Text style={[styles.welcomeText, { color: colors.textPrimary }]}>Welcome Back!</Text>
-                  <Text style={[styles.subtitleText, { color: colors.textSecondary }]}>
+                  <Text
+                    style={[styles.welcomeText, { color: colors.textPrimary }]}
+                  >
+                    Welcome Back!
+                  </Text>
+                  <Text
+                    style={[styles.subtitleText, { color: colors.textSecondary }]}
+                  >
                     Sign in to continue to your account
                   </Text>
                 </View>
 
                 <View style={styles.formContainer}>
                   <View style={styles.fieldWrapper}>
-                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Student ID</Text>
+                    <Text
+                      style={[styles.fieldLabel, { color: colors.textPrimary }]}
+                    >
+                      Student ID
+                    </Text>
                     <View
                       style={[
                         styles.inputWrapper,
-                        { backgroundColor: colors.background, borderColor: colors.border },
-                        isStudentIdFocused && [styles.inputWrapperFocused, { borderColor: '#000080' }],
-                        studentIdError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
+                        {
+                          backgroundColor: colors.background,
+                          borderColor: colors.border,
+                        },
+                        isStudentIdFocused && [
+                          styles.inputWrapperFocused,
+                          { borderColor: colors.primary },
+                        ],
+                        studentIdError
+                          ? [
+                              styles.inputWrapperError,
+                              { borderColor: colors.error },
+                            ]
+                          : null,
                       ]}
                     >
                       <Ionicons
                         name="person-outline"
                         size={20}
-                        color={isStudentIdFocused ? '#000080' : "#8A8A8A"}
+                        color={
+                          isStudentIdFocused ? colors.primary : colors.textSecondary
+                        }
                         style={styles.inputIcon}
                       />
                       <TextInput
                         style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your student ID"
-                        placeholderTextColor="#A0A0A0"
+                        placeholderTextColor={colors.textTertiary}
                         value={studentId}
                         onChangeText={(text) => {
                           setStudentId(text);
@@ -189,30 +246,53 @@ export default function LoginScreen() {
                         accessibilityLabel="Student ID"
                       />
                     </View>
-                    {studentIdError ? <Text style={[styles.errorText, { color: colors.error }]}>{studentIdError}</Text> : null}
+                    {studentIdError ? (
+                      <Text
+                        style={[styles.errorText, { color: colors.error }]}
+                      >
+                        {studentIdError}
+                      </Text>
+                    ) : null}
                   </View>
 
                   <View style={styles.fieldWrapper}>
-                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Password</Text>
+                    <Text
+                      style={[styles.fieldLabel, { color: colors.textPrimary }]}
+                    >
+                      Password
+                    </Text>
                     <View
                       style={[
                         styles.inputWrapper,
-                        { backgroundColor: colors.background, borderColor: colors.border },
-                        isPasswordFocused && [styles.inputWrapperFocused, { borderColor: '#000080' }],
-                        passwordError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
+                        {
+                          backgroundColor: colors.background,
+                          borderColor: colors.border,
+                        },
+                        isPasswordFocused && [
+                          styles.inputWrapperFocused,
+                          { borderColor: colors.primary },
+                        ],
+                        passwordError
+                          ? [
+                              styles.inputWrapperError,
+                              { borderColor: colors.error },
+                            ]
+                          : null,
                       ]}
                     >
                       <Ionicons
                         name="lock-closed-outline"
                         size={20}
-                        color={isPasswordFocused ? '#000080' : "#8A8A8A"}
+                        color={
+                          isPasswordFocused ? colors.primary : colors.textSecondary
+                        }
                         style={styles.inputIcon}
                       />
                       <TextInput
                         ref={passwordInputRef}
                         style={[styles.input, { color: colors.textPrimary }]}
                         placeholder="Enter your password"
-                        placeholderTextColor="#A0A0A0"
+                        placeholderTextColor={colors.textTertiary}
                         secureTextEntry={!showPassword}
                         value={password}
                         onChangeText={(text) => {
@@ -230,19 +310,34 @@ export default function LoginScreen() {
                       />
                       <TouchableOpacity
                         onPress={() => setShowPassword((prev) => !prev)}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        hitSlop={{
+                          top: 10,
+                          bottom: 10,
+                          left: 10,
+                          right: 10,
+                        }}
                         activeOpacity={0.7}
                         accessibilityRole="button"
-                        accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                        accessibilityLabel={
+                          showPassword ? "Hide password" : "Show password"
+                        }
                       >
                         <Ionicons
-                          name={showPassword ? "eye-off-outline" : "eye-outline"}
+                          name={
+                            showPassword ? "eye-off-outline" : "eye-outline"
+                          }
                           size={20}
-                          color="#8A8A8A"
+                          color={colors.textSecondary}
                         />
                       </TouchableOpacity>
                     </View>
-                    {passwordError ? <Text style={[styles.errorText, { color: colors.error }]}>{passwordError}</Text> : null}
+                    {passwordError ? (
+                      <Text
+                        style={[styles.errorText, { color: colors.error }]}
+                      >
+                        {passwordError}
+                      </Text>
+                    ) : null}
                   </View>
 
                   <TouchableOpacity
@@ -250,11 +345,19 @@ export default function LoginScreen() {
                     onPress={handleForgotPassword}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.forgotText, { color: '#000080' }]}>Forgot Password?</Text>
+                    <Text
+                      style={[styles.forgotText, { color: colors.primary }]}
+                    >
+                      Forgot Password?
+                    </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.loginButton, loading && styles.loginButtonDisabled, { backgroundColor: '#000080' }]}
+                    style={[
+                      styles.loginButton,
+                      loading && styles.loginButtonDisabled,
+                      { backgroundColor: colors.primary },
+                    ]}
                     onPress={handleLogin}
                     disabled={loading}
                     activeOpacity={0.8}
@@ -271,41 +374,86 @@ export default function LoginScreen() {
                           color="#FFFFFF"
                           style={styles.loginButtonIcon}
                         />
-                        <Text style={[styles.loginButtonText, { color: '#FFFFFF' }]}>Login</Text>
+                        <Text
+                          style={[
+                            styles.loginButtonText,
+                            { color: "#FFFFFF" },
+                          ]}
+                        >
+                          Login
+                        </Text>
                       </View>
                     )}
                   </TouchableOpacity>
 
                   <View style={styles.dividerContainer}>
+                    <View
+                      style={[styles.divider, { backgroundColor: colors.border }]}
+                    />
+                    <Text
+                      style={[styles.dividerText, { color: colors.textSecondary }]}
+                    >
+                      Secure Login
+                    </Text>
+                    <View
+                      style={[styles.divider, { backgroundColor: colors.border }]}
+                    />
                   </View>
 
-                  <View style={[styles.securityContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View
+                    style={[
+                      styles.securityContainer,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
                     <Ionicons
                       name="shield-checkmark-outline"
                       size={20}
-                      color="#000080"
+                      color={colors.primary}
                       style={styles.securityIcon}
                     />
                     <View style={styles.securityTextContainer}>
-                      <Text style={[styles.securityText, { color: colors.textPrimary }]}>Secure & Trusted</Text>
-                      <Text style={[styles.securitySubtext, { color: colors.textSecondary }]}>
-                        Your data is encrypted and protected with industry-standard security
+                      <Text
+                        style={[styles.securityText, { color: colors.textPrimary }]}
+                      >
+                        Secure & Trusted
+                      </Text>
+                      <Text
+                        style={[
+                          styles.securitySubtext,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        Your data is encrypted and protected with
+                        industry-standard security
                       </Text>
                     </View>
                   </View>
 
                   <View style={styles.signUpContainer}>
-                    <Text style={[styles.signUpText, { color: colors.textSecondary }]}>
+                    <Text
+                      style={[styles.signUpText, { color: colors.textSecondary }]}
+                    >
                       Don't have an account?
                     </Text>
                     <TouchableOpacity
                       onPress={handleSignUp}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.signUpLink, { color: '#000080' }]}> Sign Up</Text>
+                      <Text
+                        style={[styles.signUpLink, { color: colors.primary }]}
+                      >
+                        {" "}
+                        Sign Up
+                      </Text>
                     </TouchableOpacity>
                   </View>
-                  <Text style={[styles.signUpSubtext, { color: colors.textSecondary }]}>
+                  <Text
+                    style={[styles.signUpSubtext, { color: colors.textSecondary }]}
+                  >
                     Create an account to get started.
                   </Text>
                 </View>
@@ -313,10 +461,16 @@ export default function LoginScreen() {
             </View>
 
             <View style={[styles.footer, { backgroundColor: colors.background }]}>
-              <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+              <Text
+                style={[styles.footerText, { color: colors.textSecondary }]}
+              >
                 © {new Date().getFullYear()} {APP_NAME}
               </Text>
-              <Text style={[styles.versionText, { color: colors.textSecondary }]}>{APP_VERSION}</Text>
+              <Text
+                style={[styles.versionText, { color: colors.textSecondary }]}
+              >
+                {APP_VERSION}
+              </Text>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -331,65 +485,85 @@ const styles = StyleSheet.create({
   },
 
   navySection: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.40,
-    overflow: 'hidden',
+    height: height * 0.4,
+    overflow: "hidden",
+  },
+
+  // ✅ Toggle is now at the top level, not inside navySection
+  themeToggle: {
+    position: "absolute",
+    top: 55,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    zIndex: 999,  // ✅ HIGH z-index to stay on top
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
 
   circleTopLeft: {
-    position: 'absolute',
+    position: "absolute",
     top: -60,
     left: -60,
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
   },
 
   circleBottomRight: {
-    position: 'absolute',
+    position: "absolute",
     bottom: -80,
     right: -60,
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
   },
 
   dotGridTopRight: {
-    position: 'absolute',
+    position: "absolute",
     top: 16,
     right: 20,
     width: 64,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
 
   dotGridBottomLeft: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 16,
     left: 20,
     width: 52,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
   },
 
   dot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
     margin: 4,
   },
 
   safeArea: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
 
   keyboardView: {
@@ -496,7 +670,7 @@ const styles = StyleSheet.create({
   },
 
   inputWrapperError: {
-    borderColor: '#EF4444',
+    borderColor: "#EF4444",
   },
 
   inputIcon: {
@@ -572,11 +746,9 @@ const styles = StyleSheet.create({
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E8EDF5',
   },
 
   dividerText: {
-    color: '#64748B',
     fontSize: 12,
     fontWeight: "500",
     letterSpacing: 0.5,

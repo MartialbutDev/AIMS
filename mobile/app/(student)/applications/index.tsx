@@ -18,6 +18,7 @@ import {
 } from "react-native";
 
 import { useTheme } from "../../../src/context/ThemeContext";
+import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import api from "../../../src/services/api";
 
 const { width } = Dimensions.get("window");
@@ -61,6 +62,7 @@ const statusLabels: Record<string, string> = {
 
 export default function ApplicationsScreen() {
   const { colors, isDark } = useTheme();
+  const { handleScroll } = useAutoHideTab();
   const [applications, setApplications] = useState<Application[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -234,6 +236,8 @@ export default function ApplicationsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="briefcase-outline" size={64} color={colors.border} />

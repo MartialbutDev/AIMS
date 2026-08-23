@@ -24,6 +24,16 @@ export default function StatisticCard({
 }: StatisticCardProps) {
   const { colors, isDark } = useTheme();
 
+  // ✅ Only Applications icon turns white in dark mode
+  const getIconColor = () => {
+    // Applications icon (briefcase-outline) turns white in dark mode
+    if (icon === "briefcase-outline" && isDark) {
+      return "#FFFFFF";
+    }
+    // All other icons keep their original color
+    return color;
+  };
+
   return (
     <MotiView
       from={{ scale: 0.95, opacity: 0 }}
@@ -45,12 +55,12 @@ export default function StatisticCard({
         <View style={[
           styles.iconContainer,
           {
-            backgroundColor: `${color}15`,  // ← Solid background with color
+            backgroundColor: `${color}15`,
             borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
             borderWidth: 1,
           }
         ]}>
-          <Ionicons name={icon} size={20} color={color} />
+          <Ionicons name={icon} size={20} color={getIconColor()} />
         </View>
         <Text style={[styles.value, { color: colors.textPrimary }]}>{value}</Text>
         <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>

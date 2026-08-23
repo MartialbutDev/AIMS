@@ -1,8 +1,9 @@
+// src/components/dashboard/ActivityTimeline.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { MotiView } from "moti";
 import { StyleSheet, Text, View } from "react-native";
 
-import Colors from "../../theme/colors";
+import { useTheme } from "../../context/ThemeContext";
 import { RecentActivity } from "../../services/dashboard.service";
 
 interface ActivityTimelineProps {
@@ -10,6 +11,8 @@ interface ActivityTimelineProps {
 }
 
 export default function ActivityTimeline({ activities }: ActivityTimelineProps) {
+  const { colors, isDark } = useTheme();
+
   const getStatusColor = (status?: string) => {
     switch (status) {
       case "pending":
@@ -25,7 +28,7 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
       case "reviewing":
         return "#8B5CF6";
       default:
-        return "#6B7280";
+        return colors.textSecondary;
     }
   };
 
@@ -59,7 +62,7 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
   if (activities.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No recent activity</Text>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No recent activity</Text>
       </View>
     );
   }
@@ -78,11 +81,11 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
             <View style={[styles.iconContainer, { backgroundColor: `${getStatusColor(item.status)}15` }]}>
               <Ionicons name={getActivityIcon(item.type)} size={18} color={getStatusColor(item.status)} />
             </View>
-            {index < Math.min(activities.length, 4) - 1 && <View style={styles.timelineLine} />}
+            {index < Math.min(activities.length, 4) - 1 && <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />}
           </View>
           <View style={styles.contentColumn}>
             <View style={styles.headerRow}>
-              <Text style={styles.title}>{item.title}</Text>
+              <Text style={[styles.title, { color: colors.textPrimary }]}>{item.title}</Text>
               {item.status && (
                 <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}15` }]}>
                   <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
@@ -91,8 +94,8 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
                 </View>
               )}
             </View>
-            <Text style={styles.description}>{item.description}</Text>
-            <Text style={styles.time}>{formatTime(item.time)}</Text>
+            <Text style={[styles.description, { color: colors.textSecondary }]}>{item.description}</Text>
+            <Text style={[styles.time, { color: colors.textSecondary }]}>{formatTime(item.time)}</Text>
           </View>
         </MotiView>
       ))}
@@ -110,7 +113,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: Colors.textSecondary,
   },
   itemContainer: {
     flexDirection: 'row',
@@ -132,7 +134,6 @@ const styles = StyleSheet.create({
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#E8EDF5',
     marginTop: -4,
     marginBottom: -4,
   },
@@ -149,7 +150,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textPrimary,
     flex: 1,
   },
   statusBadge: {
@@ -164,12 +164,10 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 13,
-    color: Colors.textSecondary,
     marginBottom: 2,
   },
   time: {
     fontSize: 11,
-    color: Colors.textSecondary,
     opacity: 0.6,
   },
 });

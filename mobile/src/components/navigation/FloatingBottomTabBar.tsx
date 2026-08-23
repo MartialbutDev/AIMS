@@ -2,7 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import { MotiView } from "moti";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Animated } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../context/ThemeContext";
@@ -17,13 +17,21 @@ interface TabItem {
 
 const tabs: TabItem[] = [
   { name: "home", icon: "home-outline", route: "/(student)/dashboard", label: "Home" },
-  { name: "applications", icon: "briefcase-outline", route: "/(student)/applications", label: "Applications", badge: 3 },
+  { name: "applications", icon: "briefcase-outline", route: "/(student)/applications", label: "Applications", badge: 0 },
   { name: "documents", icon: "document-text-outline", route: "/(student)/documents", label: "Documents" },
   { name: "dtr", icon: "calendar-outline", route: "/(student)/dtr", label: "DTR" },
   { name: "more", icon: "menu-outline", route: "/(student)/settings", label: "More" },
 ];
 
-export default function FloatingBottomTabBar({ activeTab }: { activeTab?: string }) {
+interface FloatingBottomTabBarProps {
+  activeTab?: string;
+  translateY?: Animated.Value;
+}
+
+export default function FloatingBottomTabBar({ 
+  activeTab, 
+  translateY = new Animated.Value(0) 
+}: FloatingBottomTabBarProps) {
   const { colors, isDark } = useTheme();
   const pathname = usePathname();
 
@@ -43,18 +51,29 @@ export default function FloatingBottomTabBar({ activeTab }: { activeTab?: string
     router.push(tab.route as any);
   };
 
+  const animatedStyle = {
+    transform: [
+      {
+        translateY: translateY,
+      },
+    ],
+    opacity: translateY.interpolate({
+      inputRange: [0, 100],
+      outputRange: [1, 0],
+      extrapolate: 'clamp',
+    }),
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
-      <MotiView
-        from={{ opacity: 0, translateY: 20 }}
-        animate={{ opacity: 1, translateY: 0 }}
-        transition={{ type: "spring", damping: 15, stiffness: 100 }}
+      <Animated.View
         style={[
           styles.container,
           {
-            backgroundColor: isDark ? 'rgba(30,41,59,0.9)' : 'rgba(255,255,255,0.85)',
-            borderColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.3)',
-          }
+            backgroundColor: isDark ? 'rgba(30,41,59,0.92)' : 'rgba(255,255,255,0.92)',
+            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.3)',
+          },
+          animatedStyle,
         ]}
       >
         <View style={styles.tabContainer}>
@@ -83,11 +102,11 @@ export default function FloatingBottomTabBar({ activeTab }: { activeTab?: string
                     size={24}
                     color={isActive ? colors.primary : colors.textSecondary}
                   />
-                  {tab.badge && tab.badge > 0 && (
+                  {tab.badge && tab.badge > 0 ? (
                     <View style={[styles.badge, { backgroundColor: colors.error }]}>
                       <Text style={styles.badgeText}>{tab.badge}</Text>
                     </View>
-                  )}
+                  ) : null}
                 </MotiView>
                 <Text
                   style={[
@@ -98,19 +117,19 @@ export default function FloatingBottomTabBar({ activeTab }: { activeTab?: string
                 >
                   {tab.label}
                 </Text>
-                {isActive && (
+                {isActive ? (
                   <MotiView
                     from={{ scaleX: 0 }}
                     animate={{ scaleX: 1 }}
                     transition={{ type: "spring", damping: 15 }}
                     style={[styles.activeIndicator, { backgroundColor: colors.primary }]}
                   />
-                )}
+                ) : null}
               </TouchableOpacity>
             );
           })}
         </View>
-      </MotiView>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -127,7 +146,6 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
     marginBottom: 16,
-    backdropFilter: 'blur(20px)',
     borderRadius: 24,
     shadowColor: "#000",
     shadowOpacity: 0.08,

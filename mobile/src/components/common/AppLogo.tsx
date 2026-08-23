@@ -13,7 +13,6 @@ export default function AppLogo({
   decorative = false,
   variant = 'default'
 }: AppLogoProps) {
-  // Choose the right image based on variant
   const getSource = () => {
     switch (variant) {
       case 'login':

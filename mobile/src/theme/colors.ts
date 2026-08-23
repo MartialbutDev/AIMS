@@ -9,10 +9,10 @@ export const lightColors = {
   textSecondary: '#64748B',
   textTertiary: '#94A3B8',
   
-  // Brand
-  primary: '#000080',      // ✅ UPDATED to Navy Blue
-  primaryLight: '#1A1A9E',  // ✅ Updated lighter version
-  primaryDark: '#000066',   // ✅ Updated darker version
+  // Brand - Navy Blue
+  primary: '#000080',      // Navy Blue
+  primaryLight: '#1A1A9E',
+  primaryDark: '#000066',
   
   // Status
   success: '#22C55E',
@@ -33,8 +33,8 @@ export const lightColors = {
   shadow: '#000000',
   
   // Gradients
-  gradientStart: '#000080',   // ✅ Updated
-  gradientEnd: '#1A1A9E',     // ✅ Updated
+  gradientStart: '#000080',
+  gradientEnd: '#1A1A9E',
   
   // Status Badge Colors
   pending: '#F59E0B',
@@ -51,18 +51,18 @@ export const lightColors = {
 
 export const darkColors = {
   // Background
-  background: '#0F172A',
-  card: '#1E293B',
+  background: '#0F172A',    // Dark slate
+  card: '#1E293B',          // Dark card
   
   // Text
-  textPrimary: '#F1F5F9',
-  textSecondary: '#94A3B8',
-  textTertiary: '#64748B',
+  textPrimary: '#F1F5F9',   // Light text
+  textSecondary: '#94A3B8', // Gray text
+  textTertiary: '#64748B',  // Darker gray text
   
-  // Brand
-  primary: '#000080',      // ✅ UPDATED to Navy Blue
-  primaryLight: '#2A2AB0',  // ✅ Updated lighter version
-  primaryDark: '#000066',   // ✅ Updated darker version
+  // Brand - Darker Navy for dark mode
+  primary: '#000066',      // ✅ Darker Navy for dark mode
+  primaryLight: '#1A1A8E',
+  primaryDark: '#000040',
   
   // Status
   success: '#22C55E',
@@ -83,8 +83,8 @@ export const darkColors = {
   shadow: '#000000',
   
   // Gradients
-  gradientStart: '#000080',   // ✅ Updated
-  gradientEnd: '#2A2AB0',     // ✅ Updated
+  gradientStart: '#000066',
+  gradientEnd: '#1A1A8E',
   
   // Status Badge Colors (adjusted for dark mode)
   pending: '#F59E0B',
@@ -103,7 +103,7 @@ export type ThemeColors = typeof lightColors;
 
 // Default export for backward compatibility
 const Colors = {
-  primary: '#000080',      // ✅ UPDATED
+  primary: '#000080',
   background: '#F6F8FC',
   card: '#FFFFFF',
   textPrimary: '#111827',
@@ -120,8 +120,8 @@ const Colors = {
   surfaceSecondary: '#F8FAFC',
   surfaceTertiary: '#F1F5F9',
   shadow: '#000000',
-  gradientStart: '#000080',   // ✅ Updated
-  gradientEnd: '#1A1A9E',     // ✅ Updated
+  gradientStart: '#000080',
+  gradientEnd: '#1A1A9E',
   pending: '#F59E0B',
   approved: '#10B981',
   rejected: '#EF4444',

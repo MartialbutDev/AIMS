@@ -16,6 +16,7 @@ import {
 } from "react-native";
 
 import { useTheme } from "../../../src/context/ThemeContext";
+import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import { notificationService, Notification } from "../../../src/services/notification.service";
 
 const getNotificationIcon = (type: string): keyof typeof Ionicons.glyphMap => {
@@ -67,6 +68,7 @@ const getTimeAgo = (dateString: string): string => {
 
 export default function NotificationsScreen() {
   const { colors, isDark } = useTheme();
+  const { handleScroll } = useAutoHideTab();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -240,6 +242,8 @@ export default function NotificationsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListEmptyComponent={renderEmpty}
       />
     </SafeAreaView>

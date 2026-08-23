@@ -18,6 +18,7 @@ import {
 import { LineChart, PieChart } from "react-native-chart-kit";
 
 import { useTheme } from "../../../src/context/ThemeContext";
+import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import { reportService, SummaryStats, WeeklyProgress, ActivityDistribution, RecentActivity } from "../../../src/services/report.service";
 
 const { width } = Dimensions.get("window");
@@ -33,6 +34,7 @@ interface ReportCardProps {
 
 export default function ReportsScreen() {
   const { colors, isDark } = useTheme();
+  const { handleScroll } = useAutoHideTab();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<SummaryStats | null>(null);
@@ -159,9 +161,7 @@ export default function ReportsScreen() {
       );
     }
 
-    // ✅ FIX: Shorten labels to prevent overlapping
     const labels = weeklyProgress.map(d => {
-      // Use "W1", "W2", "W3" etc. for shorter labels
       const weekNum = d.week.replace('Week ', '');
       return `W${weekNum}`;
     });
@@ -203,12 +203,11 @@ export default function ReportsScreen() {
         strokeWidth: "2",
         stroke: "#2563EB",
       },
-      // ✅ Add these to prevent label overlap
       propsForLabels: {
         fontSize: 10,
         fontWeight: '500',
       },
-      formatXLabel: (value: string) => value, // Keep the shortened labels
+      formatXLabel: (value: string) => value,
     };
 
     return (
@@ -223,7 +222,6 @@ export default function ReportsScreen() {
           style={styles.chart}
           fromZero
           withShadow={false}
-          // ✅ Use these to reduce label overlapping
           withInnerLines={false}
           withOuterLines={false}
           withVerticalLabels={true}
@@ -303,6 +301,8 @@ export default function ReportsScreen() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         <View style={[styles.periodSelector, { backgroundColor: colors.card }]}>
           {["week", "month", "semester"].map((period) => (

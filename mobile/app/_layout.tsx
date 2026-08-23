@@ -2,6 +2,7 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ThemeProvider, useTheme } from "../src/context/ThemeContext";
+import { ScrollProvider } from "../src/context/ScrollContext";
 
 function RootLayoutNav() {
   const { isDark } = useTheme();
@@ -25,7 +26,9 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <RootLayoutNav />
+      <ScrollProvider>
+        <RootLayoutNav />
+      </ScrollProvider>
     </ThemeProvider>
   );
 }
