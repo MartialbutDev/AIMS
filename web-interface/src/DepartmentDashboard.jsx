@@ -16,8 +16,8 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
   const coordinators = [
     {
       id: 1,
-      initials: 'AR',
-      name: 'Dr. Ana Reyes',
+      initials: 'KA',
+      name: 'Ken Ampolitod',
       section: 'BSIT 4A & 4B',
       students: 48,
       completion: 87,
@@ -26,8 +26,8 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
     },
     {
       id: 2,
-      initials: 'ML',
-      name: 'Prof. Mark Lim',
+      initials: 'FI',
+      name: 'Faisal Inidal',
       section: 'BSCS 4A & 4B',
       students: 36,
       completion: 92,
@@ -36,8 +36,8 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
     },
     {
       id: 3,
-      initials: 'CV',
-      name: 'Ms. Carla Vega',
+      initials: 'ML',
+      name: 'Maikent Lopez',
       section: 'BSIS 4A',
       students: 24,
       completion: 78,
@@ -46,8 +46,8 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
     },
     {
       id: 4,
-      initials: 'JR',
-      name: 'Engr. Jose Ramos',
+      initials: 'VN',
+      name: 'Varren Naive',
       section: 'BSCE 4A',
       students: 20,
       completion: 95,
@@ -60,19 +60,19 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
     {
       id: 1,
       dotColor: 'bg-[#F5A800]',
-      text: 'Dr. Ana Reyes approved 3 student documents',
+      text: 'Ken Ampolitod approved 3 student documents',
       time: '30 mins ago',
     },
     {
       id: 2,
       dotColor: 'bg-[#1A1D4E]',
-      text: 'Prof. Mark Lim posted a new announcement',
+      text: 'Faisal Inidal posted a new announcement',
       time: '1 hour ago',
     },
     {
       id: 3,
       dotColor: 'bg-[#2D3270]',
-      text: 'Ms. Carla Vega completed mid-term evaluations for BSIS 4A',
+      text: 'Maikent Lopez completed mid-term evaluations for BSIS 4A',
       time: '3 hours ago',
     },
     {
@@ -84,14 +84,14 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
     {
       id: 5,
       dotColor: 'bg-[#1A1D4E]',
-      text: 'Engr. Jose Ramos submitted final student grades',
+      text: 'Varren Naive submitted final student grades',
       time: '2 days ago',
     },
   ];
 
   return (
     <div className="min-h-screen bg-[#F4F5F9] p-6 lg:p-10 font-sans text-slate-800">
-      {/* Header with Hamburger & Bell */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <button 
@@ -103,12 +103,11 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
           <div>
             <h1 className="text-2xl font-bold text-[#1A1D4E]">Department Overview</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Welcome back, <span className="font-semibold text-[#1A1D4E]">Dr. Maria Santos</span> · Department Chair · CITE
+              Welcome back, <span className="font-semibold text-[#1A1D4E]">Dr. Junar A. Landicho</span> · Dean / Chairman · CITE
             </p>
           </div>
         </div>
 
-        {/* Top Header Bell Button */}
         <div className="relative">
           <button 
             onClick={() => onNavigate('notifications')}
@@ -169,7 +168,7 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
         </div>
       </div>
 
-      {/* Main USTP Gradient Banner */}
+      {/* USTP Progress Banner */}
       <div className="bg-gradient-to-r from-[#1A1D4E] via-[#242866] to-[#1A1D4E] rounded-2xl p-6 mb-8 text-white shadow-md border-t-4 border-[#F5A800]">
         <div className="flex justify-between items-center mb-3">
           <div className="flex items-center gap-3">
@@ -188,10 +187,9 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
         </div>
       </div>
 
-      {/* Main Content Grid */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* Coordinator Overview */}
           <div>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -261,7 +259,7 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
           </div>
         </div>
 
-        {/* Quick Access Sidebar */}
+        {/* Right Sidebar */}
         <div className="space-y-6">
           <div>
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">
@@ -291,7 +289,6 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
                 </div>
               </button>
 
-              {/* Quick Access Notifications Card */}
               <button 
                 onClick={() => onNavigate('notifications')}
                 className="w-full bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 hover:border-[#F5A800] transition text-left group cursor-pointer"
@@ -307,7 +304,6 @@ const DepartmentDashboard = ({ onNavigate, onOpenSidebar }) => {
             </div>
           </div>
 
-          {/* Status Box */}
           <div className="bg-[#1A1D4E] border border-slate-800 rounded-2xl p-5 text-white shadow-sm">
             <h3 className="font-semibold text-sm mb-4 text-[#F5A800]">Department Status</h3>
             <div className="space-y-3 text-xs">

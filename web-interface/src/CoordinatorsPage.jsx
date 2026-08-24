@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, ChevronRight, ArrowLeft, Menu } from 'lucide-react';
 
-const CoordinatorsPage = ({ onBack, onSelectCoordinator }) => {
+const CoordinatorsPage = ({ onBack, onSelectCoordinator, onOpenSidebar }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   const coordinatorsData = [
     {
       id: 1,
-      initials: 'AR',
-      name: 'Dr. Ana Reyes',
-      email: 'a.reyes@cite.edu.ph',
+      initials: 'KA',
+      name: 'Ken Ampolitod',
+      email: 'k.ampolitod@ustp.edu.ph',
       section: 'BSIT 4A & 4B',
       students: 48,
       active: 42,
@@ -32,9 +32,9 @@ const CoordinatorsPage = ({ onBack, onSelectCoordinator }) => {
     },
     {
       id: 2,
-      initials: 'ML',
-      name: 'Prof. Mark Lim',
-      email: 'm.lim@cite.edu.ph',
+      initials: 'FI',
+      name: 'Faisal Inidal',
+      email: 'f.inidal@ustp.edu.ph',
       section: 'BSCS 4A & 4B',
       students: 36,
       active: 33,
@@ -55,9 +55,9 @@ const CoordinatorsPage = ({ onBack, onSelectCoordinator }) => {
     },
     {
       id: 3,
-      initials: 'CV',
-      name: 'Ms. Carla Vega',
-      email: 'c.vega@cite.edu.ph',
+      initials: 'ML',
+      name: 'Maikent Lopez',
+      email: 'm.lopez@ustp.edu.ph',
       section: 'BSIS 4A',
       students: 24,
       active: 20,
@@ -77,9 +77,9 @@ const CoordinatorsPage = ({ onBack, onSelectCoordinator }) => {
     },
     {
       id: 4,
-      initials: 'JR',
-      name: 'Engr. Jose Ramos',
-      email: 'j.ramos@cite.edu.ph',
+      initials: 'VN',
+      name: 'Varren Naive',
+      email: 'v.naive@ustp.edu.ph',
       section: 'BSCE 4A',
       students: 20,
       active: 19,
@@ -107,19 +107,27 @@ const CoordinatorsPage = ({ onBack, onSelectCoordinator }) => {
   return (
     <div className="min-h-screen bg-[#F4F5F9] p-6 lg:p-10 font-sans text-slate-800">
       <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1A1D4E]">Coordinators</h1>
-          <p className="text-xs text-slate-500 mt-1">4 active coordinators · 128 total students</p>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={onOpenSidebar}
+            className="p-2.5 bg-white border border-slate-200 rounded-xl text-[#1A1D4E] hover:bg-slate-50 transition shadow-sm cursor-pointer"
+          >
+            <Menu size={20} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-[#1A1D4E]">Coordinators</h1>
+            <p className="text-xs text-slate-500 mt-0.5">4 active coordinators · 128 total students</p>
+          </div>
         </div>
         <button
           onClick={onBack}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-[#1A1D4E] hover:bg-slate-50 hover:text-[#F5A800] transition shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-[#1A1D4E] hover:bg-slate-50 hover:text-[#F5A800] transition shadow-sm cursor-pointer"
         >
           <ArrowLeft size={16} /> Back to Dashboard
         </button>
       </div>
 
-      {/* Top 4 Summary Cards */}
+      {/* Top Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
         {coordinatorsData.map((coord) => (
           <div 
