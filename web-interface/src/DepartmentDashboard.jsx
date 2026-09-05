@@ -113,7 +113,7 @@ export default function DepartmentDashboard({ onNavigate, onOpenSidebar }) {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
+    <div className="min-h-screen bg-transparent text-slate-800 font-sans pb-12">
       
       {/* USTeP-Themed Header */}
       <header className="bg-[#1a1642] border-b-2 border-[#f59e0b] px-6 py-4 shadow-md sticky top-0 z-30">

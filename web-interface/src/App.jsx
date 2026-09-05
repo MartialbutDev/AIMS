@@ -9,6 +9,8 @@ import CoordinatorDetailPage from './CoordinatorDetailPage';
 import NotificationsPage from './NotificationsPage';
 import Sidebar from './Sidebar';
 import CoordinatorSidebar from './CoordinatorSidebar';
+import CompanyDashboard from './CompanyDashboard';
+import CompanySidebar from './CompanySidebar';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -76,6 +78,15 @@ function App() {
               onLogout={handleLogout}
             />
 
+            {/* Host Company Sidebar Drawer */}
+            <CompanySidebar 
+              isOpen={isSidebarOpen && currentUser.role === 'company'} 
+              onClose={() => setIsSidebarOpen(false)} 
+              currentPage={currentPage}
+              onNavigate={(page) => setCurrentPage(page)}
+              onLogout={handleLogout}
+            />
+
             {/* Coordinator Sidebar Drawer */}
             <CoordinatorSidebar 
               isOpen={isSidebarOpen && currentUser.role === 'coordinator'} 
@@ -134,14 +145,13 @@ function App() {
                 <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all">Logout</button>
               </div>
             )}
-
-            {currentPage === 'company-dashboard' && (
-              <div className="p-12 text-center text-white">
-                <h2 className="text-2xl font-bold text-[#f59e0b]">Host Company Portal</h2>
-                <p className="text-slate-300 text-sm mt-2">Ready to build the Student Evaluation & Attendance interface here.</p>
-                <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all">Logout</button>
-              </div>
-            )}
+{currentPage === 'company-dashboard' && (
+  <CompanyDashboard 
+    onNavigate={setCurrentPage}
+    onOpenSidebar={() => setIsSidebarOpen(true)}
+    onLogout={handleLogout}
+  />
+)}
 
             {currentPage === 'admin-dashboard' && (
               <div className="p-12 text-center text-white">
