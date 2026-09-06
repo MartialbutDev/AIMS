@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import * as SecureStore from 'expo-secure-store';
 
@@ -20,6 +21,7 @@ import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import api from "../../../src/services/api";
 import DocumentPreview from "../../../src/components/documents/DocumentPreview";
 import { BASE_URL } from "../../../src/config/env";
+import { SkeletonDocumentList } from "../../../src/components/common/Skeleton";
 
 interface Document {
   id: string;
@@ -99,11 +101,16 @@ export default function DocumentsScreen() {
     }
   };
 
+  // ✅ Skeleton Loader
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading documents...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>My Documents</Text>
+          <View style={styles.uploadButton} />
+        </View>
+        <SkeletonDocumentList count={5} />
       </SafeAreaView>
     );
   }
@@ -200,6 +207,7 @@ export default function DocumentsScreen() {
             </TouchableOpacity>
           </View>
         }
+        ListFooterComponent={<View style={styles.listFooter} />}
       />
 
       <DocumentPreview
@@ -218,6 +226,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centerContent: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -230,7 +239,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'ios' ? 12 : 16,
     paddingBottom: 12,
   },
   headerTitle: {
@@ -242,7 +251,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 10,
+    flexGrow: 1,
+  },
+  listFooter: {
+    height: 80,
   },
   documentCard: {
     flexDirection: "row",
@@ -321,6 +334,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     textAlign: "center",
+    paddingHorizontal: 40,
   },
   emptyButton: {
     paddingHorizontal: 32,

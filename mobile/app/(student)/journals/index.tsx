@@ -7,18 +7,21 @@ import {
   Dimensions,
   FlatList,
   RefreshControl,
-  SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
+  ScrollView,
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import { journalService, Journal, JournalSummary } from "../../../src/services/journal.service";
+import { usePaginatedData } from "../../../src/hooks/usePaginatedData";
+import api from "../../../src/services/api";
 
 const { width } = Dimensions.get("window");
 
@@ -49,39 +52,48 @@ const statusLabels: Record<string, string> = {
 export default function JournalsScreen() {
   const { colors, isDark } = useTheme();
   const { handleScroll } = useAutoHideTab();
-  const [journals, setJournals] = useState<Journal[]>([]);
   const [summary, setSummary] = useState<JournalSummary | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
 
   const filters = ["all", "draft", "submitted", "reviewing", "approved", "rejected"];
   const weeks: (number | "all")[] = ["all", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+  // ✅ Pagination hook
+  const {
+    data: journals,
+    loadNext,
+    refresh,
+    isLoading,
+    isRefreshing,
+    hasMore,
+  } = usePaginatedData<Journal>(
+    async (page, limit) => {
+      const response = await api.get(`/journals/?page=${page}&limit=${limit}`);
+      return {
+        data: response.data.items || response.data,
+        total: response.data.total || response.data.length || 0,
+      };
+    },
+    {
+      initialPage: 1,
+      initialLimit: 10,
+      autoLoad: true,
+    }
+  );
+
+  // ✅ Fetch summary separately
   useEffect(() => {
-    fetchData();
+    fetchSummary();
   }, []);
 
-  const fetchData = async () => {
+  const fetchSummary = async () => {
     try {
-      const [journalsData, summaryData] = await Promise.all([
-        journalService.getMyJournals(),
-        journalService.getJournalSummary(),
-      ]);
-      setJournals(journalsData);
+      const summaryData = await journalService.getJournalSummary();
       setSummary(summaryData);
     } catch (error) {
-      console.error('Error fetching journals:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      console.error('Error fetching summary:', error);
     }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchData();
   };
 
   const filteredJournals = journals.filter((journal) => {
@@ -198,11 +210,13 @@ export default function JournalsScreen() {
     );
   };
 
-  if (loading) {
+  if (isLoading && journals.length === 0) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading journals...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading journals...</Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -277,10 +291,12 @@ export default function JournalsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={colors.primary} />
         }
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        onEndReached={loadNext}
+        onEndReachedThreshold={0.5}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="book-outline" size={64} color={colors.border} />
@@ -296,6 +312,13 @@ export default function JournalsScreen() {
             </TouchableOpacity>
           </View>
         }
+        ListFooterComponent={
+          isLoading && !isRefreshing ? (
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null
+        }
       />
     </SafeAreaView>
   );
@@ -306,6 +329,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centerContent: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -318,7 +342,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'ios' ? 12 : 16,
     paddingBottom: 12,
   },
   backButton: {
@@ -396,7 +420,13 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 10,
+    flexGrow: 1,
+  },
+  loaderContainer: {
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   journalCard: {
     borderRadius: 16,

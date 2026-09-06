@@ -1,6 +1,7 @@
 // mobile/src/services/auth.service.ts
 import api from './api';
 import * as SecureStore from 'expo-secure-store';
+import { Alert } from 'react-native';
 
 export interface LoginResponse {
   access_token: string;
@@ -12,7 +13,7 @@ export interface LoginResponse {
     last_name: string;
     role: string;
     student_id: string;
-    avatar?: string;
+    avatar_url?: string;
   };
 }
 
@@ -23,6 +24,13 @@ export interface RegisterData {
   last_name: string;
   student_id: string;
 }
+
+// ✅ Get Base URL from environment
+const getBaseUrl = (): string => {
+  // You can also hardcode your IP here if env not working
+  // return 'http://192.168.1.45:8000';
+  return process.env.EXPO_PUBLIC_BASE_URL || 'http://localhost:8000';
+};
 
 export const authService = {
   // Student Login (Mobile)
@@ -80,26 +88,27 @@ export const authService = {
     }
   },
 
-  // ✅ UPDATED: Logout - Keep avatar
+  // Logout
   async logout(): Promise<void> {
     try {
       await SecureStore.deleteItemAsync('access_token');
       await SecureStore.deleteItemAsync('user');
+      await SecureStore.deleteItemAsync('user_avatar');
       console.log('✅ Logout successful');
     } catch (error) {
       console.error('❌ Logout error:', error);
     }
   },
 
-  // ✅ UPDATED: Get current user with avatar
+  // Get current user with avatar from server
   async getCurrentUser(): Promise<any> {
     try {
       const response = await api.get('/auth/me');
       
-      // Load saved avatar if exists
-      const savedAvatar = await SecureStore.getItemAsync('user_avatar');
-      if (savedAvatar) {
-        response.data.avatar = savedAvatar;
+      // If avatar_url exists from server, construct full URL
+      if (response.data.avatar_url) {
+        const BASE_URL = getBaseUrl();
+        response.data.avatar_url = `${BASE_URL}/static/${response.data.avatar_url}`;
       }
       
       return response.data;
@@ -109,75 +118,165 @@ export const authService = {
     }
   },
 
-  // ✅ UPDATED: Update Profile with Avatar Support
+  // Update Profile
   async updateProfile(data: { 
     first_name?: string; 
     last_name?: string; 
     phone?: string;
-    avatar?: string;
   }): Promise<any> {
     try {
       console.log('📝 Updating profile:', data);
       
-      // Save avatar to SecureStore if provided
-      if (data.avatar) {
-        await SecureStore.setItemAsync('user_avatar', data.avatar);
-      }
+      const response = await api.put('/auth/me', data);
       
-      // Only send text fields to backend
-      const updateData: any = {};
-      if (data.first_name) updateData.first_name = data.first_name;
-      if (data.last_name) updateData.last_name = data.last_name;
-      if (data.phone) updateData.phone = data.phone;
-      
-      const response = await api.put('/auth/me', updateData);
-      
-      // Update stored user data with avatar
+      // Update stored user data
       const storedUser = await SecureStore.getItemAsync('user');
       if (storedUser) {
         const user = JSON.parse(storedUser);
         const updatedUser = { ...user, ...response.data };
-        if (data.avatar) {
-          updatedUser.avatar = data.avatar;
-        }
         await SecureStore.setItemAsync('user', JSON.stringify(updatedUser));
       }
       
       console.log('✅ Profile updated successfully:', response.data);
-      return { ...response.data, avatar: data.avatar };
+      return response.data;
     } catch (error: any) {
       console.error('❌ Update profile error:', error.response?.data || error.message);
       throw error;
     }
   },
 
-  // ✅ NEW: Save Avatar
-  async saveAvatar(avatarUri: string): Promise<void> {
+  // Upload Avatar to Server
+  async uploadAvatar(avatarUri: string): Promise<any> {
     try {
-      await SecureStore.setItemAsync('user_avatar', avatarUri);
-      console.log('✅ Avatar saved successfully');
-    } catch (error) {
-      console.error('❌ Save avatar error:', error);
+      console.log('📤 Uploading avatar...');
+      
+      // Create FormData
+      const formData = new FormData();
+      
+      // Get filename from URI
+      const fileName = avatarUri.split('/').pop() || 'avatar.jpg';
+      const fileType = fileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      
+      // @ts-ignore - FormData expects this structure for React Native
+      formData.append('file', {
+        uri: avatarUri,
+        name: fileName,
+        type: fileType,
+      });
+      
+      const response = await api.post('/users/avatar', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      console.log('✅ Avatar uploaded:', response.data);
+      
+      // Construct full avatar URL
+      const BASE_URL = getBaseUrl();
+      const fullAvatarUrl = response.data.avatar_url ? `${BASE_URL}/static/${response.data.avatar_url}` : null;
+      
+      // Update stored user data with full avatar URL
+      const storedUser = await SecureStore.getItemAsync('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        user.avatar_url = fullAvatarUrl;
+        await SecureStore.setItemAsync('user', JSON.stringify(user));
+      }
+      
+      // Also store in local cache for quick access
+      if (fullAvatarUrl) {
+        await SecureStore.setItemAsync('user_avatar', fullAvatarUrl);
+      }
+      
+      return response.data;
+      
+    } catch (error: any) {
+      console.error('❌ Upload avatar error:', error.response?.data || error.message);
+      throw error;
     }
   },
 
-  // ✅ NEW: Get Avatar
+  // ✅ Delete Avatar from Server - Try DELETE first, fallback to POST
+  async deleteAvatar(): Promise<void> {
+    try {
+      // Try DELETE first
+      await api.delete('/users/avatar');
+      console.log('✅ Avatar deleted from server (DELETE)');
+      
+    } catch (error: any) {
+      // If DELETE fails with 403, try POST fallback
+      if (error.response?.status === 403) {
+        console.log('⚠️ DELETE failed with 403, trying POST fallback...');
+        try {
+          await api.post('/users/avatar/delete');
+          console.log('✅ Avatar deleted from server (POST fallback)');
+        } catch (postError: any) {
+          console.error('❌ POST fallback also failed:', postError.response?.data || postError.message);
+          throw postError;
+        }
+      } else {
+        throw error;
+      }
+    }
+    
+    // Clear avatar from SecureStore
+    await SecureStore.deleteItemAsync('user_avatar');
+    
+    // Update stored user data
+    const storedUser = await SecureStore.getItemAsync('user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      delete user.avatar_url;
+      await SecureStore.setItemAsync('user', JSON.stringify(user));
+    }
+  },
+
+  // Get Avatar URL (from server or local cache)
   async getAvatar(): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync('user_avatar');
+      const BASE_URL = getBaseUrl();
+      
+      // First try to get from user data (server URL)
+      const userData = await SecureStore.getItemAsync('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        if (user.avatar_url) {
+          // Check if it's already a full URL
+          if (user.avatar_url.startsWith('http')) {
+            return user.avatar_url;
+          }
+          // Construct full URL if it's a relative path
+          return `${BASE_URL}/static/${user.avatar_url}`;
+        }
+      }
+      
+      // Fallback to local avatar
+      const storedAvatar = await SecureStore.getItemAsync('user_avatar');
+      if (storedAvatar) {
+        // Check if it's already a full URL
+        if (storedAvatar.startsWith('http')) {
+          return storedAvatar;
+        }
+        // Construct full URL
+        return `${BASE_URL}/static/${storedAvatar}`;
+      }
+      
+      return null;
+      
     } catch (error) {
       console.error('❌ Get avatar error:', error);
       return null;
     }
   },
 
-  // ✅ NEW: Delete Avatar
-  async deleteAvatar(): Promise<void> {
+  // Save Avatar (local cache)
+  async saveAvatar(avatarUri: string): Promise<void> {
     try {
-      await SecureStore.deleteItemAsync('user_avatar');
-      console.log('✅ Avatar deleted successfully');
+      await SecureStore.setItemAsync('user_avatar', avatarUri);
+      console.log('✅ Avatar saved locally');
     } catch (error) {
-      console.error('❌ Delete avatar error:', error);
+      console.error('❌ Save avatar error:', error);
     }
   },
 

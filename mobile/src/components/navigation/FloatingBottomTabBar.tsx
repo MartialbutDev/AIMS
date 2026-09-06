@@ -7,6 +7,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../context/ThemeContext";
 
+// ✅ Custom colors
+const LIGHT_MODE_ACTIVE = "#000080"; // Navy Blue
+const DARK_MODE_ACTIVE = "#FCBA04";  // Yellow/Gold
+
 interface TabItem {
   name: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -35,12 +39,15 @@ export default function FloatingBottomTabBar({
   const { colors, isDark } = useTheme();
   const pathname = usePathname();
 
+  // ✅ Choose active color based on theme
+  const activeColor = isDark ? DARK_MODE_ACTIVE : LIGHT_MODE_ACTIVE;
+
   const getActiveTab = () => {
     if (pathname.includes("/dashboard")) return "home";
     if (pathname.includes("/applications")) return "applications";
     if (pathname.includes("/documents")) return "documents";
     if (pathname.includes("/dtr")) return "dtr";
-    if (pathname.includes("/settings") || pathname.includes("/profile")) return "more";
+    if (pathname.includes("/settings") || pathname.includes("/profile") || pathname.includes("/about")) return "more";
     return "home";
   };
 
@@ -65,13 +72,13 @@ export default function FloatingBottomTabBar({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
+    <SafeAreaView style={styles.safeArea}>
       <Animated.View
         style={[
           styles.container,
           {
-            backgroundColor: isDark ? 'rgba(30,41,59,0.92)' : 'rgba(255,255,255,0.92)',
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.3)',
+            backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
+            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
           },
           animatedStyle,
         ]}
@@ -79,6 +86,9 @@ export default function FloatingBottomTabBar({
         <View style={styles.tabContainer}>
           {tabs.map((tab) => {
             const isActive = currentTab === tab.name;
+            // ✅ Use activeColor (changes based on theme)
+            const tabColor = isActive ? activeColor : colors.textSecondary;
+
             return (
               <TouchableOpacity
                 key={tab.name}
@@ -100,7 +110,7 @@ export default function FloatingBottomTabBar({
                   <Ionicons
                     name={isActive ? tab.icon.replace("-outline", "") as any : tab.icon}
                     size={24}
-                    color={isActive ? colors.primary : colors.textSecondary}
+                    color={tabColor}
                   />
                   {tab.badge && tab.badge > 0 ? (
                     <View style={[styles.badge, { backgroundColor: colors.error }]}>
@@ -111,7 +121,7 @@ export default function FloatingBottomTabBar({
                 <Text
                   style={[
                     styles.tabLabel,
-                    { color: isActive ? colors.primary : colors.textSecondary },
+                    { color: tabColor },
                     isActive && styles.tabLabelActive,
                   ]}
                 >
@@ -122,7 +132,7 @@ export default function FloatingBottomTabBar({
                     from={{ scaleX: 0 }}
                     animate={{ scaleX: 1 }}
                     transition={{ type: "spring", damping: 15 }}
-                    style={[styles.activeIndicator, { backgroundColor: colors.primary }]}
+                    style={[styles.activeIndicator, { backgroundColor: activeColor }]}
                   />
                 ) : null}
               </TouchableOpacity>

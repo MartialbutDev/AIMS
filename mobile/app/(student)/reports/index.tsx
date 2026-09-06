@@ -8,7 +8,6 @@ import {
   Alert,
   Dimensions,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -274,18 +273,21 @@ export default function ReportsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading reports...</Text>
-      </SafeAreaView>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading reports...</Text>
+        </View>
+      </View>
     );
   }
 
   const reportCards = getReportCards();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -427,7 +429,7 @@ export default function ReportsScreen() {
 
         <View style={styles.footerSpacer} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -436,6 +438,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centerContent: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -448,7 +451,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 12,
   },
   backButton: {

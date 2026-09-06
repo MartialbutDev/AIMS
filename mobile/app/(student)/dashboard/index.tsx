@@ -1,6 +1,6 @@
 // app/(student)/dashboard/index.tsx
 import { router } from "expo-router";
-import { SafeAreaView, ScrollView, StyleSheet, RefreshControl, View } from "react-native";
+import { ScrollView, StyleSheet, RefreshControl, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useState, useEffect, useRef } from "react";
 import * as SecureStore from "expo-secure-store";
@@ -46,7 +46,6 @@ export default function DashboardScreen() {
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [currentDate] = useState(formatDate(new Date()));
   
-  // Track scroll position
   const lastScrollY = useRef(0);
 
   function getGreeting(): string {
@@ -76,7 +75,9 @@ export default function DashboardScreen() {
       if (userData) {
         const user = JSON.parse(userData);
         setUserName(user.first_name || "Student");
+        
         const avatar = await authService.getAvatar();
+        console.log('📸 Dashboard - Avatar URL:', avatar);
         if (avatar) {
           setUserAvatar(avatar);
         }
@@ -123,7 +124,6 @@ export default function DashboardScreen() {
     router.push(route as any);
   };
 
-  // Handle scroll to hide/show tab bar
   const handleScroll = (event: any) => {
     const currentOffsetY = event.nativeEvent.contentOffset.y;
     const diff = currentOffsetY - lastScrollY.current;
@@ -139,16 +139,16 @@ export default function DashboardScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <StatusBar style={isDark ? "light" : "dark"} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
         <SkeletonLoader />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -293,7 +293,7 @@ export default function DashboardScreen() {
 
         <View style={styles.footerSpacer} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

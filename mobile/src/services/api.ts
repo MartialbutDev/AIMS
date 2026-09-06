@@ -50,4 +50,46 @@ api.interceptors.response.use(
   }
 );
 
+// ✅ Paginated Response Interface
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+// ✅ Helper for paginated requests
+export const apiHelpers = {
+  async getPaginated<T>(
+    endpoint: string,
+    page: number = 1,
+    limit: number = 10,
+    params: Record<string, any> = {}
+  ): Promise<PaginatedResponse<T>> {
+    const response = await api.get(endpoint, {
+      params: {
+        ...params,
+        page,
+        limit,
+      },
+    });
+    // If response is already paginated, return it
+    if (response.data.items !== undefined) {
+      return response.data;
+    }
+    // If response is a plain array, wrap it
+    if (Array.isArray(response.data)) {
+      return {
+        items: response.data,
+        total: response.data.length,
+        page,
+        limit,
+        totalPages: Math.ceil(response.data.length / limit),
+      };
+    }
+    return response.data;
+  },
+};
+
 export default api;

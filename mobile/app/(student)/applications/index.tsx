@@ -2,24 +2,27 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Dimensions,
   FlatList,
   RefreshControl,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
+import { usePaginatedData } from "../../../src/hooks/usePaginatedData";
 import api from "../../../src/services/api";
+import { SkeletonApplicationList } from "../../../src/components/common/Skeleton";
 
 const { width } = Dimensions.get("window");
 
@@ -63,34 +66,33 @@ const statusLabels: Record<string, string> = {
 export default function ApplicationsScreen() {
   const { colors, isDark } = useTheme();
   const { handleScroll } = useAutoHideTab();
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
 
   const filters = ["all", "pending", "reviewing", "interview", "accepted", "rejected", "withdrawn"];
 
-  useEffect(() => {
-    fetchApplications();
-  }, []);
-
-  const fetchApplications = async () => {
-    try {
-      const response = await api.get('/applications/');
-      setApplications(response.data);
-    } catch (error) {
-      console.error('Error fetching applications:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  // ✅ Pagination hook
+  const {
+    data: applications,
+    loadNext,
+    refresh,
+    isLoading,
+    isRefreshing,
+    hasMore,
+  } = usePaginatedData<Application>(
+    async (page, limit) => {
+      const response = await api.get(`/applications/?page=${page}&limit=${limit}`);
+      return {
+        data: response.data.items || response.data,
+        total: response.data.total || response.data.length || 0,
+      };
+    },
+    {
+      initialPage: 1,
+      initialLimit: 10,
+      autoLoad: true,
     }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchApplications();
-  };
+  );
 
   const filteredApplications = applications.filter((app) => {
     const matchesSearch = app.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -176,11 +178,17 @@ export default function ApplicationsScreen() {
     </TouchableOpacity>
   );
 
-  if (loading) {
+  // ✅ Skeleton Loader
+  if (isLoading && applications.length === 0) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading applications...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <View style={styles.header}>
+          <View style={styles.backButton} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Applications</Text>
+          <View style={styles.addButton} />
+        </View>
+        <SkeletonApplicationList count={5} />
       </SafeAreaView>
     );
   }
@@ -234,10 +242,12 @@ export default function ApplicationsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={colors.primary} />
         }
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        onEndReached={loadNext}
+        onEndReachedThreshold={0.5}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="briefcase-outline" size={64} color={colors.border} />
@@ -253,6 +263,13 @@ export default function ApplicationsScreen() {
             </TouchableOpacity>
           </View>
         }
+        ListFooterComponent={
+          isLoading && !isRefreshing ? (
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null
+        }
       />
     </SafeAreaView>
   );
@@ -263,6 +280,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centerContent: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -275,7 +293,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'ios' ? 12 : 16,
     paddingBottom: 12,
   },
   backButton: {
@@ -328,7 +346,13 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 10,
+    flexGrow: 1,
+  },
+  loaderContainer: {
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   applicationCard: {
     borderRadius: 16,

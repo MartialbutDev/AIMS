@@ -7,6 +7,9 @@ import Animated from "react-native-reanimated";
 
 import { useTheme } from "../../context/ThemeContext";
 
+// ✅ Custom color for dark mode
+const DARK_MODE_ACCENT = "#FCBA04";
+
 interface InternshipProgressCardProps {
   progress: number;
   hoursRendered: number;
@@ -22,10 +25,12 @@ export default function InternshipProgressCard({
 }: InternshipProgressCardProps) {
   const { colors, isDark } = useTheme();
 
-  // ✅ FIXED: Use as const to make it a readonly tuple
+  // ✅ Use FCBA04 in dark mode, primary in light mode
+  const accentColor = isDark ? DARK_MODE_ACCENT : colors.primary;
+
   const gradientColors = isDark 
-    ? ["#1E293B", "#0F172A"] as const  // Dark mode
-    : ["#FFFFFF", "#F8FAFC"] as const; // Light mode
+    ? ["#1E293B", "#0F172A"] as const
+    : ["#FFFFFF", "#F8FAFC"] as const;
 
   return (
     <MotiView
@@ -35,14 +40,15 @@ export default function InternshipProgressCard({
       style={styles.container}
     >
       <LinearGradient
-        colors={gradientColors}  // ✅ Now TypeScript is happy
+        colors={gradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.textPrimary }]}>Internship Progress</Text>
-          <Text style={[styles.percentage, { color: colors.primary }]}>{progress}%</Text>
+          {/* ✅ Percentage uses accentColor */}
+          <Text style={[styles.percentage, { color: accentColor }]}>{progress}%</Text>
         </View>
 
         <View style={styles.progressBarContainer}>
@@ -50,7 +56,11 @@ export default function InternshipProgressCard({
             <Animated.View
               style={[
                 styles.progressBarFill,
-                { width: `${progress}%`, backgroundColor: colors.primary },
+                { 
+                  width: `${progress}%`, 
+                  // ✅ Progress bar uses accentColor
+                  backgroundColor: accentColor 
+                },
               ]}
             />
           </View>
@@ -58,8 +68,8 @@ export default function InternshipProgressCard({
 
         <View style={[styles.statsContainer, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}>
           <View style={styles.statItem}>
-            <View style={[styles.statIconContainer, { backgroundColor: `${colors.primary}15` }]}>
-              <Ionicons name="time-outline" size={16} color={colors.primary} />
+            <View style={[styles.statIconContainer, { backgroundColor: `${accentColor}15` }]}>
+              <Ionicons name="time-outline" size={16} color={accentColor} />
             </View>
             <View style={styles.statContent}>
               <Text style={[styles.statValue, { color: colors.textPrimary }]}>{hoursRendered}h</Text>

@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
   Alert,
+  Platform,
 } from "react-native";
 
 import { useTheme } from "../../../src/context/ThemeContext";
@@ -113,21 +114,25 @@ export default function ApplicationDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading application...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading application...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   if (!application) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <Ionicons name="document-text-outline" size={64} color={colors.border} />
-        <Text style={[styles.errorText, { color: colors.textSecondary }]}>Application not found</Text>
-        <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchApplicationDetail}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.centerContent}>
+          <Ionicons name="document-text-outline" size={64} color={colors.border} />
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>Application not found</Text>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchApplicationDetail}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -208,6 +213,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centerContent: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -235,7 +241,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'ios' ? 12 : 16,
     paddingBottom: 12,
   },
   backButton: {

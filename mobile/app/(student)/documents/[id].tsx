@@ -6,13 +6,14 @@ import { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from 'expo-secure-store';
 
 import { useTheme } from "../../../src/context/ThemeContext";
@@ -81,7 +82,6 @@ export default function DocumentDetailScreen() {
     if (!document) return;
     
     try {
-      // ✅ Get token and add as query parameter
       const token = await SecureStore.getItemAsync('access_token');
       const imageUrl = `${BASE_URL}/api/v1/documents/${document.id}/image?token=${encodeURIComponent(token || '')}`;
       
@@ -103,21 +103,25 @@ export default function DocumentDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading document...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading document...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   if (!document) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <Ionicons name="document-text-outline" size={64} color={colors.border} />
-        <Text style={[styles.errorText, { color: colors.textSecondary }]}>Document not found</Text>
-        <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchDocument}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.centerContent}>
+          <Ionicons name="document-text-outline" size={64} color={colors.border} />
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>Document not found</Text>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchDocument}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -207,6 +211,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centerContent: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -234,7 +239,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: Platform.OS === 'ios' ? 12 : 16,
     paddingBottom: 12,
   },
   backButton: {

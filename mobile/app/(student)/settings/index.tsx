@@ -3,7 +3,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, ScrollView, Text, TouchableOpacity, View, Alert } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import ThemeToggle from "../../../src/components/settings/ThemeToggle";
@@ -56,28 +55,31 @@ export default function SettingsScreen() {
     {
       icon: "notifications-outline",
       label: "Notification Preferences",
-      onPress: () => console.log("Notification settings"),
+      onPress: () => router.push("/(student)/notifications/preferences" as any),
     },
     {
       icon: "shield-outline",
       label: "Privacy & Security",
-      onPress: () => console.log("Privacy settings"),
+      onPress: () => router.push("/(student)/settings/privacy-security" as any),
+    },
+    {
+      icon: "settings-outline", // ✅ NEW: App Settings
+      label: "App Settings",
+      onPress: () => router.push("/(student)/settings/app-settings" as any),
     },
     {
       icon: "help-circle-outline",
       label: "Help & Support",
-      onPress: () => console.log("Help"),
+      onPress: () => router.push("/(student)/settings/help-support" as any),
     },
     {
       icon: "information-circle-outline",
       label: "About AIMS",
-      // ✅ FIXED: Use proper route path with 'as any' to bypass type checking
       onPress: () => router.push("/(student)/about" as any),
     },
   ];
 
   const renderSetting = (item: SettingItem, index: number) => {
-    // ✅ Only change icon color in dark mode - everything else stays the same
     const iconColor = isDark ? "#FFFFFF" : (item.color || colors.primary);
 
     return (
@@ -99,8 +101,8 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -141,7 +143,7 @@ export default function SettingsScreen() {
 
         <Text style={[styles.versionText, { color: colors.textSecondary }]}>Version 1.0.0</Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -154,7 +156,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 12,
   },
   backButton: {

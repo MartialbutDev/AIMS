@@ -3,7 +3,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Image, Linking, Dimensions } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { MotiView } from "moti";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -255,8 +254,8 @@ export default function AboutScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
 
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} accessibilityLabel="Go Back">
@@ -272,7 +271,7 @@ export default function AboutScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {/* Hero Card - THIS IS WHERE "ACADEMIC INTERNSHIP MANAGEMENT SYSTEM" IS DISPLAYED */}
+        {/* Hero Card */}
         <MotiView
           from={{ opacity: 0, translateY: 20 }}
           animate={{ opacity: 1, translateY: 0 }}
@@ -288,7 +287,6 @@ export default function AboutScreen() {
           <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}15` }]}>
             <Ionicons name="school-outline" size={40} color={colors.primary} />
           </View>
-          {/* This is the title that needs to be centered - it's already centered! */}
           <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>{APP_NAME}</Text>
           <View style={styles.heroBadge}>
             <View style={[styles.heroBadgeDot, { backgroundColor: colors.success }]} />
@@ -349,10 +347,10 @@ export default function AboutScreen() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary }]}>© {new Date().getFullYear()} {APP_NAME}</Text>
-          <Text style={[styles.footerSubtext, { color: colors.textSecondary }]}>Built with ❤️ by the AIMS Team</Text>
+          <Text style={[styles.footerSubtext, { color: colors.textSecondary }]}>Built by AIMS Team</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -365,7 +363,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 0, // ✅ Removed - handled by layout
     paddingBottom: 14,
     borderBottomWidth: 0.5,
   },
@@ -425,7 +423,7 @@ const styles = StyleSheet.create({
     fontWeight: '700', 
     letterSpacing: -0.5, 
     marginBottom: 4,
-    textAlign: 'center', // Ensure the title is centered
+    textAlign: 'center',
   },
   heroBadge: {
     flexDirection: 'row',

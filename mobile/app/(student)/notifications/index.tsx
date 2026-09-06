@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback } from "react";
 import {
   FlatList,
   RefreshControl,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -18,6 +17,7 @@ import {
 import { useTheme } from "../../../src/context/ThemeContext";
 import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import { notificationService, Notification } from "../../../src/services/notification.service";
+import { SkeletonNotificationList } from "../../../src/components/common/Skeleton";
 
 const getNotificationIcon = (type: string): keyof typeof Ionicons.glyphMap => {
   switch (type) {
@@ -201,18 +201,24 @@ export default function NotificationsScreen() {
     </View>
   );
 
+  // ✅ Skeleton Loader
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading notifications...</Text>
-      </SafeAreaView>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
+        <View style={styles.header}>
+          <View style={styles.backButton} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Notifications</Text>
+          <View style={styles.markAllButton} />
+        </View>
+        <SkeletonNotificationList count={5} />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -245,8 +251,9 @@ export default function NotificationsScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={16}
         ListEmptyComponent={renderEmpty}
+        ListFooterComponent={<View style={styles.listFooter} />}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -255,6 +262,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centerContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -267,7 +275,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 12,
   },
   backButton: {
@@ -298,7 +306,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 10,
+    flexGrow: 1,
+  },
+  listFooter: {
+    height: 80,
   },
   notificationItem: {
     flexDirection: 'row',

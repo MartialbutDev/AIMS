@@ -5,7 +5,6 @@ import { StatusBar } from "expo-status-bar";
 import { useState, useEffect } from "react";
 import {
   Alert,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,10 +16,10 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
-import * as FileSystem from 'expo-file-system';
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { authService } from "../../../src/services/auth.service";
+import { SkeletonProfile } from "../../../src/components/common/Skeleton";
 
 interface UserProfile {
   id: string;
@@ -32,9 +31,9 @@ interface UserProfile {
   role: string;
   is_active: boolean;
   is_verified: boolean;
+  avatar_url?: string | null;
   created_at: string;
   updated_at: string | null;
-  avatar?: string;
 }
 
 export default function ProfileScreen() {
@@ -44,30 +43,30 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [editPhone, setEditPhone] = useState("");
 
   useEffect(() => {
-    loadAvatarAndProfile();
+    loadProfile();
   }, []);
 
-  const loadAvatarAndProfile = async () => {
+  const loadProfile = async () => {
     try {
       setLoading(true);
       
-      // ✅ Load profile data
       const data = await authService.getCurrentUser();
       setProfile(data);
       setEditFirstName(data.first_name);
       setEditLastName(data.last_name);
       setEditPhone(data.phone || "");
       
-      // ✅ Load saved avatar
-      const savedAvatar = await authService.getAvatar();
-      if (savedAvatar) {
-        setAvatarUri(savedAvatar);
+      const avatar = await authService.getAvatar();
+      console.log('📸 Profile - Avatar URL:', avatar);
+      if (avatar) {
+        setAvatarUri(avatar);
       }
       
     } catch (error) {
@@ -78,35 +77,97 @@ export default function ProfileScreen() {
     }
   };
 
+  const refreshAvatar = async () => {
+    const avatar = await authService.getAvatar();
+    if (avatar) {
+      setAvatarUri(avatar);
+    }
+  };
+
   const handleSave = async () => {
     if (!profile) return;
 
     setSaving(true);
     try {
-      // ✅ Save avatar if it was updated
-      let updatedAvatar = avatarUri;
-      
-      // If avatarUri is different from the one in storage, save it
-      const savedAvatar = await authService.getAvatar();
-      if (avatarUri && avatarUri !== savedAvatar) {
-        await authService.saveAvatar(avatarUri);
-      }
-      
       const updated = await authService.updateProfile({
         first_name: editFirstName.trim(),
         last_name: editLastName.trim(),
         phone: editPhone.trim() || undefined,
-        avatar: avatarUri || undefined,
       });
       
       setProfile(updated);
       setEditing(false);
       Alert.alert("Success", "Profile updated successfully!");
+      
+      await loadProfile();
+      
     } catch (error) {
       Alert.alert("Error", "Failed to update profile");
     } finally {
       setSaving(false);
     }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission required", "Please allow access to your photo library");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        const uri = result.assets[0].uri;
+        
+        setUploadingAvatar(true);
+        setAvatarUri(uri);
+        
+        const updatedUser = await authService.uploadAvatar(uri);
+        setProfile(updatedUser);
+        
+        await refreshAvatar();
+        
+        Alert.alert("Success", "Profile picture updated!");
+      }
+      
+    } catch (error: any) {
+      console.error("Avatar upload error:", error);
+      Alert.alert("Error", error.message || "Failed to upload avatar");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleDeleteAvatar = async () => {
+    Alert.alert(
+      "Remove Profile Picture",
+      "Are you sure you want to remove your profile picture?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await authService.deleteAvatar();
+              setAvatarUri(null);
+              setProfile(prev => prev ? { ...prev, avatar_url: null } : null);
+              Alert.alert("Success", "Profile picture removed");
+              await loadProfile();
+            } catch (error) {
+              Alert.alert("Error", "Failed to remove profile picture");
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleLogout = () => {
@@ -127,34 +188,6 @@ export default function ProfileScreen() {
     router.push("/(student)/profile/change-password" as any);
   };
 
-  const handlePickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission required", "Please allow access to your photo library");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      setAvatarUri(uri);
-      
-      // ✅ Auto-save avatar immediately
-      try {
-        await authService.saveAvatar(uri);
-        Alert.alert("Success", "Profile picture updated!");
-      } catch (error) {
-        console.error("Error saving avatar:", error);
-      }
-    }
-  };
-
   const renderReadOnlyField = (label: string, value: string | null) => (
     <View style={styles.fieldContainer}>
       <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
@@ -162,32 +195,41 @@ export default function ProfileScreen() {
     </View>
   );
 
+  // ✅ Skeleton Loader
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading profile...</Text>
-      </SafeAreaView>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
+        <View style={styles.header}>
+          <View style={styles.backButton} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Profile</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <SkeletonProfile />
+      </View>
     );
   }
 
   if (!profile) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }, styles.centerContent]}>
-        <Ionicons name="person-outline" size={64} color={colors.border} />
-        <Text style={[styles.errorText, { color: colors.textSecondary }]}>Failed to load profile</Text>
-        <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={loadAvatarAndProfile}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
+        <View style={styles.centerContent}>
+          <Ionicons name="person-outline" size={64} color={colors.border} />
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>Failed to load profile</Text>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={loadProfile}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   }
 
   const fullName = `${profile.first_name} ${profile.last_name}`;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -199,9 +241,15 @@ export default function ProfileScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.avatarSection}>
-          <TouchableOpacity style={styles.avatarContainer} onPress={handlePickImage}>
+          <TouchableOpacity 
+            style={styles.avatarContainer} 
+            onPress={handlePickImage}
+            disabled={uploadingAvatar}
+          >
             <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-              {avatarUri ? (
+              {uploadingAvatar ? (
+                <ActivityIndicator size="large" color="#FFFFFF" />
+              ) : avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
               ) : (
                 <Text style={styles.avatarText}>
@@ -213,6 +261,17 @@ export default function ProfileScreen() {
               <Ionicons name="camera-outline" size={16} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
+          
+          {avatarUri && (
+            <TouchableOpacity
+              style={[styles.deleteAvatarButton, { backgroundColor: `${colors.error}10` }]}
+              onPress={handleDeleteAvatar}
+            >
+              <Ionicons name="trash-outline" size={14} color={colors.error} />
+              <Text style={[styles.deleteAvatarText, { color: colors.error }]}>Remove</Text>
+            </TouchableOpacity>
+          )}
+          
           <Text style={[styles.studentName, { color: colors.textPrimary }]}>{fullName}</Text>
           <Text style={[styles.studentId, { color: colors.textSecondary }]}>ID: {profile.student_id}</Text>
           <Text style={[styles.userRole, { color: colors.primary, backgroundColor: `${colors.primary}10` }]}>
@@ -368,7 +427,7 @@ export default function ProfileScreen() {
 
         <Text style={[styles.versionText, { color: colors.textSecondary }]}>Version 1.0.0</Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -377,6 +436,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   centerContent: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -404,7 +464,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 12,
   },
   backButton: {
@@ -427,7 +487,7 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     position: "relative",
-    marginBottom: 12,
+    marginBottom: 8,
   },
   avatar: {
     width: 100,
@@ -459,9 +519,23 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FFFFFF",
   },
+  deleteAvatarButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+    gap: 4,
+  },
+  deleteAvatarText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
   studentName: {
     fontSize: 22,
     fontWeight: "700",
+    marginTop: 4,
   },
   studentId: {
     fontSize: 14,
