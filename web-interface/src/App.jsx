@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import bgImage from './assets/ustp-bg.jpg';
 
 // Auth
@@ -19,160 +20,202 @@ import CoordinatorSidebar from './coordinator/CoordinatorSidebar';
 import CompanyDashboard from './company/CompanyDashboard';
 import CompanySidebar from './company/CompanySidebar';
 
-function App() {
+export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [currentPage, setCurrentPage] = useState('overview');
-  const [selectedCoordinator, setSelectedCoordinator] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [selectedCoordinator, setSelectedCoordinator] = useState(null);
 
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Login handler redirects to the role's default URL
   const handleLoginSuccess = ({ role, username }) => {
     setCurrentUser({ role, username });
 
     switch (role) {
       case 'dean':
-        setCurrentPage('overview');
+        navigate('/dean/overview');
         break;
       case 'coordinator':
-        setCurrentPage('coordinator-dashboard');
-        break;
-      case 'career_center':
-        setCurrentPage('career-center');
+        navigate('/coordinator/dashboard');
         break;
       case 'company':
-        setCurrentPage('company-dashboard');
+        navigate('/company/dashboard');
+        break;
+      case 'career_center':
+        navigate('/career-center');
         break;
       case 'admin':
-        setCurrentPage('admin-dashboard');
+        navigate('/admin/dashboard');
         break;
       default:
-        setCurrentPage('overview');
+        navigate('/login');
     }
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setCurrentPage('login');
+    setIsSidebarOpen(false);
+    navigate('/login');
   };
 
-  const handleSelectCoordinator = (coordinator) => {
-    setSelectedCoordinator(coordinator);
-    setCurrentPage('coordinator-detail');
+  // Helper for dean to drill down into a coordinator's profile
+  const handleSelectCoordinator = (coord) => {
+    setSelectedCoordinator(coord);
+    navigate('/dean/coordinator-detail');
   };
 
   return (
     <div
-      className="relative min-h-screen bg-cover bg-center bg-fixed bg-no-repeat"
+      className="relative min-h-screen w-full bg-cover bg-center bg-fixed bg-no-repeat"
       style={{ backgroundImage: `url(${bgImage})` }}
     >
-      {/* Background Overlay: Deep USTeP Navy gradient to maintain high contrast */}
-      <div className="min-h-screen bg-[#0e0a26]/40">
+      {/* Background tint overlay */}
+      <div className="min-h-screen w-full bg-[#0e0a26]/40 backdrop-blur-[1px]">
 
-        {/* --- NOT LOGGED IN --- */}
-        {!currentUser && (
-          <LoginPage onLoginSuccess={handleLoginSuccess} />
-        )}
-
-        {/* --- LOGGED IN PORTALS --- */}
+        {/* --- ROLE-BASED SIDEBARS --- */}
         {currentUser && (
           <>
-            {/* Dean Sidebar Drawer */}
-            <Sidebar 
-              isOpen={isSidebarOpen && currentUser.role === 'dean'} 
-              onClose={() => setIsSidebarOpen(false)} 
-              currentPage={currentPage}
-              userRole={currentUser.role}
-              onNavigate={(page) => setCurrentPage(page)}
+            {/* Dean Sidebar */}
+            <Sidebar
+              isOpen={isSidebarOpen && currentUser.role === 'dean'}
+              onClose={() => setIsSidebarOpen(false)}
+              currentPage={location.pathname}
+              onNavigate={(path) => navigate(path)}
               onLogout={handleLogout}
             />
 
-            {/* Host Company Sidebar Drawer */}
-            <CompanySidebar 
-              isOpen={isSidebarOpen && currentUser.role === 'company'} 
-              onClose={() => setIsSidebarOpen(false)} 
-              currentPage={currentPage}
-              onNavigate={(page) => setCurrentPage(page)}
+            {/* Coordinator Sidebar */}
+            <CoordinatorSidebar
+              isOpen={isSidebarOpen && currentUser.role === 'coordinator'}
+              onClose={() => setIsSidebarOpen(false)}
+              currentPage={location.pathname}
+              onNavigate={(path) => navigate(path)}
               onLogout={handleLogout}
             />
 
-            {/* Coordinator Sidebar Drawer */}
-            <CoordinatorSidebar 
-              isOpen={isSidebarOpen && currentUser.role === 'coordinator'} 
-              onClose={() => setIsSidebarOpen(false)} 
-              currentPage={currentPage}
-              onNavigate={(page) => setCurrentPage(page)}
+            {/* Company Sidebar */}
+            <CompanySidebar
+              isOpen={isSidebarOpen && currentUser.role === 'company'}
+              onClose={() => setIsSidebarOpen(false)}
+              currentPage={location.pathname}
+              onNavigate={(path) => navigate(path)}
               onLogout={handleLogout}
             />
+          </>
+        )}
 
-            {/* Dean Screens */}
-            {currentPage === 'overview' && (
-              <DepartmentDashboard 
-                onNavigate={setCurrentPage} 
+        {/* --- APPLICATION ROUTES --- */}
+        <Routes>
+          {/* Public / Auth */}
+          <Route
+            path="/login"
+            element={
+              currentUser ? (
+                <Navigate
+                  to={
+                    currentUser.role === 'dean'
+                      ? '/dean/overview'
+                      : currentUser.role === 'coordinator'
+                      ? '/coordinator/dashboard'
+                      : '/company/dashboard'
+                  }
+                  replace
+                />
+              ) : (
+                <LoginPage onLoginSuccess={handleLoginSuccess} />
+              )
+            }
+          />
+
+          {/* Dean Routes */}
+          <Route
+            path="/dean/overview"
+            element={
+              <DepartmentDashboard
                 onOpenSidebar={() => setIsSidebarOpen(true)}
                 onLogout={handleLogout}
               />
-            )}
-
-            {currentPage === 'coordinators' && (
-              <CoordinatorsPage 
-                onBack={() => setCurrentPage('overview')} 
+            }
+          />
+          <Route
+            path="/dean/coordinators"
+            element={
+              <CoordinatorsPage
+                onBack={() => navigate('/dean/overview')}
                 onSelectCoordinator={handleSelectCoordinator}
                 onOpenSidebar={() => setIsSidebarOpen(true)}
               />
-            )}
-
-            {currentPage === 'coordinator-detail' && selectedCoordinator && (
-              <CoordinatorDetailPage 
-                coordinator={selectedCoordinator} 
-                onBack={() => setCurrentPage('coordinators')} 
+            }
+          />
+          <Route
+            path="/dean/coordinator-detail"
+            element={
+              <CoordinatorDetailPage
+                coordinator={selectedCoordinator}
+                onBack={() => navigate('/dean/coordinators')}
               />
-            )}
+            }
+          />
+          <Route
+            path="/dean/notifications"
+            element={
+              <NotificationsPage
+                onBack={() => navigate('/dean/overview')}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+              />
+            }
+          />
 
-            {/* Coordinator Screen */}
-            {currentPage === 'coordinator-dashboard' && (
-              <CoordinatorDashboard 
-                onNavigate={setCurrentPage}
+          {/* Coordinator Routes */}
+          <Route
+            path="/coordinator/dashboard"
+            element={
+              <CoordinatorDashboard
                 onOpenSidebar={() => setIsSidebarOpen(true)}
                 onLogout={handleLogout}
               />
-            )}
+            }
+          />
 
-            {/* Notifications */}
-            {currentPage === 'notifications' && (
-              <NotificationsPage 
-                onBack={() => setCurrentPage(currentUser.role === 'coordinator' ? 'coordinator-dashboard' : 'overview')} 
+          {/* Host Company Routes */}
+          <Route
+            path="/company/dashboard"
+            element={
+              <CompanyDashboard
                 onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
               />
-            )}
+            }
+          />
 
-            {/* Placeholders for Upcoming Interfaces */}
-            {currentPage === 'career-center' && (
+          {/* Placeholders for Career Center & Admin */}
+          <Route
+            path="/career-center"
+            element={
               <div className="p-12 text-center text-white">
                 <h2 className="text-2xl font-bold text-[#f59e0b]">Career Center Portal</h2>
-                <p className="text-slate-300 text-sm mt-2">Ready to build the Industry Matching interface here.</p>
+                <p className="text-slate-300 text-sm mt-2">Ready to build Industry Matching routes here.</p>
                 <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all">Logout</button>
               </div>
-            )}
-{currentPage === 'company-dashboard' && (
-  <CompanyDashboard 
-    onNavigate={setCurrentPage}
-    onOpenSidebar={() => setIsSidebarOpen(true)}
-    onLogout={handleLogout}
-  />
-)}
-
-            {currentPage === 'admin-dashboard' && (
+            }
+          />
+          <Route
+            path="/admin/dashboard"
+            element={
               <div className="p-12 text-center text-white">
                 <h2 className="text-2xl font-bold text-[#f59e0b]">Admin Portal</h2>
-                <p className="text-slate-300 text-sm mt-2">Ready to build the System Administration interface here.</p>
+                <p className="text-slate-300 text-sm mt-2">Ready to build System Administration routes here.</p>
                 <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all">Logout</button>
               </div>
-            )}
-          </>
-        )}
+            }
+          />
+
+          {/* Root Fallback */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
 
       </div>
     </div>
   );
 }
-
-export default App;
