@@ -16,13 +16,12 @@ export default function Sidebar({
   onNavigate,
   onLogout
 }) {
-  const menuItems = [
-    { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'coordinators', label: 'Coordinators', icon: Users },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
+ const menuItems = [
+    { id: '/dean/overview', label: 'Dashboard', icon: LayoutDashboard },
+    { id: '/dean/coordinators', label: 'Coordinators', icon: Users },
+    { id: '/dean/analytics', label: 'Analytics', icon: BarChart3 },
+    { id: '/dean/notifications', label: 'Notifications', icon: Bell },
   ];
-
   return (
     <>
       {/* Dark Backdrop Overlay */}

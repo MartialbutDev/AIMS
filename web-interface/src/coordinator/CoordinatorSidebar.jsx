@@ -20,12 +20,12 @@ export default function CoordinatorSidebar({
   onLogout
 }) {
   const menuItems = [
-    { id: 'coordinator-dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'coordinator-students', label: 'Students', icon: Users },
-    { id: 'coordinator-reports', label: 'Reports', icon: FileText },
-    { id: 'coordinator-evaluations', label: 'Evaluations', icon: Award },
-    { id: 'coordinator-announcements', label: 'Announcements', icon: Bell },
-    { id: 'coordinator-companies', label: 'Companies', icon: Building2 },
+    { id: '/coordinator/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: '/coordinator/students', label: 'Students', icon: Users },
+    { id: '/coordinator/reports', label: 'Reports', icon: FileText },
+    { id: '/coordinator/evaluations', label: 'Evaluations', icon: Award },
+    { id: '/coordinator/announcements', label: 'Announcements', icon: Bell },
+    { id: '/coordinator/companies', label: 'Companies', icon: Building2 },
   ];
 
   return (

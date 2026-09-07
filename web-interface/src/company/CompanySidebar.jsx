@@ -18,12 +18,12 @@ export default function CompanySidebar({
   onNavigate,
   onLogout
 }) {
-  const menuItems = [
-    { id: 'company-dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'company-students', label: 'My Students', icon: Users },
-    { id: 'company-reports', label: 'Reports', icon: FileText },
-    { id: 'company-attendance', label: 'Attendance', icon: Clock },
-    { id: 'company-evaluations', label: 'Evaluations', icon: Award },
+ const menuItems = [
+    { id: '/company/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: '/company/students', label: 'My Students', icon: Users },
+    { id: '/company/reports', label: 'Reports', icon: FileText },
+    { id: '/company/attendance', label: 'Attendance', icon: Clock },
+    { id: '/company/evaluations', label: 'Evaluations', icon: Award },
   ];
 
   return (
