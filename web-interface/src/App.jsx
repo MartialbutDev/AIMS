@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
 import bgImage from './assets/ustp-bg.jpg';
 
-import LoginPage from './LoginPage';
-import DepartmentDashboard from './DepartmentDashboard';
-import CoordinatorDashboard from './CoordinatorDashboard';
-import CoordinatorsPage from './CoordinatorsPage';
-import CoordinatorDetailPage from './CoordinatorDetailPage';
-import NotificationsPage from './NotificationsPage';
-import Sidebar from './Sidebar';
-import CoordinatorSidebar from './CoordinatorSidebar';
-import CompanyDashboard from './CompanyDashboard';
-import CompanySidebar from './CompanySidebar';
+// Auth
+import LoginPage from './auth/LoginPage';
+
+// Dean Interface
+import DepartmentDashboard from './dean/DepartmentDashboard';
+import CoordinatorsPage from './dean/CoordinatorsPage';
+import CoordinatorDetailPage from './dean/CoordinatorDetailPage';
+import NotificationsPage from './dean/NotificationsPage';
+import Sidebar from './dean/Sidebar';
+
+// Coordinator Interface
+import CoordinatorDashboard from './coordinator/CoordinatorDashboard';
+import CoordinatorSidebar from './coordinator/CoordinatorSidebar';
+
+// Host Company Interface
+import CompanyDashboard from './company/CompanyDashboard';
+import CompanySidebar from './company/CompanySidebar';
 
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
