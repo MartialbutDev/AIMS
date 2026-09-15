@@ -5,7 +5,6 @@ import {
   TrendingUp,
   CheckCircle2,
   Bell,
-  Clock,
   ChevronRight,
   BarChart3,
   HelpCircle,
@@ -91,27 +90,6 @@ export default function DepartmentDashboard({ onNavigate, onOpenSidebar }) {
     }
   ];
 
-  const recentActivity = [
-    {
-      id: 1,
-      text: 'Dr. Ana Reyes approved 3 student documents',
-      time: '30 mins ago',
-      dotColor: 'bg-emerald-500'
-    },
-    {
-      id: 2,
-      text: 'Prof. Mark Lim submitted midterm evaluation batch',
-      time: '1 hour ago',
-      dotColor: 'bg-[#1a1642]'
-    },
-    {
-      id: 3,
-      text: 'Engr. Jose Ramos updated company endorsement list',
-      time: '3 hours ago',
-      dotColor: 'bg-[#f59e0b]'
-    }
-  ];
-
   return (
     <div className="min-h-screen bg-transparent text-slate-800 font-sans pb-12">
       
@@ -192,19 +170,16 @@ export default function DepartmentDashboard({ onNavigate, onOpenSidebar }) {
           })}
         </div>
 
-       {/* Overall Department Completion Banner */}
+        {/* Overall Department Completion Banner */}
         <div className="bg-[#1a1642] rounded-2xl p-5 text-white shadow-lg flex items-center gap-5 border border-[#f59e0b]/30">
-          {/* Icon */}
           <div className="p-3 bg-white/10 rounded-xl flex-shrink-0">
             <TrendingUp className="w-6 h-6 text-[#f59e0b]" />
           </div>
 
-          {/* Full-width Middle Section */}
           <div className="flex-1 min-w-0">
             <span className="text-sm font-semibold tracking-wide text-white block mb-2">
               Department OJT Completion Rate
             </span>
-            {/* Full width Progress Bar */}
             <div className="w-full bg-white/15 h-3 rounded-full overflow-hidden">
               <div
                 className="bg-[#f59e0b] h-full rounded-full transition-all duration-500 shadow-sm"
@@ -213,7 +188,6 @@ export default function DepartmentDashboard({ onNavigate, onOpenSidebar }) {
             </div>
           </div>
 
-          {/* Percentage Stats */}
           <div className="flex flex-col items-end flex-shrink-0 pl-4">
             <span className="text-3xl font-black text-[#f59e0b] leading-none">88%</span>
             <span className="text-xs text-slate-300 font-medium mt-1">overall completion</span>
@@ -223,10 +197,8 @@ export default function DepartmentDashboard({ onNavigate, onOpenSidebar }) {
         {/* 2-Column Main Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          {/* Left 2 Columns: Coordinators Overview Table & Activity */}
+          {/* Left 2 Columns: Coordinator Overview Table */}
           <div className="lg:col-span-2 space-y-6">
-
-            {/* Coordinator Overview Card */}
             <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -297,29 +269,6 @@ export default function DepartmentDashboard({ onNavigate, onOpenSidebar }) {
                 </table>
               </div>
             </div>
-
-            {/* Recent Activity Card */}
-            <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm">
-              <h2 className="text-sm font-bold text-[#1a1642] uppercase tracking-wider mb-4">
-                Recent Activity
-              </h2>
-
-              <div className="space-y-4">
-                {recentActivity.map((act) => (
-                  <div key={act.id} className="flex items-center justify-between text-sm py-1 border-b border-slate-100 last:border-none">
-                    <div className="flex items-center gap-3">
-                      <span className={`w-2.5 h-2.5 rounded-full ${act.dotColor} flex-shrink-0`} />
-                      <span className="text-slate-700 font-medium">{act.text}</span>
-                    </div>
-                    <span className="text-xs text-slate-400 flex items-center gap-1 whitespace-nowrap">
-                      <Clock className="w-3.5 h-3.5" />
-                      {act.time}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
           </div>
 
           {/* Right Column: Quick Access & Department Status */}
