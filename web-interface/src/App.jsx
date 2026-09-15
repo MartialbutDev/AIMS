@@ -20,6 +20,10 @@ import CoordinatorSidebar from './coordinator/CoordinatorSidebar';
 import CompanyDashboard from './company/CompanyDashboard';
 import CompanySidebar from './company/CompanySidebar';
 
+// Career Center Interface
+import CareerCenterDashboard from './career/CareerCenterDashboard';
+import CareerCenterSidebar from './career/CareerCenterSidebar';
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -102,6 +106,15 @@ export default function App() {
               onNavigate={(path) => navigate(path)}
               onLogout={handleLogout}
             />
+
+            {/* Career Center Sidebar */}
+            <CareerCenterSidebar
+              isOpen={isSidebarOpen && currentUser.role === 'career_center'}
+              onClose={() => setIsSidebarOpen(false)}
+              currentPage={location.pathname}
+              onNavigate={(path) => navigate(path)}
+              onLogout={handleLogout}
+            />
           </>
         )}
 
@@ -118,7 +131,11 @@ export default function App() {
                       ? '/dean/overview'
                       : currentUser.role === 'coordinator'
                       ? '/coordinator/dashboard'
-                      : '/company/dashboard'
+                      : currentUser.role === 'company'
+                      ? '/company/dashboard'
+                      : currentUser.role === 'career_center'
+                      ? '/career-center'
+                      : '/admin/dashboard'
                   }
                   replace
                 />
@@ -189,17 +206,18 @@ export default function App() {
             }
           />
 
-          {/* Placeholders for Career Center & Admin */}
+          {/* Career Center Portal */}
           <Route
             path="/career-center"
             element={
-              <div className="p-12 text-center text-white">
-                <h2 className="text-2xl font-bold text-[#f59e0b]">Career Center Portal</h2>
-                <p className="text-slate-300 text-sm mt-2">Ready to build Industry Matching routes here.</p>
-                <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all">Logout</button>
-              </div>
+              <CareerCenterDashboard
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
             }
           />
+
+          {/* Placeholder for Admin */}
           <Route
             path="/admin/dashboard"
             element={
