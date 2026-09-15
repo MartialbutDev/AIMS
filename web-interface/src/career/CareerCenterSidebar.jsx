@@ -19,16 +19,15 @@ export default function CareerCenterSidebar({
   onLogout
 }) {
   const menuItems = [
-    { id: 'career-center', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'career-partners', label: 'Partner Companies', icon: Building2 },
-    { id: 'career-placements', label: 'Students Placed', icon: Users },
-    { id: 'career-documents', label: 'MOA Documents', icon: FileCheck2 },
-    { id: 'career-reports', label: 'Reports & Analytics', icon: BarChart3 },
+    { id: '/career-center', label: 'Dashboard', icon: LayoutDashboard },
+    { id: '/career-center/partners', label: 'Partner Companies', icon: Building2 },
+    { id: '/career-center/placements', label: 'Students Placed', icon: Users },
+    { id: '/career-center/documents', label: 'MOA Documents', icon: FileCheck2 },
+    { id: '/career-center/reports', label: 'Reports & Analytics', icon: BarChart3 },
   ];
 
   return (
     <>
-      {/* Dark Overlay */}
       {isOpen && (
         <div
           onClick={onClose}
@@ -36,14 +35,12 @@ export default function CareerCenterSidebar({
         />
       )}
 
-      {/* Slide Drawer */}
       <aside
         className={`fixed top-0 left-0 bottom-0 w-72 bg-white z-50 shadow-2xl flex flex-col justify-between border-r border-slate-200 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div>
-          {/* Header */}
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-[#1a1642] flex items-center justify-center text-[#f59e0b] shadow-md">
@@ -63,7 +60,6 @@ export default function CareerCenterSidebar({
             </button>
           </div>
 
-          {/* Navigation Links */}
           <nav className="p-4 space-y-1.5">
             {menuItems.map((item) => {
               const Icon = item.icon;
@@ -99,11 +95,10 @@ export default function CareerCenterSidebar({
           </nav>
         </div>
 
-        {/* Profile & Working Logout */}
         <div className="p-4 border-t border-slate-100 space-y-3">
           <button
             onClick={() => {
-              onNavigate('career-profile');
+              onNavigate('/career-center/profile');
               onClose();
             }}
             className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-[#1a1642] transition-colors"

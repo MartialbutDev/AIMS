@@ -23,6 +23,7 @@ import CompanySidebar from './company/CompanySidebar';
 // Career Center Interface
 import CareerCenterDashboard from './career/CareerCenterDashboard';
 import CareerCenterSidebar from './career/CareerCenterSidebar';
+import PartnerCompaniesPage from './career/PartnerCompaniesPage';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -32,7 +33,7 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Login handler redirects to the role's default URL
+  // Login handler redirects to each role's starting screen
   const handleLoginSuccess = ({ role, username }) => {
     setCurrentUser({ role, username });
 
@@ -63,7 +64,7 @@ export default function App() {
     navigate('/login');
   };
 
-  // Helper for dean to drill down into a coordinator's profile
+  // Helper for the Dean to view details of one coordinator
   const handleSelectCoordinator = (coord) => {
     setSelectedCoordinator(coord);
     navigate('/dean/coordinator-detail');
@@ -77,7 +78,7 @@ export default function App() {
       {/* Background tint overlay */}
       <div className="min-h-screen w-full bg-[#0e0a26]/40 backdrop-blur-[1px]">
 
-        {/* --- ROLE-BASED SIDEBARS --- */}
+        {/* --- SIDEBAR MENUS --- */}
         {currentUser && (
           <>
             {/* Dean Sidebar */}
@@ -118,9 +119,9 @@ export default function App() {
           </>
         )}
 
-        {/* --- APPLICATION ROUTES --- */}
+        {/* --- PAGE ROUTES --- */}
         <Routes>
-          {/* Public / Auth */}
+          {/* Login Page */}
           <Route
             path="/login"
             element={
@@ -195,7 +196,7 @@ export default function App() {
             }
           />
 
-          {/* Host Company Routes */}
+          {/* Company Routes */}
           <Route
             path="/company/dashboard"
             element={
@@ -206,7 +207,7 @@ export default function App() {
             }
           />
 
-          {/* Career Center Portal */}
+          {/* Career Center Routes */}
           <Route
             path="/career-center"
             element={
@@ -216,20 +217,34 @@ export default function App() {
               />
             }
           />
+          <Route
+            path="/career-center/partners"
+            element={
+              <PartnerCompaniesPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
 
-          {/* Placeholder for Admin */}
+          {/* Admin Placeholder */}
           <Route
             path="/admin/dashboard"
             element={
               <div className="p-12 text-center text-white">
                 <h2 className="text-2xl font-bold text-[#f59e0b]">Admin Portal</h2>
                 <p className="text-slate-300 text-sm mt-2">Ready to build System Administration routes here.</p>
-                <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all">Logout</button>
+                <button
+                  onClick={handleLogout}
+                  className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Logout
+                </button>
               </div>
             }
           />
 
-          {/* Root Fallback */}
+          {/* Default fallback redirects to login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
 

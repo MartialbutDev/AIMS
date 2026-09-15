@@ -15,9 +15,11 @@ import {
   HelpCircle,
   Briefcase
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
-  // Top 4 Metric Cards
+export default function CareerCenterDashboard({ onOpenSidebar, onLogout }) {
+  const navigate = useNavigate();
+
   const stats = [
     {
       title: 'Active MOAs',
@@ -53,7 +55,6 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
     }
   ];
 
-  // Partner Companies Data
   const partnerCompanies = [
     {
       id: 1,
@@ -97,7 +98,6 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
     }
   ];
 
-  // Recent Activity Feed
   const recentActivity = [
     {
       id: 1,
@@ -138,12 +138,10 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
 
   return (
     <div className="min-h-screen bg-transparent text-slate-800 font-sans pb-12">
-      
-      {/* USTeP Header */}
       <header className="bg-[#1a1642] border-b-2 border-[#f59e0b] px-6 py-4 shadow-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={onOpenSidebar}
               className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
               aria-label="Open Menu"
@@ -166,8 +164,8 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
           </div>
 
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => onNavigate && onNavigate('career-notifications')}
+            <button
+              onClick={() => navigate('/career-center/notifications')}
               className="relative p-2 rounded-full hover:bg-white/10 text-white transition-colors"
             >
               <Bell className="w-5 h-5" />
@@ -182,10 +180,7 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
         </div>
       </header>
 
-      {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
-
-        {/* 4 Top Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat, index) => {
             const Icon = stat.icon;
@@ -215,7 +210,6 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
           })}
         </div>
 
-        {/* Elongated Placement Progress Banner */}
         <div className="bg-[#1a1642] rounded-2xl p-5 text-white shadow-lg flex items-center gap-5 border border-[#f59e0b]/30">
           <div className="p-3 bg-white/10 rounded-xl flex-shrink-0">
             <TrendingUp className="w-6 h-6 text-[#f59e0b]" />
@@ -239,21 +233,16 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
           </div>
         </div>
 
-        {/* 2-Column Dashboard Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Left Column (2 Cols wide): Partner Companies & Recent Activity */}
           <div className="lg:col-span-2 space-y-6">
-            
-            {/* Partner Companies Table */}
             <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-bold text-[#1a1642] uppercase tracking-wider">
                   Partner Companies
                 </h2>
-                <button 
-                  onClick={() => onNavigate && onNavigate('career-partners')}
-                  className="text-xs font-semibold text-[#1a1642] hover:text-[#f59e0b] transition-colors flex items-center gap-1"
+                <button
+                  onClick={() => navigate('/career-center/partners')}
+                  className="text-xs font-semibold text-[#1a1642] hover:text-[#f59e0b] transition-colors flex items-center gap-1 cursor-pointer"
                 >
                   View all <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -272,9 +261,9 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {partnerCompanies.map((company) => (
-                      <tr 
-                        key={company.id} 
-                        onClick={() => onNavigate && onNavigate('career-partners')}
+                      <tr
+                        key={company.id}
+                        onClick={() => navigate('/career-center/partners')}
                         className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
                       >
                         <td className="py-3.5 pr-3">
@@ -308,7 +297,6 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
               </div>
             </div>
 
-            {/* Recent Activity Feed */}
             <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 border border-slate-200/80 shadow-sm">
               <h2 className="text-sm font-bold text-[#1a1642] uppercase tracking-wider mb-4">
                 Recent Activity
@@ -332,21 +320,17 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
                 ))}
               </div>
             </div>
-
           </div>
 
-          {/* Right Column: Quick Access, Expiring Soon & Pending Actions */}
           <div className="space-y-6">
-
-            {/* Quick Access */}
             <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 border border-slate-200/80 shadow-sm">
               <h2 className="text-sm font-bold text-[#1a1642] uppercase tracking-wider mb-4">
                 Quick Access
               </h2>
               <div className="space-y-3">
-                <button 
-                  onClick={() => onNavigate && onNavigate('career-partners')}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-[#f59e0b] hover:bg-slate-50 transition-all text-left group"
+                <button
+                  onClick={() => navigate('/career-center/partners')}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-[#f59e0b] hover:bg-slate-50 transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-105 transition-transform">
                     <Building2 className="w-5 h-5" />
@@ -357,9 +341,9 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
                   </div>
                 </button>
 
-                <button 
-                  onClick={() => onNavigate && onNavigate('career-placements')}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-[#1a1642] hover:bg-slate-50 transition-all text-left group"
+                <button
+                  onClick={() => navigate('/career-center/placements')}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-[#1a1642] hover:bg-slate-50 transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2.5 bg-[#1a1642]/10 text-[#1a1642] rounded-xl group-hover:scale-105 transition-transform">
                     <Users className="w-5 h-5" />
@@ -370,9 +354,9 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
                   </div>
                 </button>
 
-                <button 
-                  onClick={() => onNavigate && onNavigate('career-documents')}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-purple-400 hover:bg-slate-50 transition-all text-left group"
+                <button
+                  onClick={() => navigate('/career-center/documents')}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-purple-400 hover:bg-slate-50 transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl group-hover:scale-105 transition-transform">
                     <FileText className="w-5 h-5" />
@@ -383,9 +367,9 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
                   </div>
                 </button>
 
-                <button 
-                  onClick={() => onNavigate && onNavigate('career-reports')}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-[#f59e0b] hover:bg-slate-50 transition-all text-left group"
+                <button
+                  onClick={() => navigate('/career-center/reports')}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200/80 hover:border-[#f59e0b] hover:bg-slate-50 transition-all text-left group cursor-pointer"
                 >
                   <div className="p-2.5 bg-[#f59e0b]/15 text-[#f59e0b] rounded-xl group-hover:scale-105 transition-transform">
                     <BarChart3 className="w-5 h-5" />
@@ -398,7 +382,6 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
               </div>
             </div>
 
-            {/* Expiring Soon Card */}
             <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-5 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className="w-4 h-4 text-[#f59e0b]" />
@@ -417,13 +400,10 @@ export default function CareerCenterDashboard({ onNavigate, onOpenSidebar }) {
                 </div>
               </div>
             </div>
-
           </div>
-
         </div>
       </main>
 
-      {/* Help Button */}
       <button className="fixed bottom-6 right-6 p-3 bg-white text-[#1a1642] rounded-full shadow-lg border border-slate-200 hover:bg-slate-50 transition-all">
         <HelpCircle className="w-5 h-5" />
       </button>
