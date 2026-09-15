@@ -1,16 +1,18 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, users, companies, applications, dtr, journals, notifications, reports
+from app.api.v1.endpoints import auth, users, companies, applications, dtr, journals, notifications, reports, excel, notification_settings
 from app.routers.documents import documents_router
 
 # Debug: Print all routes from each router
 print("🔍 DTR routes:", [route.path for route in dtr.router.routes])
 print("🔍 Journal routes:", [route.path for route in journals.router.routes])
 print("🔍 Document routes:", [route.path for route in documents_router.routes])
+print("🔍 Excel routes:", [route.path for route in excel.router.routes])
+print("🔍 Notification Settings routes:", [route.path for route in notification_settings.router.routes])
 
 router = APIRouter()
 
 router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-router.include_router(users.router, prefix="/users", tags=["Users"])
+router.include_router(users.router, prefix="/users", tags=["Users"])  # ✅ Contains avatar endpoints
 router.include_router(companies.router, prefix="/companies", tags=["Companies"])
 router.include_router(applications.router, prefix="/applications", tags=["Applications"])
 router.include_router(dtr.router, prefix="/dtr", tags=["DTR"])
@@ -19,6 +21,10 @@ router.include_router(notifications.router, prefix="/notifications", tags=["Noti
 router.include_router(reports.router, prefix="/reports", tags=["Reports"])
 # ✅ NO PREFIX HERE - documents_router already has "/documents"
 router.include_router(documents_router, tags=["Documents"])
+# ✅ ADD EXCEL ROUTER
+router.include_router(excel.router, prefix="/excel", tags=["Excel Export"])
+# ✅ ADD NOTIFICATION SETTINGS ROUTER
+router.include_router(notification_settings.router, prefix="/notifications", tags=["Notification Settings"])
 
 print("✅ All routers registered successfully!")
 

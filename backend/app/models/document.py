@@ -1,9 +1,11 @@
+# backend/app/models/document.py
 from sqlalchemy import (
     Column,
     String,
     DateTime,
     Text,
-    Enum as SQLEnum
+    Enum as SQLEnum,
+    Integer,
 )
 from sqlalchemy.sql import func
 from enum import Enum as PyEnum
@@ -13,6 +15,15 @@ from app.core.database import Base
 
 
 class DocumentType(str, PyEnum):
+    # Types uploaded from the mobile app
+    RESUME = "resume"
+    APPLICATION_LETTER = "application_letter"
+    ENDORSEMENT_LETTER = "endorsement_letter"
+    ACCEPTANCE_LETTER = "acceptance_letter"
+    CERTIFICATE_OF_COMPLETION = "certificate_of_completion"
+    REQUIREMENTS = "requirements"
+
+    # Legacy / misc types kept for backward compatibility
     DOCUMENT = "document"
     TRANSCRIPT = "transcript"
     USER_ID = "user_id"
@@ -24,8 +35,8 @@ class Document(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
 
     type = Column(
-        SQLEnum(DocumentType),
-        nullable=False
+        SQLEnum(DocumentType, name="documenttype"),
+        nullable=False,
     )
 
     description = Column(String(500), nullable=True)
@@ -39,21 +50,22 @@ class Document(Base):
             "pending",
             "verified",
             "rejected",
-            name="verification_status"
+            name="verification_status",
         ),
         default="pending",
-        nullable=False
+        nullable=False,
     )
 
     extracted_text = Column(Text, nullable=True)
 
-    created_at = Column(
-        DateTime,
-        server_default=func.now()
-    )
+    # Validation fields from OCR keyword matching
+    validation_confidence = Column(Integer, nullable=True)
+    validation_message = Column(Text, nullable=True)
+
+    created_at = Column(DateTime, server_default=func.now())
 
     updated_at = Column(
         DateTime,
         server_default=func.now(),
-        onupdate=func.now()
+        onupdate=func.now(),
     )

@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+# backend/app/schemas/application.py
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 from enum import Enum
@@ -38,9 +39,8 @@ class ApplicationResponse(BaseModel):
     cover_letter: Optional[str] = None
     status: ApplicationStatus
     applied_date: datetime
-    updated_date: Optional[datetime]
+    updated_date: Optional[datetime] = None
     interview_date: Optional[datetime] = None
     feedback: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
