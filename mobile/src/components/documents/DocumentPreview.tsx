@@ -1,6 +1,6 @@
 // src/components/documents/DocumentPreview.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Modal,
   View,
@@ -12,11 +12,14 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Platform,
+  Linking,
 } from "react-native";
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
-import { WebView } from 'react-native-webview';  // ✅ Use WebView instead
+import { WebView } from 'react-native-webview';
+import axios from 'axios';
+import { BASE_URL } from '../../config/env';
 
 const { width, height } = Dimensions.get("window");
 
@@ -39,9 +42,71 @@ export default function DocumentPreview({
 }: DocumentPreviewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [pdfPages, setPdfPages] = useState(0);
+  const [isPDF, setIsPDF] = useState(false);
+  const [fileExt, setFileExt] = useState<string>('');
 
-  const isPDF = imageUri?.toLowerCase().includes('.pdf') || documentType?.toLowerCase() === 'pdf';
+  // ✅ Detect file type by checking the actual file
+  useEffect(() => {
+    if (visible && imageUri) {
+      detectFileType();
+    }
+  }, [visible, imageUri]);
+
+  const detectFileType = async () => {
+    setLoading(true);
+    setError(false);
+
+    try {
+      // ✅ Try to get file info from the document endpoint
+      const token = await SecureStore.getItemAsync('access_token');
+      
+      // ✅ Get the document ID from the URL
+      const docIdMatch = imageUri.match(/\/documents\/([^\/\?]+)/);
+      const docId = docIdMatch ? docIdMatch[1] : null;
+      
+      if (docId) {
+        // ✅ Fetch document details to check file extension
+        const response = await axios.get(`${BASE_URL}/api/v1/documents/${docId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        const filePath = response.data.file_path || '';
+        const ext = filePath.split('.').pop()?.toLowerCase() || '';
+        setFileExt(ext);
+        
+        // ✅ Check if it's a PDF based on file extension
+        const isPdf = ext === 'pdf' || 
+                      ext === 'application/pdf' ||
+                      documentType?.toLowerCase() === 'pdf' ||
+                      documentType?.toLowerCase() === 'application_pdf';
+        
+        setIsPDF(isPdf);
+        console.log('🔍 File detection:', { ext, isPdf, filePath, documentType });
+      } else {
+        // ✅ Fallback: check URL and document type
+        const uriLower = imageUri.toLowerCase();
+        const typeLower = documentType?.toLowerCase() || '';
+        
+        const isPdf = uriLower.includes('.pdf') ||
+                      uriLower.includes('%2Epdf') ||
+                      typeLower === 'pdf' ||
+                      typeLower === 'application_pdf' ||
+                      typeLower === 'application/pdf' ||
+                      typeLower.includes('pdf');
+        
+        setIsPDF(isPdf);
+        console.log('🔍 Fallback detection:', { isPdf, documentType, imageUri: imageUri.substring(0, 100) });
+      }
+    } catch (error) {
+      console.error('❌ Error detecting file type:', error);
+      // ✅ Fallback: check URL
+      const isPdf = imageUri.toLowerCase().includes('.pdf') ||
+                    documentType?.toLowerCase().includes('pdf');
+      setIsPDF(isPdf);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDownload = async () => {
     if (onDownload) {
@@ -57,13 +122,11 @@ export default function DocumentPreview({
         headers.Authorization = `Bearer ${token}`;
       }
       
-      const documentDir = (FileSystem as any).documentDirectory;
-      const fileExtension = isPDF ? 'pdf' : 'jpg';
+      const documentDir = FileSystem.documentDirectory;
+      const fileExtension = isPDF ? 'pdf' : (fileExt || 'jpg');
       const fileUri = documentDir + `document_${Date.now()}.${fileExtension}`;
       
-      const cleanUri = imageUri.split('?')[0];
-      
-      const downloadResult = await FileSystem.downloadAsync(cleanUri, fileUri, {
+      const downloadResult = await FileSystem.downloadAsync(imageUri, fileUri, {
         headers,
       });
       
@@ -82,12 +145,29 @@ export default function DocumentPreview({
   };
 
   const renderContent = () => {
+    if (error) {
+      return (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
+          <Text style={styles.errorText}>Failed to load document</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => {
+              setError(false);
+              detectFileType();
+            }}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     if (isPDF) {
-      // ✅ Use WebView for PDF
-      const pdfUri = imageUri.split('?')[0];
+      // ✅ Use direct PDF URL in WebView
       return (
         <WebView
-          source={{ uri: pdfUri }}
+          source={{ uri: imageUri }}
           style={styles.webview}
           startInLoadingState={true}
           renderLoading={() => (
@@ -96,17 +176,41 @@ export default function DocumentPreview({
               <Text style={styles.loadingText}>Loading PDF...</Text>
             </View>
           )}
-          onLoad={() => setLoading(false)}
-          onError={() => {
+          onLoad={() => {
+            console.log('✅ PDF loaded successfully');
+            setLoading(false);
+          }}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.error('❌ WebView error:', nativeEvent);
             setLoading(false);
             setError(true);
           }}
           javaScriptEnabled={true}
           domStorageEnabled={true}
+          scalesPageToFit={true}
+          renderError={(errorName) => {
+            console.log('📄 WebView error name:', errorName);
+            return (
+              <View style={styles.errorContainer}>
+                <Ionicons name="document-outline" size={64} color="#EF4444" />
+                <Text style={styles.errorText}>Cannot preview PDF</Text>
+                <TouchableOpacity 
+                  style={styles.openBrowserButton}
+                  onPress={() => {
+                    Linking.openURL(imageUri);
+                  }}
+                >
+                  <Text style={styles.openBrowserButtonText}>Open in Browser</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }}
         />
       );
     }
 
+    // ✅ Image preview
     return (
       <Image
         source={{ uri: imageUri }}
@@ -142,7 +246,7 @@ export default function DocumentPreview({
               {documentName || documentType || "Document"}
             </Text>
             <Text style={styles.headerSubtitle}>
-              {isPDF ? 'PDF Document' : documentType?.replace(/_/g, ' ').toUpperCase() || "Document"}
+              {isPDF ? '📄 PDF Document' : `🖼️ ${fileExt.toUpperCase() || 'Image'}`}
             </Text>
           </View>
 
@@ -162,23 +266,7 @@ export default function DocumentPreview({
             </View>
           )}
           
-          {error ? (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
-              <Text style={styles.errorText}>Failed to load document</Text>
-              <TouchableOpacity 
-                style={styles.retryButton}
-                onPress={() => {
-                  setError(false);
-                  setLoading(true);
-                }}
-              >
-                <Text style={styles.retryButtonText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            renderContent()
-          )}
+          {renderContent()}
         </View>
 
         {/* Footer Actions */}
@@ -283,6 +371,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  openBrowserButton: {
+    marginTop: 12,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  openBrowserButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   image: {
     width: width,
     height: height - 180,
@@ -290,7 +390,7 @@ const styles = StyleSheet.create({
   webview: {
     width: width - 32,
     height: height - 200,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F5F5F5',
     borderRadius: 8,
   },
   footer: {

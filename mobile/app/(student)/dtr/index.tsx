@@ -55,7 +55,7 @@ export default function DTRScreen() {
 
   const filters = ["all", "pending", "submitted", "approved", "rejected"];
 
-  // ✅ Pagination hook
+  // ✅ Pagination hook — backend now returns { items, total, page, limit, total_pages }
   const {
     data: dtrs,
     loadNext,
@@ -67,14 +67,15 @@ export default function DTRScreen() {
     async (page, limit) => {
       const response = await api.get(`/dtr/?page=${page}&limit=${limit}`);
       return {
-        data: response.data.items || response.data,
-        total: response.data.total || response.data.length || 0,
+        data: response.data.items ?? [],
+        total: response.data.total ?? 0,
       };
     },
     {
       initialPage: 1,
       initialLimit: 10,
       autoLoad: true,
+      key: "dtr",
     }
   );
 
@@ -88,7 +89,7 @@ export default function DTRScreen() {
       const summaryData = await dtrService.getDTRSummary();
       setSummary(summaryData);
     } catch (error) {
-      console.error('Error fetching summary:', error);
+      console.error("Error fetching summary:", error);
     }
   };
 
@@ -130,14 +131,21 @@ export default function DTRScreen() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   const formatTime = (timeString: string) => {
     if (!timeString) return "—";
     try {
       const time = new Date(`2000-01-01T${timeString}`);
-      return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      return time.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } catch {
       return timeString;
     }
@@ -152,32 +160,53 @@ export default function DTRScreen() {
       <View style={styles.cardHeader}>
         <View style={styles.cardLeft}>
           <View style={styles.dateRow}>
-            <Text style={[styles.dateText, { color: colors.textPrimary }]}>{formatDate(item.date)}</Text>
+            <Text style={[styles.dateText, { color: colors.textPrimary }]}>
+              {formatDate(item.date)}
+            </Text>
           </View>
           <View style={styles.timeRow}>
             <View style={styles.timeItem}>
-              <Ionicons name="log-in-outline" size={14} color={colors.textSecondary} />
+              <Ionicons
+                name="log-in-outline"
+                size={14}
+                color={colors.textSecondary}
+              />
               <Text style={[styles.timeText, { color: colors.textSecondary }]}>
                 {item.time_in ? formatTime(item.time_in) : "—"}
               </Text>
             </View>
-            <Ionicons name="arrow-forward-outline" size={14} color={colors.textSecondary} />
+            <Ionicons
+              name="arrow-forward-outline"
+              size={14}
+              color={colors.textSecondary}
+            />
             <View style={styles.timeItem}>
-              <Ionicons name="log-out-outline" size={14} color={colors.textSecondary} />
+              <Ionicons
+                name="log-out-outline"
+                size={14}
+                color={colors.textSecondary}
+              />
               <Text style={[styles.timeText, { color: colors.textSecondary }]}>
                 {item.time_out ? formatTime(item.time_out) : "—"}
               </Text>
             </View>
           </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: `${statusColors[item.status]}15` }]}>
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: `${statusColors[item.status]}15` },
+          ]}
+        >
           <Ionicons
             name={statusIcons[item.status]}
             size={12}
             color={statusColors[item.status]}
             style={styles.statusIcon}
           />
-          <Text style={[styles.statusText, { color: statusColors[item.status] }]}>
+          <Text
+            style={[styles.statusText, { color: statusColors[item.status] }]}
+          >
             {statusLabels[item.status]}
           </Text>
         </View>
@@ -192,8 +221,15 @@ export default function DTRScreen() {
         </View>
         {item.tasks_completed && (
           <View style={styles.footerItem}>
-            <Ionicons name="checkbox-outline" size={16} color={colors.textSecondary} />
-            <Text style={[styles.footerText, { color: colors.textSecondary }]} numberOfLines={1}>
+            <Ionicons
+              name="checkbox-outline"
+              size={16}
+              color={colors.textSecondary}
+            />
+            <Text
+              style={[styles.footerText, { color: colors.textSecondary }]}
+              numberOfLines={1}
+            >
               {item.tasks_completed}
             </Text>
           </View>
@@ -207,10 +243,12 @@ export default function DTRScreen() {
       key={filter}
       style={[
         styles.filterChip,
-        { 
-          backgroundColor: selectedFilter === filter ? colors.primary : colors.card,
-          borderColor: selectedFilter === filter ? colors.primary : colors.border,
-        }
+        {
+          backgroundColor:
+            selectedFilter === filter ? colors.primary : colors.card,
+          borderColor:
+            selectedFilter === filter ? colors.primary : colors.border,
+        },
       ]}
       onPress={() => setSelectedFilter(filter)}
       activeOpacity={0.7}
@@ -218,9 +256,9 @@ export default function DTRScreen() {
       <Text
         style={[
           styles.filterChipText,
-          { 
-            color: selectedFilter === filter ? '#FFFFFF' : colors.textSecondary 
-          }
+          {
+            color: selectedFilter === filter ? "#FFFFFF" : colors.textSecondary,
+          },
         ]}
       >
         {filter.charAt(0).toUpperCase() + filter.slice(1)}
@@ -228,14 +266,19 @@ export default function DTRScreen() {
     </TouchableOpacity>
   );
 
-  // ✅ Skeleton Loader
+  // ✅ Skeleton Loader — only on very first load
   if (isLoading && dtrs.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
+        <StatusBar
+          style={isDark ? "light" : "dark"}
+          backgroundColor={colors.background}
+        />
         <View style={styles.header}>
           <View style={styles.backButton} />
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>DTR Records</Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            DTR Records
+          </Text>
           <View style={styles.headerRight}>
             <View style={styles.exportButton} />
             <View style={styles.addButton} />
@@ -248,13 +291,22 @@ export default function DTRScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
-      
+      <StatusBar
+        style={isDark ? "light" : "dark"}
+        backgroundColor={colors.background}
+      />
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
+          <Ionicons
+            name="arrow-back-outline"
+            size={24}
+            color={colors.textPrimary}
+          />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>DTR Records</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          DTR Records
+        </Text>
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={styles.exportButton}
@@ -265,10 +317,10 @@ export default function DTRScreen() {
             {exporting ? (
               <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Ionicons 
-                name="download-outline" 
-                size={24} 
-                color={dtrs.length === 0 ? colors.textSecondary : colors.primary} 
+              <Ionicons
+                name="download-outline"
+                size={24}
+                color={dtrs.length === 0 ? colors.textSecondary : colors.primary}
               />
             )}
           </TouchableOpacity>
@@ -284,28 +336,48 @@ export default function DTRScreen() {
       {summary && (
         <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>{summary.total_entries}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total</Text>
+            <Text style={[styles.statValue, { color: colors.primary }]}>
+              {summary.total_entries}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Total
+            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: "#10B981" }]}>{summary.approved}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Approved</Text>
+            <Text style={[styles.statValue, { color: "#10B981" }]}>
+              {summary.approved}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Approved
+            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: "#F59E0B" }]}>{summary.pending}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Pending</Text>
+            <Text style={[styles.statValue, { color: "#F59E0B" }]}>
+              {summary.pending}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Pending
+            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: "#3B82F6" }]}>{summary.submitted}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Submitted</Text>
+            <Text style={[styles.statValue, { color: "#3B82F6" }]}>
+              {summary.submitted}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Submitted
+            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={[styles.statItem]}>
-            <Text style={[styles.statValue, { color: "#EF4444" }]}>{summary.rejected}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Rejected</Text>
+            <Text style={[styles.statValue, { color: "#EF4444" }]}>
+              {summary.rejected}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Rejected
+            </Text>
           </View>
         </View>
       )}
@@ -324,17 +396,32 @@ export default function DTRScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={colors.primary} />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={refresh}
+            tintColor={colors.primary}
+          />
         }
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        onEndReached={loadNext}
-        onEndReachedThreshold={0.5}
+        onEndReached={() => {
+          if (hasMore && !isLoading && !isRefreshing) loadNext();
+        }}
+        onEndReachedThreshold={0.3}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="calendar-outline" size={64} color={colors.border} />
-            <Text style={[styles.emptyStateTitle, { color: colors.textPrimary }]}>No DTR Records</Text>
-            <Text style={[styles.emptyStateDescription, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.emptyStateTitle, { color: colors.textPrimary }]}
+            >
+              No DTR Records
+            </Text>
+            <Text
+              style={[
+                styles.emptyStateDescription,
+                { color: colors.textSecondary },
+              ]}
+            >
               Start submitting your daily time records
             </Text>
             <TouchableOpacity
@@ -346,7 +433,7 @@ export default function DTRScreen() {
           </View>
         }
         ListFooterComponent={
-          isLoading && !isRefreshing ? (
+          isLoading && dtrs.length > 0 ? (
             <View style={styles.loaderContainer}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>

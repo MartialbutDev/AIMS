@@ -1,24 +1,25 @@
 // mobile/src/hooks/usePaginatedData.ts
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-export interface PaginationState {
+export interface PaginationState<T> {
+  data: T[];
   page: number;
   limit: number;
+  total: number;
   hasMore: boolean;
   isLoading: boolean;
   isRefreshing: boolean;
-  data: any[];
-  total: number;
 }
 
 export interface UsePaginatedDataOptions {
   initialPage?: number;
   initialLimit?: number;
   autoLoad?: boolean;
-  dependency?: any[];
+  /** Changing this key resets and re-fetches the list. Use a stable string per resource. */
+  key?: string;
 }
 
-export function usePaginatedData<T>(
+export function usePaginatedData<T extends { id: string }>(
   fetchFn: (page: number, limit: number) => Promise<{ data: T[]; total: number }>,
   options: UsePaginatedDataOptions = {}
 ) {
@@ -26,98 +27,122 @@ export function usePaginatedData<T>(
     initialPage = 1,
     initialLimit = 10,
     autoLoad = true,
-    dependency = [],
+    key = 'default',
   } = options;
 
-  const [state, setState] = useState<PaginationState>({
+  const [state, setState] = useState<PaginationState<T>>({
+    data: [],
     page: initialPage,
     limit: initialLimit,
+    total: 0,
     hasMore: true,
     isLoading: false,
     isRefreshing: false,
-    data: [],
-    total: 0,
   });
 
   const isMounted = useRef(true);
+  const inFlight = useRef(false);
+  const fetchFnRef = useRef(fetchFn);
+
+  // Keep the latest fetchFn without re-triggering effects
+  useEffect(() => {
+    fetchFnRef.current = fetchFn;
+  }, [fetchFn]);
 
   useEffect(() => {
+    isMounted.current = true;
     return () => {
       isMounted.current = false;
     };
   }, []);
 
-  const loadData = useCallback(
-    async (page: number, refresh: boolean = false) => {
-      if (!isMounted.current) return;
+  const mergeUnique = (prev: T[], incoming: T[]): T[] => {
+    const seen = new Set(prev.map((i) => i.id));
+    const merged = [...prev];
+    for (const item of incoming) {
+      if (!seen.has(item.id)) {
+        seen.add(item.id);
+        merged.push(item);
+      }
+    }
+    return merged;
+  };
+
+  const load = useCallback(
+    async (page: number, mode: 'initial' | 'refresh' | 'append') => {
+      if (!isMounted.current || inFlight.current) return;
+      inFlight.current = true;
 
       setState((prev) => ({
         ...prev,
-        isLoading: !refresh,
-        isRefreshing: refresh,
+        isLoading: mode !== 'refresh',
+        isRefreshing: mode === 'refresh',
       }));
 
       try {
-        const result = await fetchFn(page, state.limit);
-
+        const result = await fetchFnRef.current(page, state.limit);
         if (!isMounted.current) return;
 
-        setState((prev) => ({
-          ...prev,
-          data: refresh ? result.data : [...prev.data, ...result.data],
-          total: result.total,
-          page,
-          hasMore: result.data.length === state.limit,
-          isLoading: false,
-          isRefreshing: false,
-        }));
-      } catch (error) {
-        console.error('Error loading data:', error);
-        if (isMounted.current) {
-          setState((prev) => ({
+        setState((prev) => {
+          const merged =
+            mode === 'append' ? mergeUnique(prev.data, result.data) : result.data;
+
+          // hasMore derived from TOTAL, not page size
+          const hasMore = merged.length < result.total && result.data.length > 0;
+
+          return {
             ...prev,
+            data: merged,
+            page,
+            total: result.total,
+            hasMore,
             isLoading: false,
             isRefreshing: false,
-          }));
+          };
+        });
+      } catch (err) {
+        console.error('usePaginatedData load error:', err);
+        if (isMounted.current) {
+          setState((prev) => ({ ...prev, isLoading: false, isRefreshing: false }));
         }
+      } finally {
+        inFlight.current = false;
       }
     },
-    [fetchFn, state.limit]
+    [state.limit]
   );
 
   const loadNext = useCallback(() => {
-    if (state.hasMore && !state.isLoading && !state.isRefreshing) {
-      loadData(state.page + 1, false);
-    }
-  }, [state.hasMore, state.isLoading, state.isRefreshing, state.page, loadData]);
+    setState((prev) => {
+      const canLoad = prev.hasMore && !prev.isLoading && !prev.isRefreshing;
+      if (canLoad) {
+        queueMicrotask(() => load(prev.page + 1, 'append'));
+      }
+      return prev;
+    });
+  }, [load]);
 
-  const refresh = useCallback(() => {
-    loadData(initialPage, true);
-  }, [loadData, initialPage]);
+  const refresh = useCallback(() => load(initialPage, 'refresh'), [load, initialPage]);
 
   const reset = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      page: initialPage,
-      hasMore: true,
+    setState({
       data: [],
+      page: initialPage,
+      limit: initialLimit,
       total: 0,
-    }));
-    loadData(initialPage, true);
-  }, [loadData, initialPage]);
+      hasMore: true,
+      isLoading: false,
+      isRefreshing: false,
+    });
+    load(initialPage, 'refresh');
+  }, [load, initialPage, initialLimit]);
 
-  // Auto load on mount
   useEffect(() => {
     if (autoLoad) {
-      loadData(initialPage, true);
+      load(initialPage, 'refresh');
     }
-  }, [...dependency]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
-  return {
-    ...state,
-    loadNext,
-    refresh,
-    reset,
-    loadData,
-  };
+  return { ...state, loadNext, refresh, reset };
 }
