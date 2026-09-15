@@ -23,7 +23,7 @@ class DTR(Base):
     
     date = Column(DateTime, nullable=False)
     time_in = Column(Time, nullable=False)
-    time_out = Column(Time, nullable=False)
+    time_out = Column(Time, nullable=True)
     total_hours = Column(Float, nullable=True)
     
     latitude = Column(Float, nullable=True)
@@ -32,6 +32,9 @@ class DTR(Base):
     
     tasks_completed = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
+    
+    image_in_path = Column(String(255), nullable=True)
+    image_out_path = Column(String(255), nullable=True)
     
     status = Column(
         SQLEnum(DTRStatus),

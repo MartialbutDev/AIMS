@@ -19,7 +19,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
-import { journalService, Journal, JournalSummary } from "../../../src/services/journal.service";
+import {
+  journalService,
+  Journal,
+  JournalSummary,
+} from "../../../src/services/journal.service";
 import { usePaginatedData } from "../../../src/hooks/usePaginatedData";
 import api from "../../../src/services/api";
 
@@ -56,10 +60,17 @@ export default function JournalsScreen() {
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
 
-  const filters = ["all", "draft", "submitted", "reviewing", "approved", "rejected"];
+  const filters = [
+    "all",
+    "draft",
+    "submitted",
+    "reviewing",
+    "approved",
+    "rejected",
+  ];
   const weeks: (number | "all")[] = ["all", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-  // ✅ Pagination hook
+  // ✅ Pagination hook — backend now returns { items, total, page, limit, total_pages }
   const {
     data: journals,
     loadNext,
@@ -71,14 +82,15 @@ export default function JournalsScreen() {
     async (page, limit) => {
       const response = await api.get(`/journals/?page=${page}&limit=${limit}`);
       return {
-        data: response.data.items || response.data,
-        total: response.data.total || response.data.length || 0,
+        data: response.data.items ?? [],
+        total: response.data.total ?? 0,
       };
     },
     {
       initialPage: 1,
       initialLimit: 10,
       autoLoad: true,
+      key: "journals",
     }
   );
 
@@ -92,19 +104,24 @@ export default function JournalsScreen() {
       const summaryData = await journalService.getJournalSummary();
       setSummary(summaryData);
     } catch (error) {
-      console.error('Error fetching summary:', error);
+      console.error("Error fetching summary:", error);
     }
   };
 
   const filteredJournals = journals.filter((journal) => {
-    const matchesFilter = selectedFilter === "all" || journal.status === selectedFilter;
+    const matchesFilter =
+      selectedFilter === "all" || journal.status === selectedFilter;
     const matchesWeek = selectedWeek === "all" || journal.week === selectedWeek;
     return matchesFilter && matchesWeek;
   });
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   };
 
   const getWeekLabel = (week: number) => {
@@ -119,35 +136,71 @@ export default function JournalsScreen() {
     >
       <View style={styles.cardHeader}>
         <View style={styles.cardLeft}>
-          <View style={[styles.weekBadge, { backgroundColor: `${colors.primary}10` }]}>
-            <Text style={[styles.weekBadgeText, { color: colors.primary }]}>{getWeekLabel(item.week)}</Text>
+          <View
+            style={[
+              styles.weekBadge,
+              { backgroundColor: `${colors.primary}10` },
+            ]}
+          >
+            <Text style={[styles.weekBadgeText, { color: colors.primary }]}>
+              {getWeekLabel(item.week)}
+            </Text>
           </View>
           <View style={styles.cardContent}>
-            <Text style={[styles.journalTitle, { color: colors.textPrimary }]}>{item.title}</Text>
-            <Text style={[styles.journalDate, { color: colors.textSecondary }]}>{formatDate(item.created_at)}</Text>
+            <Text
+              style={[styles.journalTitle, { color: colors.textPrimary }]}
+              numberOfLines={1}
+            >
+              {item.title}
+            </Text>
+            <Text style={[styles.journalDate, { color: colors.textSecondary }]}>
+              {formatDate(item.created_at)}
+            </Text>
           </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: `${statusColors[item.status]}15` }]}>
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: `${statusColors[item.status]}15` },
+          ]}
+        >
           <Ionicons
             name={statusIcons[item.status]}
             size={12}
             color={statusColors[item.status]}
             style={styles.statusIcon}
           />
-          <Text style={[styles.statusText, { color: statusColors[item.status] }]}>
+          <Text
+            style={[styles.statusText, { color: statusColors[item.status] }]}
+          >
             {statusLabels[item.status]}
           </Text>
         </View>
       </View>
 
-      <Text style={[styles.journalSummary, { color: colors.textSecondary }]} numberOfLines={2}>
+      <Text
+        style={[styles.journalSummary, { color: colors.textSecondary }]}
+        numberOfLines={2}
+      >
         {item.summary}
       </Text>
 
       {item.feedback && (
-        <View style={[styles.feedbackPreview, { borderTopColor: colors.border }]}>
-          <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.textSecondary} />
-          <Text style={[styles.feedbackPreviewText, { color: colors.textSecondary }]} numberOfLines={1}>
+        <View
+          style={[styles.feedbackPreview, { borderTopColor: colors.border }]}
+        >
+          <Ionicons
+            name="chatbubble-ellipses-outline"
+            size={14}
+            color={colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.feedbackPreviewText,
+              { color: colors.textSecondary },
+            ]}
+            numberOfLines={1}
+          >
             {item.feedback}
           </Text>
         </View>
@@ -160,10 +213,12 @@ export default function JournalsScreen() {
       key={filter}
       style={[
         styles.filterChip,
-        { 
-          backgroundColor: selectedFilter === filter ? colors.primary : colors.card,
-          borderColor: selectedFilter === filter ? colors.primary : colors.border,
-        }
+        {
+          backgroundColor:
+            selectedFilter === filter ? colors.primary : colors.card,
+          borderColor:
+            selectedFilter === filter ? colors.primary : colors.border,
+        },
       ]}
       onPress={() => setSelectedFilter(filter)}
       activeOpacity={0.7}
@@ -171,9 +226,9 @@ export default function JournalsScreen() {
       <Text
         style={[
           styles.filterChipText,
-          { 
-            color: selectedFilter === filter ? '#FFFFFF' : colors.textSecondary 
-          }
+          {
+            color: selectedFilter === filter ? "#FFFFFF" : colors.textSecondary,
+          },
         ]}
       >
         {filter.charAt(0).toUpperCase() + filter.slice(1)}
@@ -188,10 +243,12 @@ export default function JournalsScreen() {
         key={String(week)}
         style={[
           styles.weekChip,
-          { 
-            backgroundColor: selectedWeek === week ? colors.primary : colors.card,
-            borderColor: selectedWeek === week ? colors.primary : colors.border,
-          }
+          {
+            backgroundColor:
+              selectedWeek === week ? colors.primary : colors.card,
+            borderColor:
+              selectedWeek === week ? colors.primary : colors.border,
+          },
         ]}
         onPress={() => setSelectedWeek(week)}
         activeOpacity={0.7}
@@ -199,9 +256,9 @@ export default function JournalsScreen() {
         <Text
           style={[
             styles.weekChipText,
-            { 
-              color: selectedWeek === week ? '#FFFFFF' : colors.textSecondary 
-            }
+            {
+              color: selectedWeek === week ? "#FFFFFF" : colors.textSecondary,
+            },
           ]}
         >
           {label}
@@ -210,26 +267,39 @@ export default function JournalsScreen() {
     );
   };
 
+  // ✅ Skeleton Loader — only on very first load
   if (isLoading && journals.length === 0) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading journals...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading journals...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       <StatusBar style={isDark ? "light" : "dark"} />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
+          <Ionicons
+            name="arrow-back-outline"
+            size={24}
+            color={colors.textPrimary}
+          />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Weekly Journals</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          Weekly Journals
+        </Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => router.push("/(student)/journals/new" as any)}
@@ -241,34 +311,56 @@ export default function JournalsScreen() {
       {summary && (
         <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>{summary.total}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total</Text>
+            <Text style={[styles.statValue, { color: colors.primary }]}>
+              {summary.total}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Total
+            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: "#10B981" }]}>{summary.approved}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Approved</Text>
+            <Text style={[styles.statValue, { color: "#10B981" }]}>
+              {summary.approved}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Approved
+            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: "#3B82F6" }]}>{summary.submitted}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Submitted</Text>
+            <Text style={[styles.statValue, { color: "#3B82F6" }]}>
+              {summary.submitted}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Submitted
+            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: "#6B7280" }]}>{summary.draft}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Draft</Text>
+            <Text style={[styles.statValue, { color: "#6B7280" }]}>
+              {summary.draft}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Draft
+            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: "#EF4444" }]}>{summary.rejected}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Rejected</Text>
+            <Text style={[styles.statValue, { color: "#EF4444" }]}>
+              {summary.rejected}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+              Rejected
+            </Text>
           </View>
         </View>
       )}
 
       <View style={styles.filtersWrapper}>
-        <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Week</Text>
+        <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>
+          Week
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.filtersContainer}>
             {weeks.map(renderWeekChip)}
@@ -277,7 +369,9 @@ export default function JournalsScreen() {
       </View>
 
       <View style={styles.filtersWrapper}>
-        <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Status</Text>
+        <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>
+          Status
+        </Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.filtersContainer}>
             {filters.map(renderFilterChip)}
@@ -291,21 +385,39 @@ export default function JournalsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={colors.primary} />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={refresh}
+            tintColor={colors.primary}
+          />
         }
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        onEndReached={loadNext}
-        onEndReachedThreshold={0.5}
+        onEndReached={() => {
+          if (hasMore && !isLoading && !isRefreshing) loadNext();
+        }}
+        onEndReachedThreshold={0.3}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="book-outline" size={64} color={colors.border} />
-            <Text style={[styles.emptyStateTitle, { color: colors.textPrimary }]}>No Journals</Text>
-            <Text style={[styles.emptyStateDescription, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.emptyStateTitle, { color: colors.textPrimary }]}
+            >
+              No Journals
+            </Text>
+            <Text
+              style={[
+                styles.emptyStateDescription,
+                { color: colors.textSecondary },
+              ]}
+            >
               Start writing your weekly internship journals
             </Text>
             <TouchableOpacity
-              style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
+              style={[
+                styles.emptyStateButton,
+                { backgroundColor: colors.primary },
+              ]}
               onPress={() => router.push("/(student)/journals/new" as any)}
             >
               <Text style={styles.emptyStateButtonText}>Write Journal</Text>
@@ -313,7 +425,7 @@ export default function JournalsScreen() {
           </View>
         }
         ListFooterComponent={
-          isLoading && !isRefreshing ? (
+          isLoading && journals.length > 0 ? (
             <View style={styles.loaderContainer}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
@@ -342,7 +454,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 12 : 16,
+    paddingTop: Platform.OS === "ios" ? 12 : 16,
     paddingBottom: 12,
   },
   backButton: {

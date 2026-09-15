@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field, EmailStr
+# backend/app/schemas/dtr.py
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime, time
 from enum import Enum
@@ -14,12 +15,14 @@ class DTRStatus(str, Enum):
 class DTRBase(BaseModel):
     date: datetime
     time_in: time
-    time_out: time
+    time_out: Optional[time] = None
     tasks_completed: Optional[str] = None
     notes: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     location_address: Optional[str] = None
+    image_in_path: Optional[str] = None
+    image_out_path: Optional[str] = None
 
 
 class DTRCreate(DTRBase):
@@ -45,7 +48,6 @@ class DTRResponse(DTRBase):
     approved_date: Optional[datetime] = None
     feedback: Optional[str] = None
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

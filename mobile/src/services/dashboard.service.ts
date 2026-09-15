@@ -17,29 +17,52 @@ export interface RecentActivity {
   status?: 'pending' | 'approved' | 'rejected' | 'submitted';
 }
 
+/**
+ * Safely extract an array from either:
+ *   - a paginated response `{ items: [...] }`
+ *   - a plain array `[...]`
+ *   - anything else → []
+ */
+const toArray = <T,>(payload: any): T[] => {
+  if (Array.isArray(payload)) return payload as T[];
+  if (payload && Array.isArray(payload.items)) return payload.items as T[];
+  return [];
+};
+
+/**
+ * Extract a total count from either:
+ *   - a paginated envelope `{ total: number }`
+ *   - a plain array (length)
+ */
+const countOf = (payload: any): number => {
+  if (payload && typeof payload.total === 'number') return payload.total;
+  return toArray(payload).length;
+};
+
 export const dashboardService = {
   async getStats(): Promise<DashboardStats> {
     try {
-      // Try to get documents, but don't fail if endpoint doesn't exist
+      // Documents endpoint is optional — don't fail the whole dashboard if it errors
       let documentsCount = 0;
       try {
         const docResponse = await api.get('/documents/');
-        documentsCount = docResponse.data.length;
+        documentsCount = toArray<any>(docResponse.data).length;
       } catch (docError) {
         console.warn('Documents endpoint not available, using 0');
       }
 
-      const [applications, dtr, journals] = await Promise.all([
-        api.get('/applications/'),
-        api.get('/dtr/'),
-        api.get('/journals/'),
+      // Fetch only 1 item per resource — the `total` field gives the real count
+      const [applicationsRes, dtrRes, journalsRes] = await Promise.all([
+        api.get('/applications/?page=1&limit=1'),
+        api.get('/dtr/?page=1&limit=1'),
+        api.get('/journals/?page=1&limit=1'),
       ]);
 
       return {
-        applications: applications.data.length,
+        applications: countOf(applicationsRes.data),
         documents: documentsCount,
-        dtr: dtr.data.length,
-        journals: journals.data.length,
+        dtr: countOf(dtrRes.data),
+        journals: countOf(journalsRes.data),
       };
     } catch (error: any) {
       console.error('❌ Get stats error:', error.response?.data || error.message);
@@ -52,20 +75,27 @@ export const dashboardService = {
       let documentsData: any[] = [];
       try {
         const docResponse = await api.get('/documents/');
-        documentsData = docResponse.data;
+        documentsData = toArray<any>(docResponse.data);
       } catch (docError) {
         console.warn('Documents endpoint not available, skipping');
       }
 
-      const [applications, dtr, journals] = await Promise.all([
-        api.get('/applications/'),
-        api.get('/dtr/'),
-        api.get('/journals/'),
+      // Fetch a small slice per resource — just enough to build the top-N timeline
+      const slice = Math.max(limit, 10);
+
+      const [applicationsRes, dtrRes, journalsRes] = await Promise.all([
+        api.get(`/applications/?page=1&limit=${slice}`),
+        api.get(`/dtr/?page=1&limit=${slice}`),
+        api.get(`/journals/?page=1&limit=${slice}`),
       ]);
+
+      const applications = toArray<any>(applicationsRes.data);
+      const dtr = toArray<any>(dtrRes.data);
+      const journals = toArray<any>(journalsRes.data);
 
       const activities: RecentActivity[] = [];
 
-      applications.data.forEach((app: any) => {
+      applications.forEach((app: any) => {
         activities.push({
           id: `app-${app.id}`,
           title: `Application: ${app.position}`,
@@ -87,7 +117,7 @@ export const dashboardService = {
         });
       });
 
-      dtr.data.forEach((entry: any) => {
+      dtr.forEach((entry: any) => {
         activities.push({
           id: `dtr-${entry.id}`,
           title: `DTR: ${new Date(entry.date).toLocaleDateString()}`,
@@ -98,7 +128,7 @@ export const dashboardService = {
         });
       });
 
-      journals.data.forEach((journal: any) => {
+      journals.forEach((journal: any) => {
         activities.push({
           id: `journal-${journal.id}`,
           title: `Journal: ${journal.title}`,
@@ -109,7 +139,9 @@ export const dashboardService = {
         });
       });
 
-      activities.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+      activities.sort(
+        (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+      );
       return activities.slice(0, limit);
     } catch (error: any) {
       console.error('❌ Get recent activities error:', error.response?.data || error.message);

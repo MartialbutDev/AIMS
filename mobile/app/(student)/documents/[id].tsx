@@ -29,6 +29,8 @@ interface DocumentDetail {
   created_at: string;
   file_path?: string;
   extracted_text?: string;
+  validation_confidence?: number;    // ✅ NEW
+  validation_message?: string;      // ✅ NEW
 }
 
 export default function DocumentDetailScreen() {
@@ -162,6 +164,33 @@ export default function DocumentDetailScreen() {
           </View>
         </View>
 
+        {/* ✅ Validation Confidence Display */}
+        {document.validation_confidence !== null && document.validation_confidence !== undefined && (
+          <View style={[styles.validationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.validationHeader}>
+              <Ionicons 
+                name={document.validation_confidence >= 50 ? "checkmark-circle" : "alert-circle"} 
+                size={20} 
+                color={document.validation_confidence >= 50 ? colors.success : colors.warning} 
+              />
+              <Text style={[styles.validationTitle, { color: colors.textPrimary }]}>
+                Validation Confidence
+              </Text>
+            </View>
+            <View style={styles.validationRow}>
+              <Text style={[styles.validationLabel, { color: colors.textSecondary }]}>Score</Text>
+              <Text style={[styles.validationScore, { color: document.validation_confidence >= 50 ? colors.success : colors.warning }]}>
+                {document.validation_confidence}%
+              </Text>
+            </View>
+            {document.validation_message && (
+              <Text style={[styles.validationMessage, { color: colors.textSecondary }]}>
+                {document.validation_message}
+              </Text>
+            )}
+          </View>
+        )}
+
         {document.description && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Description</Text>
@@ -294,6 +323,40 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  // ✅ Validation styles
+  validationCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  validationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  validationTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  validationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  validationLabel: {
+    fontSize: 13,
+  },
+  validationScore: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  validationMessage: {
+    fontSize: 13,
+    marginTop: 6,
+    lineHeight: 18,
   },
   section: {
     marginBottom: 16,

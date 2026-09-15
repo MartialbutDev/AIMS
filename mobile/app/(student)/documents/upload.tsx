@@ -54,6 +54,9 @@ export default function UploadDocumentScreen() {
   const [ocrResult, setOcrResult] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
   
+  // ✅ New: Validation result state
+  const [validationResult, setValidationResult] = useState<any>(null);
+  
   // Dropdown state
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -144,6 +147,7 @@ export default function UploadDocumentScreen() {
 
     setUploading(true);
     setUploadProgress(0);
+    setValidationResult(null);
 
     try {
       const formData = new FormData();
@@ -180,6 +184,11 @@ export default function UploadDocumentScreen() {
         setOcrResult(response.data.extracted_text);
       }
       setVerificationStatus(response.data.status);
+      
+      // ✅ Set validation result
+      if (response.data.validation) {
+        setValidationResult(response.data.validation);
+      }
 
       Alert.alert(
         "Upload Successful",
@@ -198,6 +207,7 @@ export default function UploadDocumentScreen() {
       setDescription("");
       setOcrResult(null);
       setVerificationStatus(null);
+      setValidationResult(null);
 
     } catch (error: any) {
       console.error("Upload error:", error);
@@ -440,6 +450,39 @@ export default function UploadDocumentScreen() {
           />
         </View>
 
+        {/* ✅ Validation Result Display */}
+        {validationResult && (
+          <View style={styles.validationSection}>
+            <View style={styles.validationHeader}>
+              <Ionicons 
+                name={validationResult.is_valid ? "checkmark-circle" : "alert-circle"} 
+                size={24} 
+                color={validationResult.is_valid ? colors.success : colors.warning} 
+              />
+              <Text style={[styles.validationTitle, { color: colors.textPrimary }]}>
+                Document Validation
+              </Text>
+            </View>
+            <View style={[styles.validationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.validationRow}>
+                <Text style={[styles.validationLabel, { color: colors.textSecondary }]}>Confidence</Text>
+                <Text style={[styles.validationValue, { color: validationResult.is_valid ? colors.success : colors.warning }]}>
+                  {validationResult.confidence}%
+                </Text>
+              </View>
+              <View style={styles.validationRow}>
+                <Text style={[styles.validationLabel, { color: colors.textSecondary }]}>Status</Text>
+                <Text style={[styles.validationValue, { color: validationResult.is_valid ? colors.success : colors.warning }]}>
+                  {validationResult.is_valid ? "✅ Verified" : "⚠️ Needs Review"}
+                </Text>
+              </View>
+              <Text style={[styles.validationMessage, { color: colors.textSecondary }]}>
+                {validationResult.message}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {ocrResult && (
           <View style={styles.ocrSection}>
             <View style={[styles.ocrHeader]}>
@@ -657,6 +700,43 @@ const styles = StyleSheet.create({
     minHeight: 80,
     borderWidth: 1,
     textAlignVertical: "top",
+  },
+  // ✅ Validation styles
+  validationSection: {
+    marginBottom: 20,
+  },
+  validationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  validationTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  validationCard: {
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+  },
+  validationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  validationLabel: {
+    fontSize: 13,
+  },
+  validationValue: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  validationMessage: {
+    fontSize: 13,
+    marginTop: 6,
+    lineHeight: 18,
   },
   ocrSection: {
     marginBottom: 20,

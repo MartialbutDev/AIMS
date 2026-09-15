@@ -1,4 +1,3 @@
-# C:\Users\NT900X3M\AIMS\backend\app\schemas\user.py
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
@@ -21,6 +20,7 @@ class UserBase(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
     student_id: Optional[str] = Field(None, max_length=50)
+    avatar_url: Optional[str] = None  # ✅ ADDED
 
 
 # Create User (Registration)
@@ -35,6 +35,7 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
     student_id: Optional[str] = Field(None, max_length=50)
+    avatar_url: Optional[str] = None  # ✅ ADDED
 
 
 # Change Password
@@ -49,6 +50,7 @@ class UserResponse(UserBase):
     role: UserRole
     is_active: bool
     is_verified: bool
+    avatar_url: Optional[str] = None  # ✅ ADDED
     created_at: datetime
     updated_at: Optional[datetime]
 

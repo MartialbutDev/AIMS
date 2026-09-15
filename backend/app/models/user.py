@@ -75,6 +75,12 @@ class User(Base):
         default=False
     )
 
+    # ✅ ADDED: Avatar URL field
+    avatar_url = Column(
+        String(500),
+        nullable=True
+    )
+
     created_at = Column(
         DateTime,
         server_default=func.now()

@@ -30,6 +30,8 @@ interface Document {
   verification_status: string;
   created_at: string;
   file_path?: string;
+  validation_confidence?: number;     // ✅ NEW
+  validation_message?: string;       // ✅ NEW
 }
 
 export default function DocumentsScreen() {
@@ -144,6 +146,7 @@ export default function DocumentsScreen() {
         </View>
 
         <View style={styles.documentActions}>
+          {/* ✅ Preview Button */}
           <TouchableOpacity
             style={[styles.previewButton, { borderColor: colors.border }]}
             onPress={() => handlePreview(item)}
@@ -152,6 +155,7 @@ export default function DocumentsScreen() {
             <Ionicons name="eye-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
           
+          {/* ✅ Status Badge with Confidence */}
           <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
             <Ionicons
               name={getStatusIcon(item.verification_status)}
@@ -163,6 +167,20 @@ export default function DocumentsScreen() {
               {item.verification_status.charAt(0).toUpperCase() + item.verification_status.slice(1)}
             </Text>
           </View>
+          
+          {/* ✅ Validation Confidence Badge */}
+          {item.validation_confidence !== null && item.validation_confidence !== undefined && (
+            <View style={[styles.confidenceBadge, { backgroundColor: `${statusColor}15` }]}>
+              <Ionicons 
+                name={item.validation_confidence >= 50 ? "checkmark-circle" : "alert-circle"} 
+                size={10} 
+                color={statusColor} 
+              />
+              <Text style={[styles.confidenceText, { color: statusColor }]}>
+                {item.validation_confidence}%
+              </Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -295,7 +313,7 @@ const styles = StyleSheet.create({
   },
   documentActions: {
     alignItems: "flex-end",
-    gap: 6,
+    gap: 4,
   },
   previewButton: {
     width: 32,
@@ -318,6 +336,19 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
+    fontWeight: "600",
+  },
+  // ✅ New: Confidence Badge
+  confidenceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    gap: 2,
+  },
+  confidenceText: {
+    fontSize: 9,
     fontWeight: "600",
   },
   emptyState: {

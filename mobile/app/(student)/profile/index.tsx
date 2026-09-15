@@ -20,6 +20,7 @@ import * as SecureStore from "expo-secure-store";
 import { useTheme } from "../../../src/context/ThemeContext";
 import { authService } from "../../../src/services/auth.service";
 import { SkeletonProfile } from "../../../src/components/common/Skeleton";
+import api from "../../../src/services/api";
 
 interface UserProfile {
   id: string;
@@ -36,6 +37,15 @@ interface UserProfile {
   updated_at: string | null;
 }
 
+interface Document {
+  id: string;
+  type: string;
+  description: string;
+  verification_status: string;
+  created_at: string;
+  file_path?: string;
+}
+
 export default function ProfileScreen() {
   const { colors, isDark } = useTheme();
   const [loading, setLoading] = useState(true);
@@ -44,6 +54,8 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
 
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
@@ -69,11 +81,27 @@ export default function ProfileScreen() {
         setAvatarUri(avatar);
       }
       
+      // ✅ Load documents
+      await loadDocuments();
+      
     } catch (error) {
       console.error("Error loading profile:", error);
       Alert.alert("Error", "Failed to load profile data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ Fetch documents
+  const loadDocuments = async () => {
+    try {
+      setLoadingDocs(true);
+      const response = await api.get("/documents/");
+      setDocuments(response.data);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+    } finally {
+      setLoadingDocs(false);
     }
   };
 
@@ -194,6 +222,169 @@ export default function ProfileScreen() {
       <Text style={[styles.fieldValue, { color: colors.textPrimary }]}>{value || "Not provided"}</Text>
     </View>
   );
+
+  // ✅ Get status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "verified":
+        return colors.success;
+      case "rejected":
+        return colors.error;
+      default:
+        return colors.warning;
+    }
+  };
+
+  // ✅ Get status label
+  const getStatusLabel = (status: string) => {
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  // ✅ Get document display name
+  const getDocumentDisplayName = (type: string) => {
+    return type.replace(/_/g, ' ').toUpperCase();
+  };
+
+  // ✅ Render Documents Section
+  const renderDocumentsSection = () => {
+    const verifiedCount = documents.filter(d => d.verification_status === 'verified').length;
+    const pendingCount = documents.filter(d => d.verification_status === 'pending').length;
+    const rejectedCount = documents.filter(d => d.verification_status === 'rejected').length;
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            My Documents
+          </Text>
+          <TouchableOpacity onPress={() => router.push("/(student)/documents")}>
+            <Text style={[styles.seeAllText, { color: colors.primary }]}>
+              See All
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+          {loadingDocs ? (
+            // Loading state
+            <View style={styles.docLoadingContainer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.docLoadingText, { color: colors.textSecondary }]}>
+                Loading documents...
+              </Text>
+            </View>
+          ) : documents.length === 0 ? (
+            // Empty state
+            <View style={styles.docEmptyContainer}>
+              <Ionicons name="document-text-outline" size={40} color={colors.border} />
+              <Text style={[styles.docEmptyText, { color: colors.textSecondary }]}>
+                No documents uploaded yet
+              </Text>
+              <TouchableOpacity
+                style={[styles.docUploadButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push("/(student)/documents/upload")}
+              >
+                <Text style={styles.docUploadButtonText}>Upload Document</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {/* Document Stats */}
+              <View style={styles.docStatsContainer}>
+                <View style={styles.docStatItem}>
+                  <Text style={[styles.docStatValue, { color: colors.textPrimary }]}>
+                    {documents.length}
+                  </Text>
+                  <Text style={[styles.docStatLabel, { color: colors.textSecondary }]}>
+                    Total
+                  </Text>
+                </View>
+                <View style={[styles.docStatDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.docStatItem}>
+                  <Text style={[styles.docStatValue, { color: colors.success }]}>
+                    {verifiedCount}
+                  </Text>
+                  <Text style={[styles.docStatLabel, { color: colors.textSecondary }]}>
+                    Verified
+                  </Text>
+                </View>
+                <View style={[styles.docStatDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.docStatItem}>
+                  <Text style={[styles.docStatValue, { color: colors.warning }]}>
+                    {pendingCount}
+                  </Text>
+                  <Text style={[styles.docStatLabel, { color: colors.textSecondary }]}>
+                    Pending
+                  </Text>
+                </View>
+                <View style={[styles.docStatDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.docStatItem}>
+                  <Text style={[styles.docStatValue, { color: colors.error }]}>
+                    {rejectedCount}
+                  </Text>
+                  <Text style={[styles.docStatLabel, { color: colors.textSecondary }]}>
+                    Rejected
+                  </Text>
+                </View>
+              </View>
+
+              {/* Document List (Recent 3) */}
+              {documents.slice(0, 3).map((doc, index) => {
+                const statusColor = getStatusColor(doc.verification_status);
+                return (
+                  <TouchableOpacity
+                    key={doc.id}
+                    style={[
+                      styles.docItem,
+                      index < documents.slice(0, 3).length - 1 && { borderBottomColor: colors.border }
+                    ]}
+                    onPress={() => router.push(`/(student)/documents/${doc.id}` as any)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.docItemLeft}>
+                      <View style={[styles.docIcon, { backgroundColor: `${colors.primary}10` }]}>
+                        <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+                      </View>
+                      <View>
+                        <Text style={[styles.docName, { color: colors.textPrimary }]}>
+                          {getDocumentDisplayName(doc.type)}
+                        </Text>
+                        <Text style={[styles.docDate, { color: colors.textSecondary }]}>
+                          {new Date(doc.created_at).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={[
+                      styles.docStatus,
+                      { backgroundColor: `${statusColor}15` }
+                    ]}>
+                      <Text style={[
+                        styles.docStatusText,
+                        { color: statusColor }
+                      ]}>
+                        {getStatusLabel(doc.verification_status)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {/* View All Button */}
+              <TouchableOpacity
+                style={[styles.viewAllButton, { borderColor: colors.border }]}
+                onPress={() => router.push("/(student)/documents")}
+              >
+                <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                  View All Documents
+                </Text>
+                <Ionicons name="arrow-forward-outline" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   // ✅ Skeleton Loader
   if (loading) {
@@ -383,6 +574,9 @@ export default function ProfileScreen() {
             )}
           </View>
         </View>
+
+        {/* ✅ Documents Section */}
+        {renderDocumentsSection()}
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Account Settings</Text>
@@ -590,10 +784,20 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 20,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 8,
+  },
+  seeAllText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   sectionCard: {
     borderRadius: 16,
@@ -656,5 +860,107 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 12,
     opacity: 0.6,
+  },
+  // ✅ Document styles
+  docLoadingContainer: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  docLoadingText: {
+    marginTop: 8,
+    fontSize: 13,
+  },
+  docEmptyContainer: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  docEmptyText: {
+    fontSize: 14,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  docUploadButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  docUploadButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  docStatsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.05)",
+    marginBottom: 12,
+  },
+  docStatItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  docStatValue: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  docStatLabel: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  docStatDivider: {
+    width: 1,
+    height: 30,
+  },
+  docItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  docItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  docIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  docName: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  docDate: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  docStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  docStatusText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  viewAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    marginTop: 4,
+    borderWidth: 1,
+    borderRadius: 10,
+    gap: 6,
+  },
+  viewAllText: {
+    fontSize: 13,
+    fontWeight: "500",
   },
 });
