@@ -24,6 +24,7 @@ import CompanySidebar from './company/CompanySidebar';
 import CareerCenterDashboard from './career/CareerCenterDashboard';
 import CareerCenterSidebar from './career/CareerCenterSidebar';
 import PartnerCompaniesPage from './career/PartnerCompaniesPage';
+import StudentsPlacedPage from './career/StudentsPlacedPage';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -221,6 +222,15 @@ export default function App() {
             path="/career-center/partners"
             element={
               <PartnerCompaniesPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/career-center/placements"
+            element={
+              <StudentsPlacedPage
                 onOpenSidebar={() => setIsSidebarOpen(true)}
                 onLogout={handleLogout}
               />
