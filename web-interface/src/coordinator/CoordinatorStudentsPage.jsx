@@ -11,13 +11,18 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const initialStudents = [
+export const allStudentsData = [
   {
     id: 1,
+    studentId: '2023-00123',
     initials: 'JD',
     name: 'John Dela Cruz',
     course: 'BS Computer Science',
+    email: 'john.delacruz@university.edu',
+    phone: '+63 912 345 6789',
     company: 'TechVision Solutions',
+    period: 'April 1, 2026 – June 30, 2026',
+    supervisor: 'Maria Santos',
     hours: 240,
     totalHours: 500,
     barColor: 'bg-[#f59e0b]',
@@ -25,10 +30,15 @@ const initialStudents = [
   },
   {
     id: 2,
+    studentId: '2023-00124',
     initials: 'MS',
     name: 'Maria Santos',
     course: 'BS Information Technology',
+    email: 'maria.santos@university.edu',
+    phone: '+63 917 234 5678',
     company: 'Digital Innovations Corp',
+    period: 'April 1, 2026 – June 30, 2026',
+    supervisor: 'Engr. Carlos Lim',
     hours: 320,
     totalHours: 500,
     barColor: 'bg-blue-600',
@@ -36,10 +46,15 @@ const initialStudents = [
   },
   {
     id: 3,
+    studentId: '2023-00125',
     initials: 'RC',
     name: 'Robert Chen',
     course: 'BS Computer Engineering',
+    email: 'robert.chen@university.edu',
+    phone: '+63 928 345 6789',
     company: 'CloudNine Technologies',
+    period: 'April 1, 2026 – June 30, 2026',
+    supervisor: 'Dennis Wu',
     hours: 180,
     totalHours: 500,
     barColor: 'bg-[#f59e0b]',
@@ -47,10 +62,15 @@ const initialStudents = [
   },
   {
     id: 4,
+    studentId: '2023-00126',
     initials: 'LG',
     name: 'Lisa Garcia',
     course: 'BS Computer Science',
+    email: 'lisa.garcia@university.edu',
+    phone: '+63 919 456 7890',
     company: 'TechVision Solutions',
+    period: 'Pending start',
+    supervisor: 'Maria Santos',
     hours: 0,
     totalHours: 500,
     barColor: '',
@@ -58,10 +78,15 @@ const initialStudents = [
   },
   {
     id: 5,
+    studentId: '2023-00127',
     initials: 'MT',
     name: 'Michael Tan',
     course: 'BS Information Systems',
+    email: 'michael.tan@university.edu',
+    phone: '+63 922 567 8901',
     company: 'Digital Innovations Corp',
+    period: 'January 15, 2026 – May 15, 2026',
+    supervisor: 'Engr. Carlos Lim',
     hours: 450,
     totalHours: 500,
     barColor: 'bg-emerald-500',
@@ -69,10 +94,15 @@ const initialStudents = [
   },
   {
     id: 6,
+    studentId: '2023-00128',
     initials: 'AC',
     name: 'Angela Cruz',
     course: 'BS Computer Science',
+    email: 'angela.cruz@university.edu',
+    phone: '+63 930 678 9012',
     company: 'DataSolutions Inc.',
+    period: 'April 1, 2026 – June 30, 2026',
+    supervisor: 'Patricia Rivera',
     hours: 280,
     totalHours: 500,
     barColor: 'bg-blue-600',
@@ -80,7 +110,7 @@ const initialStudents = [
   }
 ];
 
-export default function CoordinatorStudentsPage({ onOpenSidebar }) {
+export default function CoordinatorStudentsPage({ onOpenSidebar, onSelectStudent }) {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
@@ -112,7 +142,15 @@ export default function CoordinatorStudentsPage({ onOpenSidebar }) {
     }
   ];
 
-  const filteredStudents = initialStudents.filter((student) => {
+  const handleRowClick = (student) => {
+    if (onSelectStudent) {
+      onSelectStudent(student);
+    } else {
+      navigate('/coordinator/student-detail', { state: { student } });
+    }
+  };
+
+  const filteredStudents = allStudentsData.filter((student) => {
     const matchesFilter =
       activeFilter === 'All' ||
       (activeFilter === 'Active' && student.status === 'active') ||
@@ -173,8 +211,6 @@ export default function CoordinatorStudentsPage({ onOpenSidebar }) {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
-        
-        {/* Title Header with high-contrast text against background */}
         <div>
           <h2 className="text-2xl font-bold text-white tracking-tight drop-shadow-sm">
             Student Management
@@ -217,8 +253,6 @@ export default function CoordinatorStudentsPage({ onOpenSidebar }) {
 
         {/* Table Container Card */}
         <div className="bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-6">
-          
-          {/* Search Bar & Filter Buttons */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="relative flex-1 max-w-lg">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -273,13 +307,17 @@ export default function CoordinatorStudentsPage({ onOpenSidebar }) {
                   const percent = Math.round((s.hours / s.totalHours) * 100);
 
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
+                    <tr
+                      key={s.id}
+                      onClick={() => handleRowClick(s)}
+                      className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                    >
                       <td className="py-4 pl-2 pr-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center flex-shrink-0">
                             {s.initials}
                           </div>
-                          <span className="font-semibold text-slate-800 text-xs group-hover:text-[#1a1642] transition-colors">
+                          <span className="font-semibold text-slate-800 text-xs group-hover:text-blue-600 transition-colors">
                             {s.name}
                           </span>
                         </div>
@@ -324,7 +362,7 @@ export default function CoordinatorStudentsPage({ onOpenSidebar }) {
                       </td>
 
                       <td className="py-4 pr-2 text-right">
-                        <button className="text-slate-300 group-hover:text-slate-500 transition-colors cursor-pointer">
+                        <button className="text-slate-300 group-hover:text-blue-600 transition-colors cursor-pointer">
                           <ChevronRight className="w-4 h-4" />
                         </button>
                       </td>

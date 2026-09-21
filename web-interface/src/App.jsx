@@ -15,6 +15,8 @@ import Sidebar from './dean/Sidebar';
 // Coordinator Interface
 import CoordinatorDashboard from './coordinator/CoordinatorDashboard';
 import CoordinatorStudentsPage from './coordinator/CoordinatorStudentsPage';
+import StudentDetailPage from './coordinator/StudentDetailPage';
+import CoordinatorReportsPage from './coordinator/CoordinatorReportsPage';
 import CoordinatorSidebar from './coordinator/CoordinatorSidebar';
 
 // Host Company Interface
@@ -31,11 +33,11 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedCoordinator, setSelectedCoordinator] = useState(null);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Redirect users to their respective portal home upon login
   const handleLoginSuccess = ({ role, username }) => {
     setCurrentUser({ role, username });
 
@@ -66,10 +68,14 @@ export default function App() {
     navigate('/login');
   };
 
-  // Helper for Dean to inspect a specific coordinator
   const handleSelectCoordinator = (coord) => {
     setSelectedCoordinator(coord);
     navigate('/dean/coordinator-detail');
+  };
+
+  const handleSelectStudent = (student) => {
+    setSelectedStudent(student);
+    navigate('/coordinator/student-detail');
   };
 
   return (
@@ -77,13 +83,10 @@ export default function App() {
       className="relative min-h-screen w-full bg-cover bg-center bg-fixed bg-no-repeat"
       style={{ backgroundImage: `url(${bgImage})` }}
     >
-      {/* Background tint overlay */}
       <div className="min-h-screen w-full bg-[#0e0a26]/40 backdrop-blur-[1px]">
-
-        {/* --- SIDEBAR MENUS --- */}
+        {/* SIDEBARS */}
         {currentUser && (
           <>
-            {/* Dean Sidebar */}
             <Sidebar
               isOpen={isSidebarOpen && currentUser.role === 'dean'}
               onClose={() => setIsSidebarOpen(false)}
@@ -92,7 +95,6 @@ export default function App() {
               onLogout={handleLogout}
             />
 
-            {/* Coordinator Sidebar */}
             <CoordinatorSidebar
               isOpen={isSidebarOpen && currentUser.role === 'coordinator'}
               onClose={() => setIsSidebarOpen(false)}
@@ -101,7 +103,6 @@ export default function App() {
               onLogout={handleLogout}
             />
 
-            {/* Company Sidebar */}
             <CompanySidebar
               isOpen={isSidebarOpen && currentUser.role === 'company'}
               onClose={() => setIsSidebarOpen(false)}
@@ -110,7 +111,6 @@ export default function App() {
               onLogout={handleLogout}
             />
 
-            {/* Career Center Sidebar */}
             <CareerCenterSidebar
               isOpen={isSidebarOpen && currentUser.role === 'career_center'}
               onClose={() => setIsSidebarOpen(false)}
@@ -121,9 +121,8 @@ export default function App() {
           </>
         )}
 
-        {/* --- PAGE ROUTES --- */}
+        {/* ROUTES */}
         <Routes>
-          {/* Login Page */}
           <Route
             path="/login"
             element={
@@ -202,12 +201,31 @@ export default function App() {
             element={
               <CoordinatorStudentsPage
                 onOpenSidebar={() => setIsSidebarOpen(true)}
+                onSelectStudent={handleSelectStudent}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/student-detail"
+            element={
+              <StudentDetailPage
+                student={selectedStudent}
+                onBack={() => navigate('/coordinator/students')}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/reports"
+            element={
+              <CoordinatorReportsPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
                 onLogout={handleLogout}
               />
             }
           />
 
-          {/* Company Routes */}
+          {/* Host Company Routes */}
           <Route
             path="/company/dashboard"
             element={
@@ -247,13 +265,12 @@ export default function App() {
             }
           />
 
-          {/* Admin Placeholder */}
+          {/* Admin Route */}
           <Route
             path="/admin/dashboard"
             element={
               <div className="p-12 text-center text-white">
                 <h2 className="text-2xl font-bold text-[#f59e0b]">Admin Portal</h2>
-                <p className="text-slate-300 text-sm mt-2">Ready to build System Administration routes here.</p>
                 <button
                   onClick={handleLogout}
                   className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
@@ -264,10 +281,9 @@ export default function App() {
             }
           />
 
-          {/* Default fallback route */}
+          {/* Default Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-
       </div>
     </div>
   );
