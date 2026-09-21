@@ -14,21 +14,32 @@ import Sidebar from './dean/Sidebar';
 
 // Coordinator Interface
 import CoordinatorDashboard from './coordinator/CoordinatorDashboard';
+import CoordinatorStudentsPage from './coordinator/CoordinatorStudentsPage';
+import StudentDetailPage from './coordinator/StudentDetailPage';
+import CoordinatorReportsPage from './coordinator/CoordinatorReportsPage';
+import CoordinatorEvaluationsPage from './coordinator/CoordinatorEvaluationsPage';
+import CoordinatorAnnouncementsPage from './coordinator/CoordinatorAnnouncementsPage';
 import CoordinatorSidebar from './coordinator/CoordinatorSidebar';
 
 // Host Company Interface
 import CompanyDashboard from './company/CompanyDashboard';
 import CompanySidebar from './company/CompanySidebar';
 
+// Career Center Interface
+import CareerCenterDashboard from './career/CareerCenterDashboard';
+import CareerCenterSidebar from './career/CareerCenterSidebar';
+import PartnerCompaniesPage from './career/PartnerCompaniesPage';
+import StudentsPlacedPage from './career/StudentsPlacedPage';
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedCoordinator, setSelectedCoordinator] = useState(null);
+  const [selectedStudent, setSelectedStudent] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Login handler redirects to the role's default URL
   const handleLoginSuccess = ({ role, username }) => {
     setCurrentUser({ role, username });
 
@@ -59,10 +70,14 @@ export default function App() {
     navigate('/login');
   };
 
-  // Helper for dean to drill down into a coordinator's profile
   const handleSelectCoordinator = (coord) => {
     setSelectedCoordinator(coord);
     navigate('/dean/coordinator-detail');
+  };
+
+  const handleSelectStudent = (student) => {
+    setSelectedStudent(student);
+    navigate('/coordinator/student-detail');
   };
 
   return (
@@ -70,13 +85,10 @@ export default function App() {
       className="relative min-h-screen w-full bg-cover bg-center bg-fixed bg-no-repeat"
       style={{ backgroundImage: `url(${bgImage})` }}
     >
-      {/* Background tint overlay */}
       <div className="min-h-screen w-full bg-[#0e0a26]/40 backdrop-blur-[1px]">
-
-        {/* --- ROLE-BASED SIDEBARS --- */}
+        {/* SIDEBARS */}
         {currentUser && (
           <>
-            {/* Dean Sidebar */}
             <Sidebar
               isOpen={isSidebarOpen && currentUser.role === 'dean'}
               onClose={() => setIsSidebarOpen(false)}
@@ -85,7 +97,6 @@ export default function App() {
               onLogout={handleLogout}
             />
 
-            {/* Coordinator Sidebar */}
             <CoordinatorSidebar
               isOpen={isSidebarOpen && currentUser.role === 'coordinator'}
               onClose={() => setIsSidebarOpen(false)}
@@ -94,9 +105,16 @@ export default function App() {
               onLogout={handleLogout}
             />
 
-            {/* Company Sidebar */}
             <CompanySidebar
               isOpen={isSidebarOpen && currentUser.role === 'company'}
+              onClose={() => setIsSidebarOpen(false)}
+              currentPage={location.pathname}
+              onNavigate={(path) => navigate(path)}
+              onLogout={handleLogout}
+            />
+
+            <CareerCenterSidebar
+              isOpen={isSidebarOpen && currentUser.role === 'career_center'}
               onClose={() => setIsSidebarOpen(false)}
               currentPage={location.pathname}
               onNavigate={(path) => navigate(path)}
@@ -105,9 +123,8 @@ export default function App() {
           </>
         )}
 
-        {/* --- APPLICATION ROUTES --- */}
+        {/* ROUTES */}
         <Routes>
-          {/* Public / Auth */}
           <Route
             path="/login"
             element={
@@ -118,7 +135,11 @@ export default function App() {
                       ? '/dean/overview'
                       : currentUser.role === 'coordinator'
                       ? '/coordinator/dashboard'
-                      : '/company/dashboard'
+                      : currentUser.role === 'company'
+                      ? '/company/dashboard'
+                      : currentUser.role === 'career_center'
+                      ? '/career-center'
+                      : '/admin/dashboard'
                   }
                   replace
                 />
@@ -177,6 +198,53 @@ export default function App() {
               />
             }
           />
+          <Route
+            path="/coordinator/students"
+            element={
+              <CoordinatorStudentsPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onSelectStudent={handleSelectStudent}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/student-detail"
+            element={
+              <StudentDetailPage
+                student={selectedStudent}
+                onBack={() => navigate('/coordinator/students')}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/reports"
+            element={
+              <CoordinatorReportsPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/evaluations"
+            element={
+              <CoordinatorEvaluationsPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onSelectStudent={handleSelectStudent}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/announcements"
+            element={
+              <CoordinatorAnnouncementsPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
 
           {/* Host Company Routes */}
           <Route
@@ -189,32 +257,54 @@ export default function App() {
             }
           />
 
-          {/* Placeholders for Career Center & Admin */}
+          {/* Career Center Routes */}
           <Route
             path="/career-center"
             element={
-              <div className="p-12 text-center text-white">
-                <h2 className="text-2xl font-bold text-[#f59e0b]">Career Center Portal</h2>
-                <p className="text-slate-300 text-sm mt-2">Ready to build Industry Matching routes here.</p>
-                <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all">Logout</button>
-              </div>
+              <CareerCenterDashboard
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
             }
           />
+          <Route
+            path="/career-center/partners"
+            element={
+              <PartnerCompaniesPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/career-center/placements"
+            element={
+              <StudentsPlacedPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+
+          {/* Admin Route */}
           <Route
             path="/admin/dashboard"
             element={
               <div className="p-12 text-center text-white">
                 <h2 className="text-2xl font-bold text-[#f59e0b]">Admin Portal</h2>
-                <p className="text-slate-300 text-sm mt-2">Ready to build System Administration routes here.</p>
-                <button onClick={handleLogout} className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all">Logout</button>
+                <button
+                  onClick={handleLogout}
+                  className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Logout
+                </button>
               </div>
             }
           />
 
-          {/* Root Fallback */}
+          {/* Default Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-
       </div>
     </div>
   );
