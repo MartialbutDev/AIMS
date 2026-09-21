@@ -14,6 +14,7 @@ import Sidebar from './dean/Sidebar';
 
 // Coordinator Interface
 import CoordinatorDashboard from './coordinator/CoordinatorDashboard';
+import CoordinatorStudentsPage from './coordinator/CoordinatorStudentsPage';
 import CoordinatorSidebar from './coordinator/CoordinatorSidebar';
 
 // Host Company Interface
@@ -34,7 +35,7 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Login handler redirects to each role's starting screen
+  // Redirect users to their respective portal home upon login
   const handleLoginSuccess = ({ role, username }) => {
     setCurrentUser({ role, username });
 
@@ -65,7 +66,7 @@ export default function App() {
     navigate('/login');
   };
 
-  // Helper for the Dean to view details of one coordinator
+  // Helper for Dean to inspect a specific coordinator
   const handleSelectCoordinator = (coord) => {
     setSelectedCoordinator(coord);
     navigate('/dean/coordinator-detail');
@@ -196,6 +197,15 @@ export default function App() {
               />
             }
           />
+          <Route
+            path="/coordinator/students"
+            element={
+              <CoordinatorStudentsPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
 
           {/* Company Routes */}
           <Route
@@ -254,7 +264,7 @@ export default function App() {
             }
           />
 
-          {/* Default fallback redirects to login */}
+          {/* Default fallback route */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
 
