@@ -17,6 +17,7 @@ import CoordinatorDashboard from './coordinator/CoordinatorDashboard';
 import CoordinatorStudentsPage from './coordinator/CoordinatorStudentsPage';
 import StudentDetailPage from './coordinator/StudentDetailPage';
 import CoordinatorReportsPage from './coordinator/CoordinatorReportsPage';
+import CoordinatorEvaluationsPage from './coordinator/CoordinatorEvaluationsPage';
 import CoordinatorSidebar from './coordinator/CoordinatorSidebar';
 
 // Host Company Interface
@@ -220,6 +221,16 @@ export default function App() {
             element={
               <CoordinatorReportsPage
                 onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/evaluations"
+            element={
+              <CoordinatorEvaluationsPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onSelectStudent={handleSelectStudent}
                 onLogout={handleLogout}
               />
             }
