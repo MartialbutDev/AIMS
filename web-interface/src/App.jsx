@@ -22,6 +22,7 @@ import StudentDetailPage from './coordinator/StudentDetailPage';
 import CoordinatorReportsPage from './coordinator/CoordinatorReportsPage';
 import CoordinatorEvaluationsPage from './coordinator/CoordinatorEvaluationsPage';
 import CoordinatorAnnouncementsPage from './coordinator/CoordinatorAnnouncementsPage';
+import CoordinatorCompaniesPage from './coordinator/CoordinatorCompaniesPage';
 import CoordinatorSidebar from './coordinator/CoordinatorSidebar';
 
 // Host Company Interface
@@ -152,7 +153,7 @@ export default function App() {
             }
           />
 
-          {/* SHARED PROFILE ROUTES (ACCESSIBLE BY ANY LOGGED-IN ROLE) */}
+          {/* SHARED PROFILE ROUTES */}
           <Route
             path="/profile"
             element={
@@ -249,6 +250,7 @@ export default function App() {
             element={
               <CoordinatorDashboard
                 onOpenSidebar={() => setIsSidebarOpen(true)}
+                onNavigate={(path) => navigate(path)}
                 onLogout={handleLogout}
               />
             }
@@ -295,6 +297,15 @@ export default function App() {
             path="/coordinator/announcements"
             element={
               <CoordinatorAnnouncementsPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/companies"
+            element={
+              <CoordinatorCompaniesPage
                 onOpenSidebar={() => setIsSidebarOpen(true)}
                 onLogout={handleLogout}
               />
@@ -357,7 +368,7 @@ export default function App() {
             }
           />
 
-          {/* Fallback */}
+          {/* Default Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>
