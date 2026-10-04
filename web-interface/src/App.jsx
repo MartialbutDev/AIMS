@@ -5,6 +5,9 @@ import bgImage from './assets/ustp-bg.jpg';
 // Auth
 import LoginPage from './auth/LoginPage';
 
+// Shared Profile
+import ProfileSettingsPage from './common/ProfileSettingsPage';
+
 // Dean Interface
 import DepartmentDashboard from './dean/DepartmentDashboard';
 import CoordinatorsPage from './dean/CoordinatorsPage';
@@ -146,6 +149,58 @@ export default function App() {
               ) : (
                 <LoginPage onLoginSuccess={handleLoginSuccess} />
               )
+            }
+          />
+
+          {/* SHARED PROFILE ROUTES (ACCESSIBLE BY ANY LOGGED-IN ROLE) */}
+          <Route
+            path="/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/dean/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/company/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/career-center/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
             }
           />
 
@@ -302,7 +357,7 @@ export default function App() {
             }
           />
 
-          {/* Default Fallback */}
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>
