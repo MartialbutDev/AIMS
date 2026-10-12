@@ -1,5 +1,5 @@
 # backend/app/schemas/document.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 from enum import Enum
@@ -24,14 +24,14 @@ class DocumentCreate(DocumentBase):
 class DocumentResponse(BaseModel):
     id: str
     type: str
-    description: Optional[str]
+    description: Optional[str] = None
+    original_filename: Optional[str] = None      # ✅ NEW
     file_path: str
     verification_status: str
-    extracted_text: Optional[str]
-    validation_confidence: Optional[int]  # ✅ NEW
-    validation_message: Optional[str]     # ✅ NEW
+    extracted_text: Optional[str] = None
+    validation_confidence: Optional[int] = None
+    validation_message: Optional[str] = None
     created_at: datetime
-    updated_at: Optional[datetime]
+    updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

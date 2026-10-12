@@ -1,261 +1,440 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+# backend/app/api/v1/endpoints/journals.py
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    Query,
+    File,
+    UploadFile,
+    Form,
+)
 from sqlalchemy.orm import Session
-from typing import List
-from sqlalchemy import func
+from sqlalchemy import func, case
+from typing import Optional, List
+import math
+import os
 import uuid
+import shutil
 from datetime import datetime
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.journal import Journal, JournalStatus
-from app.schemas.journal import JournalCreate, JournalUpdate, JournalResponse
+from app.schemas.journal import JournalResponse, JournalUpdate
+from app.schemas.pagination import PaginatedResponse
 
 router = APIRouter()
 
 
+# ------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------
+
+ALLOWED_JOURNAL_EXT = {".pdf"}
+MAX_JOURNAL_SIZE_BYTES = 15 * 1024 * 1024  # 15 MB
+
+
+def _save_journal_pdf(upload: UploadFile) -> str:
+    """Save an uploaded PDF to `journal_uploads/`. Returns the relative path."""
+    ext = os.path.splitext(upload.filename or "")[1].lower()
+    if ext not in ALLOWED_JOURNAL_EXT:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed for journals",
+        )
+
+    content = upload.file.read()
+    if len(content) > MAX_JOURNAL_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Max {MAX_JOURNAL_SIZE_BYTES // (1024 * 1024)} MB",
+        )
+    upload.file.seek(0)
+
+    folder = os.path.join(settings.ASSET_DIR, "journal_uploads")
+    os.makedirs(folder, exist_ok=True)
+
+    filename = f"{uuid.uuid4()}{ext}"
+    file_path = os.path.join(folder, filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(upload.file, buffer)
+
+    return os.path.join("journal_uploads", filename)
+
+
+def _delete_file_if_exists(relative_path: Optional[str]) -> None:
+    if not relative_path:
+        return
+    full = os.path.join(settings.ASSET_DIR, relative_path)
+    if os.path.exists(full):
+        try:
+            os.remove(full)
+        except OSError:
+            pass
+
+
+def _to_response(journal: Journal, student_name: Optional[str]) -> JournalResponse:
+    return JournalResponse.model_validate(journal).model_copy(
+        update={"student_name": student_name}
+    )
+
+
+def _student_name_map(db: Session, items: List[Journal]) -> dict[str, str]:
+    ids = {j.student_id for j in items if j.student_id}
+    if not ids:
+        return {}
+    rows = (
+        db.query(User.id, User.first_name, User.last_name)
+        .filter(User.id.in_(ids))
+        .all()
+    )
+    return {sid: f"{fn} {ln}" for sid, fn, ln in rows}
+
+
+def _parse_bool(value) -> bool:
+    """FormData sends 'true'/'false' as strings; treat truthy strings as True."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"true", "1", "yes", "on"}
+
+
+# ------------------------------------------------------------------
+# Create (multipart upload; supports single-step submit)
+# ------------------------------------------------------------------
+
 @router.post("/", response_model=JournalResponse, status_code=status.HTTP_201_CREATED)
 async def create_journal(
-    journal_data: JournalCreate,
+    week: int = Form(...),
+    title: str = Form(...),
+    summary: Optional[str] = Form(None),
+    submit: bool = Form(False),           # ✅ single-step submit flag
+    file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Create a new journal entry"""
-    
-    # Only students can create journals
+    """
+    Student creates a journal by uploading a PDF + metadata.
+
+    - `submit=true` → status goes straight to SUBMITTED and submitted_date is set.
+    - `submit=false` → saved as DRAFT so the student can review later.
+    """
     if current_user.role != UserRole.STUDENT:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only students can create journals"
+        raise HTTPException(403, "Only students can create journals")
+
+    if week < 1 or week > 52:
+        raise HTTPException(400, "Week must be between 1 and 52")
+
+    # Duplicate-week guard (only blocks if a non-rejected journal exists)
+    existing = (
+        db.query(Journal)
+        .filter(
+            Journal.student_id == current_user.id,
+            Journal.week == week,
+            Journal.status != JournalStatus.REJECTED,
         )
-    
-    # Check if journal already exists for this week
-    existing = db.query(Journal).filter(
-        Journal.student_id == current_user.id,
-        Journal.week == journal_data.week,
-        Journal.status != JournalStatus.REJECTED
-    ).first()
-    
+        .first()
+    )
     if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Journal for week {journal_data.week} already exists"
-        )
-    
-    # Create journal
+        raise HTTPException(400, f"Journal for week {week} already exists")
+
+    relative_path = _save_journal_pdf(file)
+
+    # ✅ Decide status up-front
+    wants_submit = _parse_bool(submit)
+    if wants_submit:
+        journal_status = JournalStatus.SUBMITTED
+        submitted_date = datetime.utcnow()
+    else:
+        journal_status = JournalStatus.DRAFT
+        submitted_date = None
+
     journal = Journal(
         id=str(uuid.uuid4()),
         student_id=current_user.id,
-        week=journal_data.week,
-        title=journal_data.title,
-        summary=journal_data.summary,
-        content=journal_data.content,
-        status=JournalStatus.DRAFT
+        week=week,
+        title=title.strip(),
+        summary=(summary or "").strip() or None,
+        file_path=relative_path,
+        status=journal_status,
+        submitted_date=submitted_date,
     )
-    
     db.add(journal)
     db.commit()
     db.refresh(journal)
-    
-    # Include student name
-    response = JournalResponse(
-        **journal.__dict__,
-        student_name=f"{current_user.first_name} {current_user.last_name}"
-    )
-    
-    return response
+
+    student_name = f"{current_user.first_name} {current_user.last_name}"
+    return _to_response(journal, student_name)
 
 
-@router.get("/", response_model=List[JournalResponse])
+# ------------------------------------------------------------------
+# Student list (PAGINATED)
+# ------------------------------------------------------------------
+
+@router.get("/", response_model=PaginatedResponse[JournalResponse])
 async def get_my_journals(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Get current student's journals"""
-    
-    journals = (
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(403, "Only students can view their journals")
+
+    query = (
         db.query(Journal)
         .filter(Journal.student_id == current_user.id)
         .order_by(Journal.week.desc())
-        .all()
     )
-    
-    result = []
-    for journal in journals:
-        student = db.query(User).filter(User.id == journal.student_id).first()
-        result.append(
-            JournalResponse(
-                **journal.__dict__,
-                student_name=f"{student.first_name} {student.last_name}" if student else None
-            )
-        )
-    
-    return result
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
+
+    student_name = f"{current_user.first_name} {current_user.last_name}"
+    return PaginatedResponse[JournalResponse](
+        items=[_to_response(j, student_name) for j in items],
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 0,
+    )
 
 
-@router.get("/all", response_model=List[JournalResponse])
+# ------------------------------------------------------------------
+# Admin: all journals (PAGINATED)
+# MUST stay BEFORE /{journal_id}
+# ------------------------------------------------------------------
+
+@router.get("/all", response_model=PaginatedResponse[JournalResponse])
 async def get_all_journals(
-    skip: int = 0,
-    limit: int = 100,
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin"))
+    current_user: User = Depends(require_role("admin")),
 ):
-    """Get all journals (admin only)"""
-    
-    journals = db.query(Journal).offset(skip).limit(limit).all()
-    
-    result = []
-    for journal in journals:
-        student = db.query(User).filter(User.id == journal.student_id).first()
-        result.append(
-            JournalResponse(
-                **journal.__dict__,
-                student_name=f"{student.first_name} {student.last_name}" if student else None
-            )
-        )
-    
-    return result
+    query = db.query(Journal).order_by(Journal.week.desc())
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
+
+    names = _student_name_map(db, items)
+    return PaginatedResponse[JournalResponse](
+        items=[_to_response(j, names.get(j.student_id)) for j in items],
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 0,
+    )
 
 
-# ===== SUMMARY ENDPOINT - MOVED ABOVE /{journal_id} =====
+# ------------------------------------------------------------------
+# Summary
+# ------------------------------------------------------------------
+
 @router.get("/summary")
 async def get_journal_summary(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Get journal summary for current student"""
-    
     if current_user.role != UserRole.STUDENT:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only students can view their journal summary"
+        raise HTTPException(403, "Only students can view their journal summary")
+
+    row = (
+        db.query(
+            func.count(Journal.id).label("total"),
+            func.sum(case((Journal.status == JournalStatus.DRAFT, 1), else_=0)).label("draft"),
+            func.sum(case((Journal.status == JournalStatus.SUBMITTED, 1), else_=0)).label("submitted"),
+            func.sum(case((Journal.status == JournalStatus.REVIEWING, 1), else_=0)).label("reviewing"),
+            func.sum(case((Journal.status == JournalStatus.APPROVED, 1), else_=0)).label("approved"),
+            func.sum(case((Journal.status == JournalStatus.REJECTED, 1), else_=0)).label("rejected"),
         )
-    
-    journals = db.query(Journal).filter(Journal.student_id == current_user.id).all()
-    
-    total = len(journals)
-    draft = len([j for j in journals if j.status == JournalStatus.DRAFT])
-    submitted = len([j for j in journals if j.status == JournalStatus.SUBMITTED])
-    approved = len([j for j in journals if j.status == JournalStatus.APPROVED])
-    rejected = len([j for j in journals if j.status == JournalStatus.REJECTED])
-    
+        .filter(Journal.student_id == current_user.id)
+        .one()
+    )
+
     return {
-        "total": total,
-        "draft": draft,
-        "submitted": submitted,
-        "approved": approved,
-        "rejected": rejected
+        "total": int(row.total or 0),
+        "draft": int(row.draft or 0),
+        "submitted": int(row.submitted or 0),
+        "reviewing": int(row.reviewing or 0),
+        "approved": int(row.approved or 0),
+        "rejected": int(row.rejected or 0),
     }
 
+
+# ------------------------------------------------------------------
+# File serving (inline PDF preview)
+# ------------------------------------------------------------------
+
+@router.get("/{journal_id}/file")
+async def get_journal_file(
+    journal_id: str,
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Stream the journal PDF. Token goes in the query string for viewers."""
+    from app.core.security import decode_token
+    from fastapi.responses import FileResponse
+
+    user_id = None
+    if token:
+        try:
+            payload = decode_token(token)
+            user_id = payload.get("sub")
+        except Exception:
+            user_id = None
+
+    if not user_id:
+        raise HTTPException(401, "Not authenticated")
+
+    journal = db.query(Journal).filter(Journal.id == journal_id).first()
+    if not journal:
+        raise HTTPException(404, "Journal not found")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(401, "User not found")
+
+    if user.role == UserRole.STUDENT and journal.student_id != user.id:
+        raise HTTPException(403, "Access denied")
+
+    full_path = os.path.join(settings.ASSET_DIR, journal.file_path)
+    if not os.path.exists(full_path):
+        raise HTTPException(404, "File not found")
+
+    return FileResponse(
+        full_path,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="journal_week_{journal.week}.pdf"',
+            "Cache-Control": "private, max-age=300",
+        },
+    )
+
+
+# ------------------------------------------------------------------
+# Single journal
+# ------------------------------------------------------------------
 
 @router.get("/{journal_id}", response_model=JournalResponse)
 async def get_journal(
     journal_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Get journal by ID"""
-    
     journal = db.query(Journal).filter(Journal.id == journal_id).first()
     if not journal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Journal not found"
-        )
-    
-    # Check permissions
-    if current_user.role != UserRole.ADMIN and current_user.id != journal.student_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied"
-        )
-    
-    student = db.query(User).filter(User.id == journal.student_id).first()
-    
-    return JournalResponse(
-        **journal.__dict__,
-        student_name=f"{student.first_name} {student.last_name}" if student else None
-    )
+        raise HTTPException(404, "Journal not found")
 
+    if current_user.role != UserRole.ADMIN and current_user.id != journal.student_id:
+        raise HTTPException(403, "Access denied")
+
+    student = db.query(User).filter(User.id == journal.student_id).first()
+    student_name = f"{student.first_name} {student.last_name}" if student else None
+    return _to_response(journal, student_name)
+
+
+# ------------------------------------------------------------------
+# Update (metadata + status; file replacement is a separate endpoint)
+# ------------------------------------------------------------------
 
 @router.put("/{journal_id}", response_model=JournalResponse)
 async def update_journal(
     journal_id: str,
     journal_data: JournalUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Update journal"""
-    
     journal = db.query(Journal).filter(Journal.id == journal_id).first()
     if not journal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Journal not found"
-        )
-    
-    # Check permissions
-    if current_user.id != journal.student_id and current_user.role not in [UserRole.COORDINATOR, UserRole.ADMIN]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied"
-        )
-    
-    # If status is being changed to submitted, set submitted_date
-    if journal_data.status == JournalStatus.SUBMITTED:
-        journal.submitted_date = datetime.utcnow()
-    
-    # If status is being changed to approved/rejected, set approved_date
-    if journal_data.status in [JournalStatus.APPROVED, JournalStatus.REJECTED]:
-        journal.approved_date = datetime.utcnow()
-    
-    update_data = journal_data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
+        raise HTTPException(404, "Journal not found")
+
+    is_owner = current_user.id == journal.student_id
+    is_staff = current_user.role in [UserRole.COORDINATOR, UserRole.ADMIN]
+
+    if not is_owner and not is_staff:
+        raise HTTPException(403, "Access denied")
+
+    if is_owner and not is_staff and journal.status != JournalStatus.DRAFT:
+        raise HTTPException(400, "Only draft journals can be edited")
+
+    updates = journal_data.model_dump(exclude_unset=True)
+
+    if "status" in updates:
+        new_status = updates["status"]
+        if is_owner and not is_staff and new_status != JournalStatus.SUBMITTED:
+            raise HTTPException(403, "Students can only submit journals")
+        if new_status == JournalStatus.SUBMITTED:
+            journal.submitted_date = datetime.utcnow()
+        elif new_status in (JournalStatus.APPROVED, JournalStatus.REJECTED):
+            journal.approved_date = datetime.utcnow()
+
+    for key, value in updates.items():
         setattr(journal, key, value)
-    
+
     journal.updated_at = func.now()
-    
     db.commit()
     db.refresh(journal)
-    
-    student = db.query(User).filter(User.id == journal.student_id).first()
-    
-    return JournalResponse(
-        **journal.__dict__,
-        student_name=f"{student.first_name} {student.last_name}" if student else None
-    )
 
+    student = db.query(User).filter(User.id == journal.student_id).first()
+    student_name = f"{student.first_name} {student.last_name}" if student else None
+    return _to_response(journal, student_name)
+
+
+# ------------------------------------------------------------------
+# Replace file (only while draft)
+# ------------------------------------------------------------------
+
+@router.put("/{journal_id}/file", response_model=JournalResponse)
+async def replace_journal_file(
+    journal_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    journal = db.query(Journal).filter(Journal.id == journal_id).first()
+    if not journal:
+        raise HTTPException(404, "Journal not found")
+    if journal.student_id != current_user.id:
+        raise HTTPException(403, "You can only edit your own journals")
+    if journal.status != JournalStatus.DRAFT:
+        raise HTTPException(400, "Only draft journals can be edited")
+
+    old_path = journal.file_path
+    journal.file_path = _save_journal_pdf(file)
+    db.commit()
+    db.refresh(journal)
+
+    _delete_file_if_exists(old_path)
+
+    student = db.query(User).filter(User.id == journal.student_id).first()
+    student_name = f"{student.first_name} {student.last_name}" if student else None
+    return _to_response(journal, student_name)
+
+
+# ------------------------------------------------------------------
+# Delete (only while draft)
+# ------------------------------------------------------------------
 
 @router.delete("/{journal_id}")
 async def delete_journal(
     journal_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Delete journal (only if draft)"""
-    
     journal = db.query(Journal).filter(Journal.id == journal_id).first()
     if not journal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Journal not found"
-        )
-    
-    # Only the student who owns the journal can delete it
+        raise HTTPException(404, "Journal not found")
     if current_user.id != journal.student_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only delete your own journals"
-        )
-    
-    # Only draft journals can be deleted
+        raise HTTPException(403, "You can only delete your own journals")
     if journal.status != JournalStatus.DRAFT:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only draft journals can be deleted"
-        )
-    
+        raise HTTPException(400, "Only draft journals can be deleted")
+
+    file_path = journal.file_path
     db.delete(journal)
     db.commit()
-    
+    _delete_file_if_exists(file_path)
+
     return {"message": "Journal deleted successfully"}

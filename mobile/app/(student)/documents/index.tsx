@@ -6,20 +6,18 @@ import { useState, useEffect } from "react";
 import {
   FlatList,
   RefreshControl,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator,
-  Platform,
+  Alert,
 } from "react-native";
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from "expo-secure-store";
+import * as Linking from "expo-linking";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import api from "../../../src/services/api";
-import DocumentPreview from "../../../src/components/documents/DocumentPreview";
 import { BASE_URL } from "../../../src/config/env";
 import { SkeletonDocumentList } from "../../../src/components/common/Skeleton";
 
@@ -27,11 +25,12 @@ interface Document {
   id: string;
   type: string;
   description: string;
+  original_filename?: string;      // ✅ NEW
   verification_status: string;
   created_at: string;
   file_path?: string;
-  validation_confidence?: number;     // ✅ NEW
-  validation_message?: string;       // ✅ NEW
+  validation_confidence?: number;
+  validation_message?: string;
 }
 
 export default function DocumentsScreen() {
@@ -40,11 +39,6 @@ export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string>("");
-  const [previewType, setPreviewType] = useState<string>("");
-  const [previewName, setPreviewName] = useState<string>("");
 
   const fetchDocuments = async () => {
     try {
@@ -89,55 +83,94 @@ export default function DocumentsScreen() {
     }
   };
 
+  // ✅ Open the document externally with the JWT in the query string
   const handlePreview = async (document: Document) => {
     try {
-      const token = await SecureStore.getItemAsync('access_token');
-      const imageUrl = `${BASE_URL}/api/v1/documents/${document.id}/image?token=${encodeURIComponent(token || '')}`;
-      
-      setPreviewImage(imageUrl);
-      setPreviewType(document.type);
-      setPreviewName(document.description || document.type.replace(/_/g, ' ').toUpperCase());
-      setPreviewVisible(true);
+      const token = await SecureStore.getItemAsync("access_token");
+      if (!token) {
+        Alert.alert("Error", "Session expired. Please log in again.");
+        return;
+      }
+
+      const url = `${BASE_URL}/api/v1/documents/${document.id}/image?token=${encodeURIComponent(
+        token
+      )}`;
+
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) {
+        Alert.alert("Error", "Cannot open this file on this device");
+        return;
+      }
+
+      await Linking.openURL(url);
     } catch (error) {
-      console.error('Error preparing preview:', error);
+      console.error("Preview error:", error);
+      Alert.alert("Error", "Failed to open document");
     }
   };
 
-  // ✅ Skeleton Loader
+  // ✅ Skeleton on first load
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <StatusBar style={isDark ? "light" : "dark"} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar
+          style={isDark ? "light" : "dark"}
+          backgroundColor={colors.background}
+        />
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>My Documents</Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            My Documents
+          </Text>
           <View style={styles.uploadButton} />
         </View>
         <SkeletonDocumentList count={5} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   const renderDocument = ({ item }: { item: Document }) => {
     const statusColor = getStatusColor(item.verification_status);
-    const displayName = item.type.replace(/_/g, ' ').toUpperCase();
-    
+    const displayName = item.type.replace(/_/g, " ").toUpperCase();
+
+    // Prefer the original filename, then description, then nothing
+    const subtitle =
+      item.original_filename || item.description || null;
+
     return (
       <TouchableOpacity
         style={[styles.documentCard, { backgroundColor: colors.card }]}
         onPress={() => router.push(`/(student)/documents/${item.id}` as any)}
         activeOpacity={0.7}
       >
-        <View style={[styles.documentIcon, { backgroundColor: `${colors.primary}10` }]}>
-          <Ionicons name="document-text-outline" size={28} color={colors.primary} />
+        <View
+          style={[
+            styles.documentIcon,
+            { backgroundColor: `${colors.primary}10` },
+          ]}
+        >
+          <Ionicons
+            name="document-text-outline"
+            size={28}
+            color={colors.primary}
+          />
         </View>
-        
+
         <View style={styles.documentInfo}>
-          <Text style={[styles.documentType, { color: colors.textPrimary }]}>
+          <Text
+            style={[styles.documentType, { color: colors.textPrimary }]}
+            numberOfLines={1}
+          >
             {displayName}
           </Text>
-          {item.description ? (
-            <Text style={[styles.documentDescription, { color: colors.textSecondary }]} numberOfLines={1}>
-              {item.description}
+          {subtitle ? (
+            <Text
+              style={[
+                styles.documentDescription,
+                { color: colors.textSecondary },
+              ]}
+              numberOfLines={1}
+            >
+              {subtitle}
             </Text>
           ) : null}
           <Text style={[styles.documentDate, { color: colors.textSecondary }]}>
@@ -146,7 +179,6 @@ export default function DocumentsScreen() {
         </View>
 
         <View style={styles.documentActions}>
-          {/* ✅ Preview Button */}
           <TouchableOpacity
             style={[styles.previewButton, { borderColor: colors.border }]}
             onPress={() => handlePreview(item)}
@@ -154,9 +186,10 @@ export default function DocumentsScreen() {
           >
             <Ionicons name="eye-outline" size={20} color={colors.primary} />
           </TouchableOpacity>
-          
-          {/* ✅ Status Badge with Confidence */}
-          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
+
+          <View
+            style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}
+          >
             <Ionicons
               name={getStatusIcon(item.verification_status)}
               size={12}
@@ -164,34 +197,49 @@ export default function DocumentsScreen() {
               style={styles.statusIcon}
             />
             <Text style={[styles.statusText, { color: statusColor }]}>
-              {item.verification_status.charAt(0).toUpperCase() + item.verification_status.slice(1)}
+              {item.verification_status.charAt(0).toUpperCase() +
+                item.verification_status.slice(1)}
             </Text>
           </View>
-          
-          {/* ✅ Validation Confidence Badge */}
-          {item.validation_confidence !== null && item.validation_confidence !== undefined && (
-            <View style={[styles.confidenceBadge, { backgroundColor: `${statusColor}15` }]}>
-              <Ionicons 
-                name={item.validation_confidence >= 50 ? "checkmark-circle" : "alert-circle"} 
-                size={10} 
-                color={statusColor} 
-              />
-              <Text style={[styles.confidenceText, { color: statusColor }]}>
-                {item.validation_confidence}%
-              </Text>
-            </View>
-          )}
+
+          {item.validation_confidence !== null &&
+            item.validation_confidence !== undefined && (
+              <View
+                style={[
+                  styles.confidenceBadge,
+                  { backgroundColor: `${statusColor}15` },
+                ]}
+              >
+                <Ionicons
+                  name={
+                    item.validation_confidence >= 50
+                      ? "checkmark-circle"
+                      : "alert-circle"
+                  }
+                  size={10}
+                  color={statusColor}
+                />
+                <Text style={[styles.confidenceText, { color: statusColor }]}>
+                  {item.validation_confidence}%
+                </Text>
+              </View>
+            )}
         </View>
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar
+        style={isDark ? "light" : "dark"}
+        backgroundColor={colors.background}
+      />
+
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>My Documents</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          My Documents
+        </Text>
         <TouchableOpacity
           style={styles.uploadButton}
           onPress={() => router.push("/(student)/documents/upload")}
@@ -206,14 +254,24 @@ export default function DocumentsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
         }
         onScroll={handleScroll}
         scrollEventThrottle={16}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="document-text-outline" size={64} color={colors.border} />
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Documents</Text>
+            <Ionicons
+              name="document-text-outline"
+              size={64}
+              color={colors.border}
+            />
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+              No Documents
+            </Text>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               Upload your internship documents to get started
             </Text>
@@ -227,54 +285,28 @@ export default function DocumentsScreen() {
         }
         ListFooterComponent={<View style={styles.listFooter} />}
       />
-
-      <DocumentPreview
-        visible={previewVisible}
-        imageUri={previewImage}
-        documentType={previewType}
-        documentName={previewName}
-        onClose={() => setPreviewVisible(false)}
-      />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  centerContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 12 : 16,
+    paddingTop: 0,
     paddingBottom: 12,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  uploadButton: {
-    padding: 4,
-  },
+  headerTitle: { fontSize: 20, fontWeight: "700" },
+  uploadButton: { padding: 4 },
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 10,
     flexGrow: 1,
   },
-  listFooter: {
-    height: 80,
-  },
+  listFooter: { height: 80 },
   documentCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -295,26 +327,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
-  documentInfo: {
-    flex: 1,
-  },
-  documentType: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  documentDescription: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  documentDate: {
-    fontSize: 11,
-    marginTop: 2,
-    opacity: 0.7,
-  },
-  documentActions: {
-    alignItems: "flex-end",
-    gap: 4,
-  },
+  documentInfo: { flex: 1 },
+  documentType: { fontSize: 15, fontWeight: "600" },
+  documentDescription: { fontSize: 13, marginTop: 2 },
+  documentDate: { fontSize: 11, marginTop: 2, opacity: 0.7 },
+  documentActions: { alignItems: "flex-end", gap: 4 },
   previewButton: {
     width: 32,
     height: 32,
@@ -331,14 +348,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  statusIcon: {
-    marginRight: 4,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  // ✅ New: Confidence Badge
+  statusIcon: { marginRight: 4 },
+  statusText: { fontSize: 11, fontWeight: "600" },
   confidenceBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -347,20 +358,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     gap: 2,
   },
-  confidenceText: {
-    fontSize: 9,
-    fontWeight: "600",
-  },
+  confidenceText: { fontSize: 9, fontWeight: "600" },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 60,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginTop: 16,
-  },
+  emptyTitle: { fontSize: 18, fontWeight: "600", marginTop: 16 },
   emptyText: {
     fontSize: 14,
     marginTop: 8,
@@ -373,9 +377,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 20,
   },
-  emptyButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  emptyButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
 });

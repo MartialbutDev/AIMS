@@ -11,6 +11,7 @@ from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.company import Company
 from app.models.application import Application, ApplicationStatus
+from app.models.document import Document
 from app.schemas.application import (
     ApplicationCreate,
     ApplicationUpdate,
@@ -26,17 +27,12 @@ router = APIRouter()
 # ------------------------------------------------------------------
 
 def _to_response(app: Application, company_name: str | None) -> ApplicationResponse:
-    """
-    Build a response from ORM object without leaking SQLAlchemy internals
-    (`_sa_instance_state`) into Pydantic.
-    """
     return ApplicationResponse.model_validate(app).model_copy(
         update={"company_name": company_name}
     )
 
 
 def _company_name_map(db: Session, items: List[Application]) -> dict[str, str]:
-    """Fetch all referenced company names in a single query."""
     ids = {a.company_id for a in items if a.company_id}
     if not ids:
         return {}
@@ -45,10 +41,38 @@ def _company_name_map(db: Session, items: List[Application]) -> dict[str, str]:
 
 
 def _paginate(query, page: int, limit: int):
-    """Return (items, total) for a SQLAlchemy query."""
     total = query.count()
     items = query.offset((page - 1) * limit).limit(limit).all()
     return items, total
+
+
+def _validate_document_ownership(
+    db: Session,
+    document_id: str | None,
+    student_id: str,
+    field_label: str,
+) -> Document | None:
+    """Ensure a document exists, belongs to the student, and is verified."""
+    if not document_id:
+        return None
+
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_label}: document not found",
+        )
+    if doc.uploaded_by != student_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{field_label}: you can only attach your own documents",
+        )
+    if doc.verification_status != "verified":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_label}: document must be verified before attaching",
+        )
+    return doc
 
 
 # ------------------------------------------------------------------
@@ -61,7 +85,7 @@ async def create_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Student applies to a company."""
+    """Student applies to a company, optionally attaching resume + letter."""
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -95,12 +119,22 @@ async def create_application(
             detail="You already have an active application for this position",
         )
 
+    # ✅ Validate attached documents (must exist, belong to student, be verified)
+    _validate_document_ownership(
+        db, application_data.resume_id, current_user.id, "Resume"
+    )
+    _validate_document_ownership(
+        db, application_data.application_letter_id, current_user.id, "Application letter"
+    )
+
     application = Application(
         id=str(uuid.uuid4()),
         student_id=current_user.id,
         company_id=application_data.company_id,
         position=application_data.position,
         cover_letter=application_data.cover_letter,
+        resume_id=application_data.resume_id,
+        application_letter_id=application_data.application_letter_id,
         status=ApplicationStatus.PENDING,
     )
     db.add(application)
@@ -111,7 +145,7 @@ async def create_application(
 
 
 # ------------------------------------------------------------------
-# Student: list own applications (PAGINATED)
+# Student: own applications (paginated)
 # ------------------------------------------------------------------
 
 @router.get("/", response_model=PaginatedResponse[ApplicationResponse])
@@ -121,7 +155,6 @@ async def get_my_applications(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get current student's applications (paginated)."""
     query = (
         db.query(Application)
         .filter(Application.student_id == current_user.id)
@@ -140,7 +173,7 @@ async def get_my_applications(
 
 
 # ------------------------------------------------------------------
-# Admin: list all applications (PAGINATED)
+# Admin: all applications (paginated)
 # MUST stay declared BEFORE /{application_id}
 # ------------------------------------------------------------------
 
@@ -151,7 +184,6 @@ async def get_all_applications(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
-    """Get all applications (admin only, paginated)."""
     query = db.query(Application).order_by(Application.applied_date.desc())
     items, total = _paginate(query, page, limit)
     companies = _company_name_map(db, items)

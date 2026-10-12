@@ -7,7 +7,6 @@ import {
   Dimensions,
   FlatList,
   RefreshControl,
-  SafeAreaView,
   StyleSheet,
   ScrollView,
   Text,
@@ -15,7 +14,6 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 
 import { useTheme } from "../../../src/context/ThemeContext";
@@ -24,14 +22,18 @@ import { usePaginatedData } from "../../../src/hooks/usePaginatedData";
 import api from "../../../src/services/api";
 import { SkeletonApplicationList } from "../../../src/components/common/Skeleton";
 
-const { width } = Dimensions.get("window");
-
 interface Application {
   id: string;
   company_id: string;
   company_name: string;
   position: string;
-  status: "pending" | "reviewing" | "interview" | "accepted" | "rejected" | "withdrawn";
+  status:
+    | "pending"
+    | "reviewing"
+    | "interview"
+    | "accepted"
+    | "rejected"
+    | "withdrawn";
   applied_date: string;
   cover_letter?: string;
 }
@@ -79,7 +81,7 @@ export default function ApplicationsScreen() {
     "withdrawn",
   ];
 
-  // ✅ Pagination hook — backend now returns { items, total, page, limit, total_pages }
+  // ✅ Pagination hook — backend returns { items, total, page, limit, total_pages }
   const {
     data: applications,
     loadNext,
@@ -109,18 +111,10 @@ export default function ApplicationsScreen() {
     const matchesSearch =
       app.company_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.position.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = selectedFilter === "all" || app.status === selectedFilter;
+    const matchesFilter =
+      selectedFilter === "all" || app.status === selectedFilter;
     return matchesSearch && matchesFilter;
   });
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
 
   const getDaysAgo = (dateString: string) => {
     const now = new Date();
@@ -133,9 +127,7 @@ export default function ApplicationsScreen() {
   const renderApplication = ({ item }: { item: Application }) => (
     <TouchableOpacity
       style={[styles.applicationCard, { backgroundColor: colors.card }]}
-      onPress={() =>
-        router.push(`/(student)/applications/${item.id}` as any)
-      }
+      onPress={() => router.push(`/(student)/applications/${item.id}` as any)}
       activeOpacity={0.7}
     >
       <View style={styles.cardHeader}>
@@ -231,10 +223,11 @@ export default function ApplicationsScreen() {
   // ✅ Skeleton Loader — only on very first load
   if (isLoading && applications.length === 0) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
-        <StatusBar style={isDark ? "light" : "dark"} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar
+          style={isDark ? "light" : "dark"}
+          backgroundColor={colors.background}
+        />
         <View style={styles.header}>
           <View style={styles.backButton} />
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
@@ -243,19 +236,24 @@ export default function ApplicationsScreen() {
           <View style={styles.addButton} />
         </View>
         <SkeletonApplicationList count={5} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar
+        style={isDark ? "light" : "dark"}
+        backgroundColor={colors.background}
+      />
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
+          <Ionicons
+            name="arrow-back-outline"
+            size={24}
+            color={colors.textPrimary}
+          />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
           Applications
@@ -290,7 +288,11 @@ export default function ApplicationsScreen() {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={colors.textSecondary}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -329,12 +331,18 @@ export default function ApplicationsScreen() {
               No Applications
             </Text>
             <Text
-              style={[styles.emptyStateDescription, { color: colors.textSecondary }]}
+              style={[
+                styles.emptyStateDescription,
+                { color: colors.textSecondary },
+              ]}
             >
               Start applying to internships to build your career
             </Text>
             <TouchableOpacity
-              style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
+              style={[
+                styles.emptyStateButton,
+                { backgroundColor: colors.primary },
+              ]}
               onPress={() => router.push("/(student)/applications/new" as any)}
             >
               <Text style={styles.emptyStateButtonText}>Apply Now</Text>
@@ -349,7 +357,7 @@ export default function ApplicationsScreen() {
           ) : null
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -371,7 +379,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === "ios" ? 12 : 16,
+    paddingTop: 0,
     paddingBottom: 12,
   },
   backButton: {

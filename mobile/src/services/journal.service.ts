@@ -1,13 +1,14 @@
 // src/services/journal.service.ts
-import api from './api';
+import api from "./api";
+import { BASE_URL } from "../config/env";
 
 export interface Journal {
   id: string;
   week: number;
   title: string;
-  summary: string;
-  content?: string;
-  status: 'draft' | 'submitted' | 'reviewing' | 'approved' | 'rejected';
+  summary?: string;
+  file_path: string;
+  status: "draft" | "submitted" | "reviewing" | "approved" | "rejected";
   feedback?: string;
   submitted_date?: string;
   approved_date?: string;
@@ -18,87 +19,97 @@ export interface JournalSummary {
   total: number;
   draft: number;
   submitted: number;
+  reviewing: number;
   approved: number;
   rejected: number;
 }
 
-export interface CreateJournalData {
+export interface CreateJournalPayload {
   week: number;
   title: string;
-  summary: string;
-  content?: string;
+  summary?: string;
+  fileUri: string;
+  fileName: string;
+  mimeType?: string;
+  submit?: boolean;
 }
 
 export const journalService = {
-  // Get all journals for current student
-  async getMyJournals(): Promise<Journal[]> {
-    try {
-      const response = await api.get('/journals/');
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Get journals error:', error.response?.data || error.message);
-      return [];
-    }
-  },
-
-  // Get journal summary - Fixed: returns default values on error
   async getJournalSummary(): Promise<JournalSummary> {
     try {
-      const response = await api.get('/journals/summary');
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Get journal summary error:', error.response?.data || error.message);
-      // Return default values instead of throwing
+      const res = await api.get("/journals/summary");
+      return res.data;
+    } catch (err) {
+      console.error("❌ getJournalSummary error:", err);
       return {
         total: 0,
         draft: 0,
         submitted: 0,
+        reviewing: 0,
         approved: 0,
-        rejected: 0
+        rejected: 0,
       };
     }
   },
 
-  // Create new journal
-  async createJournal(data: CreateJournalData): Promise<Journal> {
-    try {
-      const response = await api.post('/journals/', data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Create journal error:', error.response?.data || error.message);
-      throw error;
+  async createJournal(payload: CreateJournalPayload): Promise<Journal> {
+    const formData = new FormData();
+
+    formData.append("week", String(payload.week));
+    formData.append("title", payload.title.trim());
+    if (payload.summary?.trim()) {
+      formData.append("summary", payload.summary.trim());
     }
+    formData.append("submit", payload.submit ? "true" : "false");
+
+    formData.append("file", {
+      uri: payload.fileUri,
+      name: payload.fileName,
+      type: payload.mimeType || "application/pdf",
+    } as any);
+
+    const res = await api.post("/journals/", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
   },
 
-  // Get single journal
   async getJournalById(id: string): Promise<Journal> {
-    try {
-      const response = await api.get(`/journals/${id}`);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Get journal by ID error:', error.response?.data || error.message);
-      throw error;
-    }
+    const res = await api.get(`/journals/${id}`);
+    return res.data;
   },
 
-  // Update journal
   async updateJournal(id: string, data: Partial<Journal>): Promise<Journal> {
-    try {
-      const response = await api.put(`/journals/${id}`, data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Update journal error:', error.response?.data || error.message);
-      throw error;
-    }
+    const res = await api.put(`/journals/${id}`, data);
+    return res.data;
   },
 
-  // Delete journal (only if draft)
+  async replaceFile(
+    id: string,
+    fileUri: string,
+    fileName: string,
+    mimeType = "application/pdf"
+  ): Promise<Journal> {
+    const formData = new FormData();
+    formData.append("file", {
+      uri: fileUri,
+      name: fileName,
+      type: mimeType,
+    } as any);
+
+    const res = await api.put(`/journals/${id}/file`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  },
+
   async deleteJournal(id: string): Promise<void> {
-    try {
-      await api.delete(`/journals/${id}`);
-    } catch (error: any) {
-      console.error('❌ Delete journal error:', error.response?.data || error.message);
-      throw error;
-    }
+    await api.delete(`/journals/${id}`);
+  },
+
+  getFileUrl(journalId: string, token: string): string {
+    return `${BASE_URL}/api/v1/journals/${journalId}/file?token=${encodeURIComponent(
+      token
+    )}`;
   },
 };

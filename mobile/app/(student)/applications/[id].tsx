@@ -237,12 +237,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 12 : 16,
-    paddingBottom: 12,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingHorizontal: 20,
+  paddingTop: 0,
+  paddingBottom: 12,
   },
   backButton: {
     padding: 4,

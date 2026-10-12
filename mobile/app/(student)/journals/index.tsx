@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState, useEffect } from "react";
 import {
-  Dimensions,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -13,9 +12,7 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
-  Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
@@ -26,8 +23,7 @@ import {
 } from "../../../src/services/journal.service";
 import { usePaginatedData } from "../../../src/hooks/usePaginatedData";
 import api from "../../../src/services/api";
-
-const { width } = Dimensions.get("window");
+import { SkeletonJournalList } from "../../../src/components/common/Skeleton";
 
 const statusColors: Record<string, string> = {
   draft: "#6B7280",
@@ -70,7 +66,7 @@ export default function JournalsScreen() {
   ];
   const weeks: (number | "all")[] = ["all", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-  // ✅ Pagination hook — backend now returns { items, total, page, limit, total_pages }
+  // ✅ Paginated hook — backend returns { items, total, page, limit, total_pages }
   const {
     data: journals,
     loadNext,
@@ -94,7 +90,7 @@ export default function JournalsScreen() {
     }
   );
 
-  // ✅ Fetch summary separately
+  // ✅ Summary
   useEffect(() => {
     fetchSummary();
   }, []);
@@ -127,6 +123,8 @@ export default function JournalsScreen() {
   const getWeekLabel = (week: number) => {
     return `Week ${week}`;
   };
+
+  // ----- renderers -----
 
   const renderJournalCard = ({ item }: { item: Journal }) => (
     <TouchableOpacity
@@ -178,12 +176,14 @@ export default function JournalsScreen() {
         </View>
       </View>
 
-      <Text
-        style={[styles.journalSummary, { color: colors.textSecondary }]}
-        numberOfLines={2}
-      >
-        {item.summary}
-      </Text>
+      {item.summary && (
+        <Text
+          style={[styles.journalSummary, { color: colors.textSecondary }]}
+          numberOfLines={2}
+        >
+          {item.summary}
+        </Text>
+      )}
 
       {item.feedback && (
         <View
@@ -267,28 +267,34 @@ export default function JournalsScreen() {
     );
   };
 
-  // ✅ Skeleton Loader — only on very first load
+  // ✅ Skeleton — first load only
   if (isLoading && journals.length === 0) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Loading journals...
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar
+          style={isDark ? "light" : "dark"}
+          backgroundColor={colors.background}
+        />
+        <View style={styles.header}>
+          <View style={styles.backButton} />
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            Weekly Journals
           </Text>
+          <View style={styles.addButton} />
         </View>
-      </SafeAreaView>
+        <SkeletonJournalList count={5} />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar
+        style={isDark ? "light" : "dark"}
+        backgroundColor={colors.background}
+      />
 
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons
@@ -308,6 +314,7 @@ export default function JournalsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Summary stats */}
       {summary && (
         <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
           <View style={styles.statItem}>
@@ -357,6 +364,7 @@ export default function JournalsScreen() {
         </View>
       )}
 
+      {/* Week filter */}
       <View style={styles.filtersWrapper}>
         <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>
           Week
@@ -368,6 +376,7 @@ export default function JournalsScreen() {
         </ScrollView>
       </View>
 
+      {/* Status filter */}
       <View style={styles.filtersWrapper}>
         <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>
           Status
@@ -379,6 +388,7 @@ export default function JournalsScreen() {
         </ScrollView>
       </View>
 
+      {/* List */}
       <FlatList
         data={filteredJournals}
         renderItem={renderJournalCard}
@@ -411,7 +421,7 @@ export default function JournalsScreen() {
                 { color: colors.textSecondary },
               ]}
             >
-              Start writing your weekly internship journals
+              Upload your weekly internship journal as a PDF
             </Text>
             <TouchableOpacity
               style={[
@@ -420,7 +430,7 @@ export default function JournalsScreen() {
               ]}
               onPress={() => router.push("/(student)/journals/new" as any)}
             >
-              <Text style={styles.emptyStateButtonText}>Write Journal</Text>
+              <Text style={styles.emptyStateButtonText}>Upload Journal</Text>
             </TouchableOpacity>
           </View>
         }
@@ -432,7 +442,7 @@ export default function JournalsScreen() {
           ) : null
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -440,21 +450,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centerContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === "ios" ? 12 : 16,
+    paddingTop: 0,
     paddingBottom: 12,
   },
   backButton: {

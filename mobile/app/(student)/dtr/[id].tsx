@@ -1,8 +1,8 @@
 // app/(student)/dtr/[id].tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,8 +12,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-  Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { dtrService, DTR } from "../../../src/services/dtr.service";
@@ -43,41 +43,61 @@ const statusLabels: Record<string, string> = {
 
 export default function DTRDetailScreen() {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
+
   const [loading, setLoading] = useState(true);
   const [dtr, setDtr] = useState<DTR | null>(null);
   const [previewImage, setPreviewImage] = useState<string>("");
   const [previewTitle, setPreviewTitle] = useState<string>("");
   const [previewVisible, setPreviewVisible] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      fetchDTR();
-    }
-  }, [id]);
+  // ----- fetch -----
 
-  const fetchDTR = async () => {
-    try {
-      setLoading(true);
-      const data = await dtrService.getDTRById(id);
-      setDtr(data);
-    } catch (error) {
-      console.error("Error fetching DTR detail:", error);
-      Alert.alert("Error", "Failed to load DTR details");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchDTR = useCallback(
+    async (showSpinner = true) => {
+      if (!id) return;
+      try {
+        if (showSpinner) setLoading(true);
+        const data = await dtrService.getDTRById(id);
+        setDtr(data);
+      } catch (error) {
+        console.error("Error fetching DTR detail:", error);
+        Alert.alert("Error", "Failed to load DTR details");
+      } finally {
+        if (showSpinner) setLoading(false);
+      }
+    },
+    [id]
+  );
+
+  // Initial load
+  useEffect(() => {
+    fetchDTR(true);
+  }, [fetchDTR]);
+
+  // Refresh when returning from Time-Out screen (or from anywhere)
+  useFocusEffect(
+    useCallback(() => {
+      // Skip the very first focus — useEffect already fetched
+      if (dtr) {
+        fetchDTR(false);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id])
+  );
+
+  // ----- helpers -----
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
+      return date.toLocaleDateString("en-US", {
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
     } catch {
       return dateString;
@@ -88,7 +108,10 @@ export default function DTRDetailScreen() {
     if (!timeString) return "—";
     try {
       const time = new Date(`2000-01-01T${timeString}`);
-      return time.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      return time.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } catch {
       return timeString;
     }
@@ -107,7 +130,7 @@ export default function DTRDetailScreen() {
     setPreviewVisible(true);
   };
 
-  const canTimeOut = dtr?.status === 'pending' && !dtr?.time_out;
+  // ----- early states -----
 
   if (loading) {
     return (
@@ -115,7 +138,9 @@ export default function DTRDetailScreen() {
         <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading DTR details...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading DTR details...
+          </Text>
         </View>
       </View>
     );
@@ -127,10 +152,12 @@ export default function DTRDetailScreen() {
         <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
         <View style={styles.centerContent}>
           <Ionicons name="calendar-outline" size={64} color={colors.border} />
-          <Text style={[styles.errorText, { color: colors.textSecondary }]}>DTR record not found</Text>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+            DTR record not found
+          </Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
-            onPress={fetchDTR}
+            onPress={() => fetchDTR(true)}
           >
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
@@ -139,35 +166,45 @@ export default function DTRDetailScreen() {
     );
   }
 
+  // ----- computed -----
+
   const statusColor = statusColors[dtr.status] || colors.primary;
   const statusIcon = statusIcons[dtr.status] || "help-circle-outline";
   const imageInUri = getImageUri(dtr.image_in_path);
   const imageOutUri = getImageUri(dtr.image_out_path);
   const hasTimeOut = !!dtr.time_out;
+  const canTimeOut = dtr.status === "pending" && !dtr.time_out;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
-      
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>DTR Details</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          DTR Details
+        </Text>
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
+      <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          canTimeOut && styles.contentWithButton,
+          canTimeOut && {
+            paddingBottom: 140 + insets.bottom,
+          },
         ]}
       >
+        {/* ----- summary card ----- */}
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.dateRow}>
             <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-            <Text style={[styles.dateText, { color: colors.textPrimary }]}>{formatDate(dtr.date)}</Text>
+            <Text style={[styles.dateText, { color: colors.textPrimary }]}>
+              {formatDate(dtr.date)}
+            </Text>
           </View>
 
           <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
@@ -179,24 +216,35 @@ export default function DTRDetailScreen() {
 
           <View style={styles.timeGrid}>
             <View style={styles.timeBlock}>
-              <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>Time In</Text>
+              <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
+                Time In
+              </Text>
               <View style={styles.timeValueRow}>
                 <Ionicons name="log-in-outline" size={18} color="#10B981" />
-                <Text style={[styles.timeValue, { color: colors.textPrimary }]}>{formatTime(dtr.time_in)}</Text>
+                <Text style={[styles.timeValue, { color: colors.textPrimary }]}>
+                  {formatTime(dtr.time_in)}
+                </Text>
               </View>
             </View>
 
             <View style={[styles.timeDivider, { backgroundColor: colors.border }]} />
 
             <View style={styles.timeBlock}>
-              <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>Time Out</Text>
+              <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
+                Time Out
+              </Text>
               <View style={styles.timeValueRow}>
-                <Ionicons 
-                  name={hasTimeOut ? "log-out-outline" : "time-outline"} 
-                  size={18} 
-                  color={hasTimeOut ? "#EF4444" : colors.textSecondary} 
+                <Ionicons
+                  name={hasTimeOut ? "log-out-outline" : "time-outline"}
+                  size={18}
+                  color={hasTimeOut ? "#EF4444" : colors.textSecondary}
                 />
-                <Text style={[styles.timeValue, { color: hasTimeOut ? colors.textPrimary : colors.textSecondary }]}>
+                <Text
+                  style={[
+                    styles.timeValue,
+                    { color: hasTimeOut ? colors.textPrimary : colors.textSecondary },
+                  ]}
+                >
                   {hasTimeOut ? formatTime(dtr.time_out) : "Not yet"}
                 </Text>
               </View>
@@ -205,10 +253,17 @@ export default function DTRDetailScreen() {
             <View style={[styles.timeDivider, { backgroundColor: colors.border }]} />
 
             <View style={styles.timeBlock}>
-              <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>Total Hours</Text>
+              <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
+                Total Hours
+              </Text>
               <View style={styles.timeValueRow}>
                 <Ionicons name="time-outline" size={18} color={colors.primary} />
-                <Text style={[styles.timeValue, { color: hasTimeOut ? colors.primary : colors.textSecondary }]}>
+                <Text
+                  style={[
+                    styles.timeValue,
+                    { color: hasTimeOut ? colors.primary : colors.textSecondary },
+                  ]}
+                >
                   {hasTimeOut && dtr.total_hours ? `${dtr.total_hours} hrs` : "—"}
                 </Text>
               </View>
@@ -216,6 +271,7 @@ export default function DTRDetailScreen() {
           </View>
         </View>
 
+        {/* ----- location ----- */}
         {dtr.location_address && (
           <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
@@ -227,29 +283,50 @@ export default function DTRDetailScreen() {
           </View>
         )}
 
+        {/* ----- tasks ----- */}
         {!!dtr.tasks_completed && (
           <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Tasks Completed</Text>
-            <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{dtr.tasks_completed}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              Tasks Completed
+            </Text>
+            <Text style={[styles.sectionText, { color: colors.textSecondary }]}>
+              {dtr.tasks_completed}
+            </Text>
           </View>
         )}
 
+        {/* ----- notes ----- */}
         {!!dtr.notes && (
           <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notes</Text>
-            <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{dtr.notes}</Text>
+            <Text style={[styles.sectionText, { color: colors.textSecondary }]}>
+              {dtr.notes}
+            </Text>
           </View>
         )}
 
+        {/* ----- feedback ----- */}
         {!!dtr.feedback && (
-          <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: statusColor }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Coordinator Feedback</Text>
-            <Text style={[styles.sectionText, { color: colors.textSecondary }]}>{dtr.feedback}</Text>
+          <View
+            style={[
+              styles.sectionCard,
+              { backgroundColor: colors.card, borderColor: statusColor, borderWidth: 1 },
+            ]}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+              Coordinator Feedback
+            </Text>
+            <Text style={[styles.sectionText, { color: colors.textSecondary }]}>
+              {dtr.feedback}
+            </Text>
           </View>
         )}
 
+        {/* ----- photos ----- */}
         <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Verification Photos</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Verification Photos
+          </Text>
           <View style={styles.photosRow}>
             {imageInUri ? (
               <TouchableOpacity
@@ -258,15 +335,21 @@ export default function DTRDetailScreen() {
                 activeOpacity={0.8}
               >
                 <Image source={{ uri: imageInUri }} style={styles.photo} />
-                <View style={[styles.photoBadge, { backgroundColor: "rgba(16, 185, 129, 0.85)" }]}>
+                <View
+                  style={[styles.photoBadge, { backgroundColor: "rgba(16, 185, 129, 0.85)" }]}
+                >
                   <Ionicons name="log-in-outline" size={10} color="#FFFFFF" />
                   <Text style={styles.photoBadgeText}>Time In</Text>
                 </View>
               </TouchableOpacity>
             ) : (
-              <View style={[styles.noPhotoContainer, { backgroundColor: `${colors.border}40` }]}>
+              <View
+                style={[styles.noPhotoContainer, { backgroundColor: `${colors.border}40` }]}
+              >
                 <Ionicons name="image-outline" size={32} color={colors.textSecondary} />
-                <Text style={[styles.noPhotoText, { color: colors.textSecondary }]}>No Time-In Photo</Text>
+                <Text style={[styles.noPhotoText, { color: colors.textSecondary }]}>
+                  No Time-In Photo
+                </Text>
               </View>
             )}
 
@@ -277,29 +360,51 @@ export default function DTRDetailScreen() {
                 activeOpacity={0.8}
               >
                 <Image source={{ uri: imageOutUri }} style={styles.photo} />
-                <View style={[styles.photoBadge, { backgroundColor: "rgba(239, 68, 68, 0.85)" }]}>
+                <View
+                  style={[styles.photoBadge, { backgroundColor: "rgba(239, 68, 68, 0.85)" }]}
+                >
                   <Ionicons name="log-out-outline" size={10} color="#FFFFFF" />
                   <Text style={styles.photoBadgeText}>Time Out</Text>
                 </View>
               </TouchableOpacity>
             ) : (
-              <View style={[styles.noPhotoContainer, { backgroundColor: `${colors.border}40` }]}>
+              <View
+                style={[styles.noPhotoContainer, { backgroundColor: `${colors.border}40` }]}
+              >
                 <Ionicons name="image-outline" size={32} color={colors.textSecondary} />
-                <Text style={[styles.noPhotoText, { color: colors.textSecondary }]}>No Time-Out Photo</Text>
+                <Text style={[styles.noPhotoText, { color: colors.textSecondary }]}>
+                  No Time-Out Photo
+                </Text>
               </View>
             )}
           </View>
         </View>
       </ScrollView>
 
+      {/* ----- bottom action (only when a Time-Out is possible) ----- */}
       {canTimeOut && (
-        <View style={[styles.buttonContainer, { backgroundColor: colors.background }]}>
+        <View
+          style={[
+            styles.buttonContainer,
+            {
+              backgroundColor: colors.background,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push(`/(student)/dtr/time-out?id=${dtr.id}` as any)}
-            activeOpacity={0.8}
+            onPress={() =>
+              router.push(`/(student)/dtr/time-out?id=${dtr.id}` as any)
+            }
+            activeOpacity={0.85}
           >
-            <Ionicons name="log-out-outline" size={22} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Ionicons
+              name="log-out-outline"
+              size={22}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
             <Text style={styles.actionButtonText}>Record Time-Out</Text>
           </TouchableOpacity>
         </View>
@@ -317,34 +422,22 @@ export default function DTRDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   centerContent: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-  errorText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
+  loadingText: { marginTop: 12, fontSize: 14 },
+  errorText: { marginTop: 12, fontSize: 16 },
   retryButton: {
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 10,
     marginTop: 16,
   },
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
-  },
+  retryButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -353,22 +446,12 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 12,
   },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  headerRight: {
-    width: 32,
-  },
+  backButton: { padding: 4 },
+  headerTitle: { fontSize: 20, fontWeight: "700" },
+  headerRight: { width: 32 },
   content: {
     paddingHorizontal: 20,
     paddingBottom: 30,
-  },
-  contentWithButton: {
-    paddingBottom: 100,
   },
   card: {
     borderRadius: 16,
@@ -380,16 +463,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
-  },
-  dateText: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
+  dateRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  dateText: { fontSize: 18, fontWeight: "700" },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -399,13 +474,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 20,
   },
-  statusIcon: {
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
+  statusIcon: { marginRight: 6 },
+  statusText: { fontSize: 13, fontWeight: "600" },
   timeGrid: {
     flexDirection: "row",
     alignItems: "center",
@@ -414,27 +484,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "rgba(0,0,0,0.06)",
   },
-  timeBlock: {
-    flex: 1,
-    alignItems: "center",
-  },
-  timeDivider: {
-    width: 1,
-    height: 32,
-  },
-  timeLabel: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  timeValueRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  timeValue: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
+  timeBlock: { flex: 1, alignItems: "center" },
+  timeDivider: { width: 1, height: 32 },
+  timeLabel: { fontSize: 12, marginBottom: 4 },
+  timeValueRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  timeValue: { fontSize: 14, fontWeight: "700" },
   sectionCard: {
     borderRadius: 16,
     padding: 18,
@@ -446,20 +500,9 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 0,
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  sectionText: {
-    fontSize: 14,
-    lineHeight: 22,
-  },
-  photosRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-  },
+  sectionTitle: { fontSize: 15, fontWeight: "600", marginBottom: 8 },
+  sectionText: { fontSize: 14, lineHeight: 22 },
+  photosRow: { flexDirection: "row", gap: 12, marginTop: 8 },
   photoContainer: {
     flex: 1,
     height: 140,
@@ -467,11 +510,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
-  photo: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
+  photo: { width: "100%", height: "100%", resizeMode: "cover" },
   photoBadge: {
     position: "absolute",
     bottom: 8,
@@ -483,11 +522,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
   },
-  photoBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "600",
-  },
+  photoBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "600" },
   noPhotoContainer: {
     flex: 1,
     height: 140,
@@ -495,18 +530,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  noPhotoText: {
-    fontSize: 12,
-    marginTop: 6,
-  },
+  noPhotoText: { fontSize: 12, marginTop: 6 },
   buttonContainer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: "rgba(0,0,0,0.05)",
   },
@@ -522,9 +553,5 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  actionButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  actionButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
 });

@@ -21,13 +21,26 @@ class ApplicationBase(BaseModel):
 
 
 class ApplicationCreate(ApplicationBase):
-    pass
+    # ✅ Optional — server validates ownership + verification
+    resume_id: Optional[str] = None
+    application_letter_id: Optional[str] = None
 
 
 class ApplicationUpdate(BaseModel):
     status: Optional[ApplicationStatus] = None
     interview_date: Optional[datetime] = None
     feedback: Optional[str] = None
+
+
+class DocumentSummary(BaseModel):
+    """Compact view of an attached document."""
+    id: str
+    type: str
+    original_filename: Optional[str] = None
+    verification_status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ApplicationResponse(BaseModel):
@@ -37,6 +50,13 @@ class ApplicationResponse(BaseModel):
     company_name: Optional[str] = None
     position: str
     cover_letter: Optional[str] = None
+
+    # ✅ IDs + embedded docs
+    resume_id: Optional[str] = None
+    application_letter_id: Optional[str] = None
+    resume: Optional[DocumentSummary] = None
+    application_letter: Optional[DocumentSummary] = None
+
     status: ApplicationStatus
     applied_date: datetime
     updated_date: Optional[datetime] = None

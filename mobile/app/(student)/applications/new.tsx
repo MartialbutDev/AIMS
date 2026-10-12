@@ -6,7 +6,6 @@ import { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +15,7 @@ import {
   Modal,
   FlatList,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import api from "../../../src/services/api";
@@ -64,17 +64,20 @@ const toArray = <T,>(payload: any): T[] => {
 
 export default function NewApplicationScreen() {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+
   const [loading, setLoading] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [selectedCompany, setSelectedCompany] = useState<string>("");
   const [position, setPosition] = useState("");
-  const [coverLetter, setCoverLetter] = useState("");
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [selectedResume, setSelectedResume] = useState<Document | null>(null);
-  const [selectedAppLetter, setSelectedAppLetter] = useState<Document | null>(null);
+  const [selectedAppLetter, setSelectedAppLetter] = useState<Document | null>(
+    null
+  );
   const [showResumeDropdown, setShowResumeDropdown] = useState(false);
   const [showAppLetterDropdown, setShowAppLetterDropdown] = useState(false);
 
@@ -82,6 +85,8 @@ export default function NewApplicationScreen() {
     fetchCompanies();
     fetchDocuments();
   }, []);
+
+  // -------- fetch --------
 
   const fetchCompanies = async () => {
     try {
@@ -99,30 +104,20 @@ export default function NewApplicationScreen() {
     try {
       setLoadingDocs(true);
       const response = await api.get("/documents/");
-
-      // 🔎 DEBUG: uncomment this temporarily to see the exact raw payload
-      console.log(
-        "📄 /documents/ raw response:",
-        JSON.stringify(response.data, null, 2)
-      );
-
       const normalized = toArray<any>(response.data).map(normalizeDoc);
-      console.log(
-        "📄 Normalized documents:",
-        normalized.map((d) => ({ id: d.id, type: d.type, status: d.verification_status }))
-      );
-
       setDocuments(normalized);
     } catch (error) {
       console.error("Error fetching documents:", error);
       Alert.alert(
         "Documents Error",
-        "Could not load your documents. Pull down to refresh."
+        "Could not load your documents. Please try again."
       );
     } finally {
       setLoadingDocs(false);
     }
   };
+
+  // -------- helpers --------
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -135,10 +130,6 @@ export default function NewApplicationScreen() {
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
-  };
-
   const getVerifiedDocuments = (type?: string) => {
     const wanted = type?.toLowerCase();
     return documents.filter((d) => {
@@ -147,6 +138,8 @@ export default function NewApplicationScreen() {
       return statusOk && typeOk;
     });
   };
+
+  // -------- dropdown --------
 
   const renderDocumentDropdown = (
     label: string,
@@ -183,14 +176,18 @@ export default function NewApplicationScreen() {
         >
           <View style={styles.docSelectorLeft}>
             <Ionicons
-              name={selectedDoc ? "document-text-outline" : "cloud-upload-outline"}
+              name={
+                selectedDoc ? "document-text-outline" : "cloud-upload-outline"
+              }
               size={20}
               color={selectedDoc ? colors.success : colors.textSecondary}
             />
             <Text
               style={[
                 styles.docSelectorText,
-                { color: selectedDoc ? colors.textPrimary : colors.textSecondary },
+                {
+                  color: selectedDoc ? colors.textPrimary : colors.textSecondary,
+                },
               ]}
               numberOfLines={1}
             >
@@ -201,7 +198,9 @@ export default function NewApplicationScreen() {
           </View>
           {verifiedDocs.length > 0 && (
             <Ionicons
-              name={showDropdown ? "chevron-up-outline" : "chevron-down-outline"}
+              name={
+                showDropdown ? "chevron-up-outline" : "chevron-down-outline"
+              }
               size={20}
               color={colors.textSecondary}
             />
@@ -212,10 +211,17 @@ export default function NewApplicationScreen() {
           <View
             style={[
               styles.noDocWarning,
-              { backgroundColor: `${colors.warning}10`, borderColor: `${colors.warning}30` },
+              {
+                backgroundColor: `${colors.warning}10`,
+                borderColor: `${colors.warning}30`,
+              },
             ]}
           >
-            <Ionicons name="alert-circle-outline" size={16} color={colors.warning} />
+            <Ionicons
+              name="alert-circle-outline"
+              size={16}
+              color={colors.warning}
+            />
             <Text style={[styles.noDocWarningText, { color: colors.warning }]}>
               No verified {docTypeLabel} found. Please upload and wait for
               verification.
@@ -241,13 +247,22 @@ export default function NewApplicationScreen() {
               ]}
             >
               <View
-                style={[styles.dropdownHeader, { borderBottomColor: colors.border }]}
+                style={[
+                  styles.dropdownHeader,
+                  { borderBottomColor: colors.border },
+                ]}
               >
-                <Text style={[styles.dropdownTitle, { color: colors.textPrimary }]}>
+                <Text
+                  style={[styles.dropdownTitle, { color: colors.textPrimary }]}
+                >
                   Select {docTypeLabel}
                 </Text>
                 <TouchableOpacity onPress={() => setShowDropdown(false)}>
-                  <Ionicons name="close-outline" size={24} color={colors.textSecondary} />
+                  <Ionicons
+                    name="close-outline"
+                    size={24}
+                    color={colors.textSecondary}
+                  />
                 </TouchableOpacity>
               </View>
 
@@ -284,14 +299,21 @@ export default function NewApplicationScreen() {
                       </View>
                       <View>
                         <Text
-                          style={[styles.dropdownItemName, { color: colors.textPrimary }]}
+                          style={[
+                            styles.dropdownItemName,
+                            { color: colors.textPrimary },
+                          ]}
                         >
                           {item.description ||
-                            DOCUMENT_TYPES.find((t) => t.value === item.type)?.label ||
+                            DOCUMENT_TYPES.find((t) => t.value === item.type)
+                              ?.label ||
                             item.type}
                         </Text>
                         <Text
-                          style={[styles.dropdownItemDate, { color: colors.textSecondary }]}
+                          style={[
+                            styles.dropdownItemDate,
+                            { color: colors.textSecondary },
+                          ]}
                         >
                           Verified on{" "}
                           {item.created_at
@@ -303,7 +325,11 @@ export default function NewApplicationScreen() {
                     <View
                       style={[
                         styles.dropdownStatus,
-                        { backgroundColor: `${getStatusColor(item.verification_status)}15` },
+                        {
+                          backgroundColor: `${getStatusColor(
+                            item.verification_status
+                          )}15`,
+                        },
                       ]}
                     >
                       <Text
@@ -319,19 +345,32 @@ export default function NewApplicationScreen() {
                 )}
                 ListEmptyComponent={
                   <View style={styles.dropdownEmpty}>
-                    <Ionicons name="document-outline" size={40} color={colors.border} />
+                    <Ionicons
+                      name="document-outline"
+                      size={40}
+                      color={colors.border}
+                    />
                     <Text
-                      style={[styles.dropdownEmptyText, { color: colors.textSecondary }]}
+                      style={[
+                        styles.dropdownEmptyText,
+                        { color: colors.textSecondary },
+                      ]}
                     >
                       No verified {docTypeLabel} found
                     </Text>
                     <Text
-                      style={[styles.dropdownEmptySubtext, { color: colors.textTertiary }]}
+                      style={[
+                        styles.dropdownEmptySubtext,
+                        { color: colors.textTertiary },
+                      ]}
                     >
                       Upload and wait for verification
                     </Text>
                     <TouchableOpacity
-                      style={[styles.dropdownUploadBtn, { backgroundColor: colors.primary }]}
+                      style={[
+                        styles.dropdownUploadBtn,
+                        { backgroundColor: colors.primary },
+                      ]}
                       onPress={() => {
                         setShowDropdown(false);
                         router.push("/(student)/documents/upload");
@@ -352,6 +391,8 @@ export default function NewApplicationScreen() {
     );
   };
 
+  // -------- submit --------
+
   const handleSubmit = async () => {
     if (!selectedCompany) return Alert.alert("Error", "Please select a company");
     if (!position.trim()) return Alert.alert("Error", "Please enter a position");
@@ -365,7 +406,6 @@ export default function NewApplicationScreen() {
       await api.post("/applications/", {
         company_id: selectedCompany,
         position: position.trim(),
-        cover_letter: coverLetter.trim() || undefined,
         resume_id: selectedResume.id,
         application_letter_id: selectedAppLetter.id,
       });
@@ -380,7 +420,6 @@ export default function NewApplicationScreen() {
 
       setSelectedCompany("");
       setPosition("");
-      setCoverLetter("");
       setSelectedResume(null);
       setSelectedAppLetter(null);
     } catch (error: any) {
@@ -396,14 +435,32 @@ export default function NewApplicationScreen() {
   };
 
   const selectedCompanyData = companies.find((c) => c.id === selectedCompany);
+  const canSubmit =
+    !!selectedCompany &&
+    !!position.trim() &&
+    !!selectedResume &&
+    !!selectedAppLetter &&
+    !loading;
+
+  // -------- render --------
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar
+        style={isDark ? "light" : "dark"}
+        backgroundColor={colors.background}
+      />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Ionicons
+            name="arrow-back-outline"
+            size={24}
+            color={colors.textPrimary}
+          />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
           New Application
@@ -411,7 +468,14 @@ export default function NewApplicationScreen() {
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          // extra bottom room so the fixed submit button never covers content
+          { paddingBottom: 120 + insets.bottom },
+        ]}
+      >
         {loadingCompanies ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -431,8 +495,11 @@ export default function NewApplicationScreen() {
           </View>
         ) : (
           <>
+            {/* -------- company selection -------- */}
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>
+              <Text
+                style={[styles.sectionLabel, { color: colors.textPrimary }]}
+              >
                 Select Company <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.companyGrid}>
@@ -448,7 +515,8 @@ export default function NewApplicationScreen() {
                             ? colors.primary
                             : colors.border,
                       },
-                      selectedCompany === company.id && styles.companyCardSelected,
+                      selectedCompany === company.id &&
+                        styles.companyCardSelected,
                     ]}
                     onPress={() => setSelectedCompany(company.id)}
                     activeOpacity={0.7}
@@ -459,7 +527,12 @@ export default function NewApplicationScreen() {
                         { backgroundColor: `${colors.primary}10` },
                       ]}
                     >
-                      <Text style={[styles.companyInitial, { color: colors.primary }]}>
+                      <Text
+                        style={[
+                          styles.companyInitial,
+                          { color: colors.primary },
+                        ]}
+                      >
                         {company.name.charAt(0)}
                       </Text>
                     </View>
@@ -477,7 +550,10 @@ export default function NewApplicationScreen() {
                       {company.name}
                     </Text>
                     <Text
-                      style={[styles.companyIndustry, { color: colors.textSecondary }]}
+                      style={[
+                        styles.companyIndustry,
+                        { color: colors.textSecondary },
+                      ]}
                     >
                       {company.industry}
                     </Text>
@@ -494,6 +570,7 @@ export default function NewApplicationScreen() {
               </View>
             </View>
 
+            {/* -------- selected company info -------- */}
             {selectedCompanyData && (
               <View
                 style={[
@@ -505,17 +582,26 @@ export default function NewApplicationScreen() {
                 ]}
               >
                 <Text
-                  style={[styles.selectedInfoTitle, { color: colors.textSecondary }]}
+                  style={[
+                    styles.selectedInfoTitle,
+                    { color: colors.textSecondary },
+                  ]}
                 >
                   Selected Company
                 </Text>
                 <Text
-                  style={[styles.selectedInfoName, { color: colors.textPrimary }]}
+                  style={[
+                    styles.selectedInfoName,
+                    { color: colors.textPrimary },
+                  ]}
                 >
                   {selectedCompanyData.name}
                 </Text>
                 <Text
-                  style={[styles.selectedInfoDesc, { color: colors.textSecondary }]}
+                  style={[
+                    styles.selectedInfoDesc,
+                    { color: colors.textSecondary },
+                  ]}
                 >
                   {selectedCompanyData.description}
                 </Text>
@@ -527,7 +613,9 @@ export default function NewApplicationScreen() {
                         : "time-outline"
                     }
                     size={14}
-                    color={selectedCompanyData.is_moa_signed ? "#10B981" : "#F59E0B"}
+                    color={
+                      selectedCompanyData.is_moa_signed ? "#10B981" : "#F59E0B"
+                    }
                   />
                   <Text
                     style={[
@@ -537,14 +625,19 @@ export default function NewApplicationScreen() {
                         : styles.moaPending,
                     ]}
                   >
-                    {selectedCompanyData.is_moa_signed ? "MOA Signed" : "MOA Pending"}
+                    {selectedCompanyData.is_moa_signed
+                      ? "MOA Signed"
+                      : "MOA Pending"}
                   </Text>
                 </View>
               </View>
             )}
 
+            {/* -------- position -------- */}
             <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>
+              <Text
+                style={[styles.sectionLabel, { color: colors.textPrimary }]}
+              >
                 Position <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
@@ -563,11 +656,22 @@ export default function NewApplicationScreen() {
               />
             </View>
 
+            {/* -------- documents -------- */}
             <View style={styles.docSectionWrapper}>
-              <Text style={[styles.docSectionTitle, { color: colors.textSecondary }]}>
+              <Text
+                style={[
+                  styles.docSectionTitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
                 Required Documents
               </Text>
-              <Text style={[styles.docSectionSubtitle, { color: colors.textTertiary }]}>
+              <Text
+                style={[
+                  styles.docSectionSubtitle,
+                  { color: colors.textTertiary },
+                ]}
+              >
                 Select from your verified documents
               </Text>
 
@@ -575,7 +679,10 @@ export default function NewApplicationScreen() {
                 <View style={styles.docLoadingContainer}>
                   <ActivityIndicator size="small" color={colors.primary} />
                   <Text
-                    style={[styles.docLoadingText, { color: colors.textSecondary }]}
+                    style={[
+                      styles.docLoadingText,
+                      { color: colors.textSecondary },
+                    ]}
                   >
                     Loading your documents...
                   </Text>
@@ -601,87 +708,66 @@ export default function NewApplicationScreen() {
                 </>
               )}
             </View>
-
-            <View style={styles.section}>
-              <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>
-                Cover Letter (Optional)
-              </Text>
-              <TextInput
-                style={[
-                  styles.textArea,
-                  {
-                    backgroundColor: colors.card,
-                    color: colors.textPrimary,
-                    borderColor: colors.border,
-                  },
-                ]}
-                placeholder="Write a brief cover letter..."
-                placeholderTextColor={colors.textSecondary}
-                value={coverLetter}
-                onChangeText={setCoverLetter}
-                multiline
-                numberOfLines={6}
-                textAlignVertical="top"
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.submitButton,
-                { backgroundColor: colors.primary },
-                (!selectedCompany ||
-                  !position.trim() ||
-                  !selectedResume ||
-                  !selectedAppLetter ||
-                  loading) &&
-                  styles.submitButtonDisabled,
-              ]}
-              onPress={handleSubmit}
-              disabled={
-                !selectedCompany ||
-                !position.trim() ||
-                !selectedResume ||
-                !selectedAppLetter ||
-                loading
-              }
-              activeOpacity={0.8}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons
-                    name="send-outline"
-                    size={20}
-                    color="#FFFFFF"
-                    style={styles.submitIcon}
-                  />
-                  <Text style={styles.submitButtonText}>Submit Application</Text>
-                </>
-              )}
-            </TouchableOpacity>
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+
+      {/* -------- fixed bottom submit button -------- */}
+      {!loadingCompanies && companies.length > 0 && (
+        <View
+          style={[
+            styles.footer,
+            {
+              backgroundColor: colors.background,
+              borderTopColor: colors.border,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              { backgroundColor: colors.primary },
+              !canSubmit && styles.submitButtonDisabled,
+            ]}
+            onPress={handleSubmit}
+            disabled={!canSubmit}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons
+                  name="send-outline"
+                  size={20}
+                  color="#FFFFFF"
+                  style={styles.submitIcon}
+                />
+                <Text style={styles.submitButtonText}>Submit Application</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  /* same styles as before — nothing changed */
   container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 12,
   },
   backButton: { padding: 4 },
   headerTitle: { fontSize: 20, fontWeight: "700" },
   headerRight: { width: 32 },
-  content: { paddingHorizontal: 20, paddingBottom: 30 },
+  content: { paddingHorizontal: 20 },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -747,29 +833,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     borderWidth: 1,
   },
-  textArea: {
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    minHeight: 120,
-    borderWidth: 1,
-    textAlignVertical: "top",
-  },
-  submitButton: {
-    flexDirection: "row",
-    paddingVertical: 16,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-    marginTop: 8,
-  },
-  submitButtonDisabled: { opacity: 0.6, shadowOpacity: 0, elevation: 0 },
-  submitIcon: { marginRight: 8 },
-  submitButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
   docSectionWrapper: { marginBottom: 20 },
   docSectionTitle: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
   docSectionSubtitle: { fontSize: 12, marginBottom: 12 },
@@ -864,4 +927,29 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   dropdownUploadBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
+  // -------- fixed footer --------
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+  },
+  submitButton: {
+    flexDirection: "row",
+    paddingVertical: 16,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    minHeight: 54,
+  },
+  submitButtonDisabled: { opacity: 0.6, shadowOpacity: 0, elevation: 0 },
+  submitIcon: { marginRight: 8 },
+  submitButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
 });

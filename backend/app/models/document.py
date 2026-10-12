@@ -41,6 +41,10 @@ class Document(Base):
 
     description = Column(String(500), nullable=True)
 
+    # ✅ NEW — original filename as uploaded by the student
+    # (e.g. "my_resume_v2.pdf"). Used for download headers + display.
+    original_filename = Column(String(500), nullable=True)
+
     file_path = Column(String(255), nullable=False)
 
     uploaded_by = Column(String(36), nullable=False)
