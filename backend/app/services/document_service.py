@@ -13,15 +13,28 @@ from app.utils.document_keywords import (
     validate_endorsement_letter,
     validate_certificate_of_completion,
     validate_generic_document,
+    validate_waiver,
+    validate_medical_certificate,
+    validate_internship_plan,
+    validate_insurance,
 )
 
 
 class DocumentService:
 
     VALIDATION_FUNCTIONS = {
+        # Application docs
         "resume": validate_resume,
         "application_letter": validate_application_letter,
+
+        # Pre-deployment / CHED-required
+        "waiver": validate_waiver,
+        "medical_certificate": validate_medical_certificate,
+        "internship_plan": validate_internship_plan,
+        "insurance": validate_insurance,
         "endorsement_letter": validate_endorsement_letter,
+
+        # Post-selection
         "certificate_of_completion": validate_certificate_of_completion,
         "acceptance_letter": validate_generic_document,
         "requirements": validate_generic_document,
@@ -30,6 +43,10 @@ class DocumentService:
     _TYPE_ALIASES = {
         "resume": "RESUME",
         "application_letter": "APPLICATION_LETTER",
+        "waiver": "WAIVER",
+        "medical_certificate": "MEDICAL_CERTIFICATE",
+        "internship_plan": "INTERNSHIP_PLAN",
+        "insurance": "INSURANCE",
         "endorsement_letter": "ENDORSEMENT_LETTER",
         "acceptance_letter": "ACCEPTANCE_LETTER",
         "certificate_of_completion": "CERTIFICATE_OF_COMPLETION",
@@ -38,10 +55,6 @@ class DocumentService:
         "transcript": "TRANSCRIPT",
         "user_id": "USER_ID",
     }
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
 
     @classmethod
     def _resolve_type(cls, document_type: str) -> DocumentType:
@@ -71,10 +84,6 @@ class DocumentService:
 
         return validation_func(extracted_text)
 
-    # ------------------------------------------------------------------
-    # Upload
-    # ------------------------------------------------------------------
-
     @classmethod
     def upload_document(
         cls,
@@ -85,7 +94,6 @@ class DocumentService:
         uploaded_by: str,
     ) -> dict:
         try:
-            # ✅ Capture original filename BEFORE saving
             original_filename = (file.filename or "").strip() or None
 
             relative_path, file_type = OCRService.save_file(file)
@@ -99,7 +107,6 @@ class DocumentService:
 
             text_len = len((extracted_text or "").strip())
 
-            # Strict binary status mapping (85% gate enforced by validators)
             if text_len < 100 or not is_valid:
                 status = "rejected"
             else:
@@ -111,7 +118,7 @@ class DocumentService:
                 id=str(uuid.uuid4()),
                 type=doc_type_enum,
                 description=description,
-                original_filename=original_filename,      # ✅ store it
+                original_filename=original_filename,
                 file_path=relative_path,
                 uploaded_by=uploaded_by,
                 verification_status=status,

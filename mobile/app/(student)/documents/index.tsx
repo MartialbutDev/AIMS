@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import {
   FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -25,7 +26,7 @@ interface Document {
   id: string;
   type: string;
   description: string;
-  original_filename?: string;      // ✅ NEW
+  original_filename?: string;
   verification_status: string;
   created_at: string;
   file_path?: string;
@@ -33,12 +34,36 @@ interface Document {
   validation_message?: string;
 }
 
+// ✅ Per-type icons so each doc is visually distinguishable
+const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  resume: "person-outline",
+  application_letter: "mail-outline",
+  waiver: "document-text-outline",
+  medical_certificate: "medkit-outline",
+  internship_plan: "clipboard-outline",
+  insurance: "shield-checkmark-outline",
+  endorsement_letter: "ribbon-outline",
+  acceptance_letter: "checkmark-done-outline",
+  certificate_of_completion: "trophy-outline",
+  requirements: "list-outline",
+  document: "document-outline",
+  transcript: "school-outline",
+  user_id: "card-outline",
+};
+
+const FILTERS = [
+  { value: "all", label: "All" },
+  { value: "verified", label: "Verified" },
+  { value: "rejected", label: "Rejected" },
+];
+
 export default function DocumentsScreen() {
   const { colors, isDark } = useTheme();
   const { handleScroll } = useAutoHideTab();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<string>("all");
 
   const fetchDocuments = async () => {
     try {
@@ -60,6 +85,11 @@ export default function DocumentsScreen() {
     setRefreshing(true);
     fetchDocuments();
   };
+
+  const filteredDocuments =
+    selectedFilter === "all"
+      ? documents
+      : documents.filter((d) => d.verification_status === selectedFilter);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -83,7 +113,10 @@ export default function DocumentsScreen() {
     }
   };
 
-  // ✅ Open the document externally with the JWT in the query string
+  const getTypeIcon = (type: string): keyof typeof Ionicons.glyphMap => {
+    return TYPE_ICONS[type.toLowerCase()] || "document-text-outline";
+  };
+
   const handlePreview = async (document: Document) => {
     try {
       const token = await SecureStore.getItemAsync("access_token");
@@ -131,10 +164,8 @@ export default function DocumentsScreen() {
   const renderDocument = ({ item }: { item: Document }) => {
     const statusColor = getStatusColor(item.verification_status);
     const displayName = item.type.replace(/_/g, " ").toUpperCase();
-
-    // Prefer the original filename, then description, then nothing
-    const subtitle =
-      item.original_filename || item.description || null;
+    const subtitle = item.original_filename || item.description || null;
+    const typeIcon = getTypeIcon(item.type);
 
     return (
       <TouchableOpacity
@@ -148,11 +179,7 @@ export default function DocumentsScreen() {
             { backgroundColor: `${colors.primary}10` },
           ]}
         >
-          <Ionicons
-            name="document-text-outline"
-            size={28}
-            color={colors.primary}
-          />
+          <Ionicons name={typeIcon} size={24} color={colors.primary} />
         </View>
 
         <View style={styles.documentInfo}>
@@ -229,6 +256,57 @@ export default function DocumentsScreen() {
     );
   };
 
+  const renderFilterChip = (filter: { value: string; label: string }) => {
+    const isActive = selectedFilter === filter.value;
+    return (
+      <TouchableOpacity
+        key={filter.value}
+        style={[
+          styles.filterChip,
+          {
+            backgroundColor: isActive ? colors.primary : colors.card,
+            borderColor: isActive ? colors.primary : colors.border,
+          },
+        ]}
+        onPress={() => setSelectedFilter(filter.value)}
+        activeOpacity={0.7}
+      >
+        <Text
+          style={[
+            styles.filterChipText,
+            { color: isActive ? "#FFFFFF" : colors.textSecondary },
+          ]}
+        >
+          {filter.label}
+        </Text>
+        {filter.value !== "all" && (
+          <View
+            style={[
+              styles.filterCountBadge,
+              {
+                backgroundColor: isActive
+                  ? "rgba(255,255,255,0.25)"
+                  : `${colors.primary}15`,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterCountText,
+                { color: isActive ? "#FFFFFF" : colors.primary },
+              ]}
+            >
+              {
+                documents.filter((d) => d.verification_status === filter.value)
+                  .length
+              }
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar
@@ -248,8 +326,21 @@ export default function DocumentsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Filter chips */}
+      {documents.length > 0 && (
+        <View style={styles.filtersWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersContainer}
+          >
+            {FILTERS.map(renderFilterChip)}
+          </ScrollView>
+        </View>
+      )}
+
       <FlatList
-        data={documents}
+        data={filteredDocuments}
         renderItem={renderDocument}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -270,17 +361,21 @@ export default function DocumentsScreen() {
               color={colors.border}
             />
             <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-              No Documents
+              {selectedFilter === "all" ? "No Documents" : `No ${selectedFilter} Documents`}
             </Text>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Upload your internship documents to get started
+              {selectedFilter === "all"
+                ? "Upload your internship documents to get started"
+                : `Try a different filter or upload a new document`}
             </Text>
-            <TouchableOpacity
-              style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-              onPress={() => router.push("/(student)/documents/upload")}
-            >
-              <Text style={styles.emptyButtonText}>Upload Now</Text>
-            </TouchableOpacity>
+            {selectedFilter === "all" && (
+              <TouchableOpacity
+                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push("/(student)/documents/upload")}
+              >
+                <Text style={styles.emptyButtonText}>Upload Now</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
         ListFooterComponent={<View style={styles.listFooter} />}
@@ -301,6 +396,41 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: "700" },
   uploadButton: { padding: 4 },
+
+  // Filters
+  filtersWrapper: {
+    paddingBottom: 12,
+  },
+  filtersContainer: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  filterCountBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterCountText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 10,

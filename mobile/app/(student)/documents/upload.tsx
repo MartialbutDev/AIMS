@@ -27,11 +27,22 @@ interface DocumentType {
 }
 
 const DOCUMENT_TYPES: DocumentType[] = [
+  // ── Application docs ──
   { value: "resume", label: "Resume/CV" },
   { value: "application_letter", label: "Application Letter" },
+
+  // ── Pre-deployment / CHED-required ──
+  { value: "waiver", label: "Waiver / Consent" },
+  { value: "medical_certificate", label: "Medical Certificate" },
+  { value: "internship_plan", label: "Internship Plan" },
+  { value: "insurance", label: "Insurance" },
+
+  // ── Post-selection ──
   { value: "endorsement_letter", label: "Endorsement Letter" },
   { value: "acceptance_letter", label: "Acceptance Letter" },
   { value: "certificate_of_completion", label: "Certificate of Completion" },
+
+  // ── Misc ──
   { value: "requirements", label: "Requirements" },
 ];
 
@@ -53,7 +64,7 @@ export default function UploadDocumentScreen() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [ocrResult, setOcrResult] = useState<string | null>(null);
   const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
-  
+
   // Dropdown state
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -107,25 +118,25 @@ export default function UploadDocumentScreen() {
     }
   };
 
-  const handleSelectOption = async (option: 'photos' | 'documents') => {
+  const handleSelectOption = async (option: "photos" | "documents") => {
     closeDropdown();
     setIsSelecting(true);
-    
+
     try {
       let file = null;
-      if (option === 'photos') {
+      if (option === "photos") {
         file = await pickImage();
       } else {
         file = await pickAnyFile();
       }
       if (file) {
-        console.log('✅ File selected:', file.name);
+        console.log("✅ File selected:", file.name);
       } else {
-        console.log('❌ User cancelled');
+        console.log("❌ User cancelled");
       }
     } catch (error) {
-      console.error('Error selecting file:', error);
-      Alert.alert('Error', 'Failed to select file');
+      console.error("Error selecting file:", error);
+      Alert.alert("Error", "Failed to select file");
     } finally {
       setIsSelecting(false);
     }
@@ -147,12 +158,12 @@ export default function UploadDocumentScreen() {
 
     try {
       const formData = new FormData();
-      
+
       const fileUri = selectedFile.uri;
       const fileName = selectedFile.name;
-      const fileType = selectedFile.type || 'application/octet-stream';
+      const fileType = selectedFile.type || "application/octet-stream";
 
-      let fileToUpload: any = {
+      const fileToUpload: any = {
         uri: fileUri,
         name: fileName,
         type: fileType,
@@ -183,11 +194,12 @@ export default function UploadDocumentScreen() {
 
       Alert.alert(
         "Upload Successful",
-        `Document uploaded and verified!\nStatus: ${response.data.status}`,
+        `Document uploaded!\nStatus: ${response.data.status}`,
         [
           {
             text: "View Document",
-            onPress: () => router.push(`/(student)/documents/${response.data.document.id}` as any),
+            onPress: () =>
+              router.push(`/(student)/documents/${response.data.document.id}` as any),
           },
           { text: "OK", style: "default" },
         ]
@@ -198,7 +210,6 @@ export default function UploadDocumentScreen() {
       setDescription("");
       setOcrResult(null);
       setVerificationStatus(null);
-
     } catch (error: any) {
       console.error("Upload error:", error);
       Alert.alert(
@@ -271,10 +282,10 @@ export default function UploadDocumentScreen() {
           key={type.value}
           style={[
             styles.typeChip,
-            { 
+            {
               backgroundColor: selectedType === type.value ? colors.primary : colors.card,
               borderColor: selectedType === type.value ? colors.primary : colors.border,
-            }
+            },
           ]}
           onPress={() => setSelectedType(type.value)}
           activeOpacity={0.7}
@@ -282,9 +293,9 @@ export default function UploadDocumentScreen() {
           <Text
             style={[
               styles.typeChipText,
-              { 
-                color: selectedType === type.value ? '#FFFFFF' : colors.textSecondary 
-              }
+              {
+                color: selectedType === type.value ? "#FFFFFF" : colors.textSecondary,
+              },
             ]}
           >
             {type.label}
@@ -304,7 +315,7 @@ export default function UploadDocumentScreen() {
           activeOpacity={1}
           onPress={handleOutsidePress}
         />
-        
+
         <Animated.View
           style={[
             styles.dropdownContainer,
@@ -315,7 +326,7 @@ export default function UploadDocumentScreen() {
               left: dropdownPosition.left,
               width: dropdownPosition.width || 200,
               opacity: fadeAnim,
-              shadowColor: isDark ? '#000' : '#000',
+              shadowColor: "#000",
               transform: [
                 {
                   scale: fadeAnim.interpolate({
@@ -324,12 +335,12 @@ export default function UploadDocumentScreen() {
                   }),
                 },
               ],
-            }
+            },
           ]}
         >
           <TouchableOpacity
             style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
-            onPress={() => handleSelectOption('photos')}
+            onPress={() => handleSelectOption("photos")}
             activeOpacity={0.7}
             disabled={isSelecting}
           >
@@ -337,15 +348,19 @@ export default function UploadDocumentScreen() {
               <Ionicons name="images-outline" size={20} color={colors.primary} />
             </View>
             <View style={styles.dropdownTextContainer}>
-              <Text style={[styles.dropdownItemText, { color: colors.textPrimary }]}>Photos</Text>
-              <Text style={[styles.dropdownItemSubtext, { color: colors.textSecondary }]}>Gallery</Text>
+              <Text style={[styles.dropdownItemText, { color: colors.textPrimary }]}>
+                Photos
+              </Text>
+              <Text style={[styles.dropdownItemSubtext, { color: colors.textSecondary }]}>
+                Gallery
+              </Text>
             </View>
             <Ionicons name="chevron-forward-outline" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.dropdownItem, { borderBottomColor: colors.border }]}
-            onPress={() => handleSelectOption('documents')}
+            onPress={() => handleSelectOption("documents")}
             activeOpacity={0.7}
             disabled={isSelecting}
           >
@@ -353,8 +368,12 @@ export default function UploadDocumentScreen() {
               <Ionicons name="document-text-outline" size={20} color={colors.primary} />
             </View>
             <View style={styles.dropdownTextContainer}>
-              <Text style={[styles.dropdownItemText, { color: colors.textPrimary }]}>Documents</Text>
-              <Text style={[styles.dropdownItemSubtext, { color: colors.textSecondary }]}>PDF</Text>
+              <Text style={[styles.dropdownItemText, { color: colors.textPrimary }]}>
+                Documents
+              </Text>
+              <Text style={[styles.dropdownItemSubtext, { color: colors.textSecondary }]}>
+                PDF
+              </Text>
             </View>
             <Ionicons name="chevron-forward-outline" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -371,7 +390,9 @@ export default function UploadDocumentScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Upload Document</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          Upload Document
+        </Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -381,39 +402,48 @@ export default function UploadDocumentScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Select Document</Text>
-          
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Select Document
+          </Text>
+
           {selectedFile ? (
             renderFilePreview()
           ) : (
-            <View style={[styles.pickerContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View
+              style={[
+                styles.pickerContainer,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
               <Ionicons name="cloud-upload-outline" size={48} color={colors.textSecondary} />
-              <Text style={[styles.pickerTitle, { color: colors.textPrimary }]}>Choose a document</Text>
+              <Text style={[styles.pickerTitle, { color: colors.textPrimary }]}>
+                Choose a document
+              </Text>
               <Text style={[styles.pickerSubtitle, { color: colors.textSecondary }]}>
                 Supports: Images (JPG, PNG) and PDF
               </Text>
               <View style={styles.pickerButtons}>
-                <TouchableOpacity 
-                  style={[styles.pickerButton, { backgroundColor: colors.primary }]} 
+                <TouchableOpacity
+                  style={[styles.pickerButton, { backgroundColor: colors.primary }]}
                   onPress={takePhoto}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="camera-outline" size={20} color="#FFFFFF" />
                   <Text style={styles.pickerButtonText}>Camera</Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
+
+                <TouchableOpacity
                   ref={buttonRef}
-                  style={[styles.pickerButton, { backgroundColor: colors.primary }]} 
+                  style={[styles.pickerButton, { backgroundColor: colors.primary }]}
                   onPress={toggleDropdown}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="folder-outline" size={20} color="#FFFFFF" />
                   <Text style={styles.pickerButtonText}>Choose File</Text>
-                  <Ionicons 
-                    name={dropdownVisible ? "chevron-up-outline" : "chevron-down-outline"} 
-                    size={16} 
-                    color="#FFFFFF" 
+                  <Ionicons
+                    name={dropdownVisible ? "chevron-up-outline" : "chevron-down-outline"}
+                    size={16}
+                    color="#FFFFFF"
                   />
                 </TouchableOpacity>
               </View>
@@ -422,14 +452,25 @@ export default function UploadDocumentScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Document Type</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Document Type
+          </Text>
           <DocumentTypeSelector />
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Description (Optional)</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+            Description (Optional)
+          </Text>
           <TextInput
-            style={[styles.descriptionInput, { backgroundColor: colors.card, color: colors.textPrimary, borderColor: colors.border }]}
+            style={[
+              styles.descriptionInput,
+              {
+                backgroundColor: colors.card,
+                color: colors.textPrimary,
+                borderColor: colors.border,
+              },
+            ]}
             placeholder="Enter a brief description..."
             placeholderTextColor={colors.textSecondary}
             value={description}
@@ -444,14 +485,28 @@ export default function UploadDocumentScreen() {
           <View style={styles.ocrSection}>
             <View style={[styles.ocrHeader]}>
               <Ionicons
-                name={verificationStatus === "verified" ? "checkmark-circle" : "alert-circle"}
+                name={
+                  verificationStatus === "verified" ? "checkmark-circle" : "alert-circle"
+                }
                 size={24}
-                color={verificationStatus === "verified" ? colors.success : colors.warning}
+                color={
+                  verificationStatus === "verified" ? colors.success : colors.warning
+                }
               />
-              <Text style={[styles.ocrTitle, { color: colors.textPrimary }]}>OCR Results</Text>
+              <Text style={[styles.ocrTitle, { color: colors.textPrimary }]}>
+                OCR Results
+              </Text>
             </View>
-            <View style={[styles.ocrCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.ocrText, { color: colors.textSecondary }]} numberOfLines={5}>
+            <View
+              style={[
+                styles.ocrCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+            >
+              <Text
+                style={[styles.ocrText, { color: colors.textSecondary }]}
+                numberOfLines={5}
+              >
                 {ocrResult}
               </Text>
               <View style={[styles.ocrStatus, { borderTopColor: colors.border }]}>
@@ -480,7 +535,9 @@ export default function UploadDocumentScreen() {
                 ]}
               />
             </View>
-            <Text style={[styles.progressText, { color: colors.textSecondary }]}>{uploadProgress}% Uploaded</Text>
+            <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+              {uploadProgress}% Uploaded
+            </Text>
           </View>
         )}
 
@@ -505,7 +562,11 @@ export default function UploadDocumentScreen() {
         </TouchableOpacity>
 
         <View style={[styles.infoNote, { backgroundColor: `${colors.primary}10` }]}>
-          <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
+          <Ionicons
+            name="information-circle-outline"
+            size={20}
+            color={colors.textSecondary}
+          />
           <Text style={[styles.infoText, { color: colors.textSecondary }]}>
             Supported formats: JPEG, PNG, HEIC, PDF. Max file size: 10MB
           </Text>
@@ -518,39 +579,21 @@ export default function UploadDocumentScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  paddingHorizontal: 20,
-  paddingTop: 0,
-  paddingBottom: 12,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  headerRight: {
-    width: 32,
-  },
-  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingTop: 0,
+    paddingBottom: 12,
   },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
+  backButton: { padding: 4 },
+  headerTitle: { fontSize: 20, fontWeight: "700" },
+  headerRight: { width: 32 },
+  content: { paddingHorizontal: 20, paddingBottom: 30 },
+  section: { marginBottom: 20 },
+  sectionTitle: { fontSize: 16, fontWeight: "600", marginBottom: 12 },
   pickerContainer: {
     borderRadius: 16,
     padding: 24,
@@ -558,21 +601,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderStyle: "dashed",
   },
-  pickerTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginTop: 12,
-  },
-  pickerSubtitle: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  pickerButtons: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 16,
-    width: '100%',
-  },
+  pickerTitle: { fontSize: 16, fontWeight: "600", marginTop: 12 },
+  pickerSubtitle: { fontSize: 13, marginTop: 4 },
+  pickerButtons: { flexDirection: "row", gap: 12, marginTop: 16, width: "100%" },
   pickerButton: {
     flexDirection: "row",
     paddingHorizontal: 20,
@@ -583,11 +614,7 @@ const styles = StyleSheet.create({
     gap: 8,
     flex: 1,
   },
-  pickerButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "500",
-  },
+  pickerButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "500" },
   imagePreview: {
     position: "relative",
     width: "100%",
@@ -595,61 +622,21 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 8,
   },
-  previewImage: {
-    width: "100%",
-    height: 200,
-    borderRadius: 12,
-    resizeMode: "contain",
-  },
-  pdfPreview: {
-    padding: 20,
-    borderRadius: 12,
-    alignItems: "center",
-    minHeight: 150,
-  },
-  pdfName: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  pdfSize: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  filePreview: {
-    padding: 20,
-    borderRadius: 12,
-    alignItems: "center",
-    minHeight: 120,
-  },
-  fileName: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginTop: 8,
-    textAlign: "center",
-  },
-  removeFileButton: {
-    position: "absolute",
-    top: -10,
-    right: -10,
-    borderRadius: 12,
-  },
-  typeSelector: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  previewImage: { width: "100%", height: 200, borderRadius: 12, resizeMode: "contain" },
+  pdfPreview: { padding: 20, borderRadius: 12, alignItems: "center", minHeight: 150 },
+  pdfName: { fontSize: 14, fontWeight: "500", marginTop: 8, textAlign: "center" },
+  pdfSize: { fontSize: 12, marginTop: 4 },
+  filePreview: { padding: 20, borderRadius: 12, alignItems: "center", minHeight: 120 },
+  fileName: { fontSize: 14, fontWeight: "500", marginTop: 8, textAlign: "center" },
+  removeFileButton: { position: "absolute", top: -10, right: -10, borderRadius: 12 },
+  typeSelector: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   typeChip: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
   },
-  typeChipText: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
+  typeChipText: { fontSize: 13, fontWeight: "500" },
   descriptionInput: {
     borderRadius: 12,
     padding: 14,
@@ -658,60 +645,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     textAlignVertical: "top",
   },
-  ocrSection: {
-    marginBottom: 20,
-  },
-  ocrHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  },
-  ocrTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  ocrCard: {
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-  },
-  ocrText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  ocrStatus: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-  },
-  ocrStatusText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  verifiedText: {
-    color: "#22C55E",
-  },
-  rejectedText: {
-    color: "#EF4444",
-  },
-  progressSection: {
-    marginBottom: 20,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 12,
-    marginTop: 6,
-    textAlign: "center",
-  },
+  ocrSection: { marginBottom: 20 },
+  ocrHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  ocrTitle: { fontSize: 16, fontWeight: "600" },
+  ocrCard: { borderRadius: 12, padding: 14, borderWidth: 1 },
+  ocrText: { fontSize: 14, lineHeight: 20 },
+  ocrStatus: { marginTop: 10, paddingTop: 10, borderTopWidth: 1 },
+  ocrStatusText: { fontSize: 13, fontWeight: "600" },
+  verifiedText: { color: "#22C55E" },
+  rejectedText: { color: "#EF4444" },
+  progressSection: { marginBottom: 20 },
+  progressBar: { height: 8, borderRadius: 4, overflow: "hidden" },
+  progressFill: { height: "100%", borderRadius: 4 },
+  progressText: { fontSize: 12, marginTop: 6, textAlign: "center" },
   uploadButton: {
     flexDirection: "row",
     paddingVertical: 16,
@@ -724,16 +670,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  uploadButtonDisabled: {
-    opacity: 0.6,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  uploadButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  uploadButtonDisabled: { opacity: 0.6, shadowOpacity: 0, elevation: 0 },
+  uploadButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
   infoNote: {
     flexDirection: "row",
     alignItems: "center",
@@ -742,13 +680,9 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
   },
-  infoText: {
-    fontSize: 12,
-    flex: 1,
-  },
-
+  infoText: { fontSize: 12, flex: 1 },
   dropdownOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
@@ -756,20 +690,20 @@ const styles = StyleSheet.create({
     zIndex: 998,
   },
   dropdownContainer: {
-    position: 'absolute',
+    position: "absolute",
     borderRadius: 12,
     borderWidth: 1,
     shadowOpacity: 0.15,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
-    overflow: 'hidden',
+    overflow: "hidden",
     zIndex: 999,
     paddingVertical: 4,
   },
   dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 14,
     paddingVertical: 12,
     gap: 10,
@@ -779,18 +713,10 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
-  dropdownTextContainer: {
-    flex: 1,
-  },
-  dropdownItemText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  dropdownItemSubtext: {
-    fontSize: 11,
-    opacity: 0.6,
-  },
+  dropdownTextContainer: { flex: 1 },
+  dropdownItemText: { fontSize: 14, fontWeight: "500" },
+  dropdownItemSubtext: { fontSize: 11, opacity: 0.6 },
 });

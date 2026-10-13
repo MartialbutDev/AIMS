@@ -26,11 +26,20 @@ async def upload_document(
 ):
     """Upload and validate a document."""
     valid_types = [
+        # Application docs
         "resume",
         "application_letter",
+
+        # Pre-deployment / CHED-required
+        "waiver",
+        "medical_certificate",
+        "internship_plan",
+        "insurance",
         "endorsement_letter",
-        "certificate_of_completion",
+
+        # Post-selection
         "acceptance_letter",
+        "certificate_of_completion",
         "requirements",
     ]
 
@@ -131,11 +140,9 @@ async def get_document_image(
 
     media_type = media_types.get(ext, "application/octet-stream")
 
-    # ✅ Prefer the original filename the student uploaded
     fallback_name = os.path.basename(file_path)
     display_name = document.original_filename or fallback_name
 
-    # Sanitize header value
     safe_name = (
         display_name.replace('"', "")
         .replace("\n", "")
@@ -143,7 +150,6 @@ async def get_document_image(
         .strip()
     )
 
-    # Make sure the extension matches the real file
     if safe_name and not safe_name.lower().endswith(ext):
         safe_name = f"{os.path.splitext(safe_name)[0]}{ext}"
 
