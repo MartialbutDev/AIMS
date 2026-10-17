@@ -39,13 +39,26 @@ const coordinatorNavItems = [
   { label: 'Notifications', icon: 'bell' as const },
 ]
 
-function MetricCard({ metric }: { metric: DashboardMetric }) {
-  return (
-    <article className="metric-card">
+function MetricCard({
+  metric,
+  onClick,
+}: {
+  metric: DashboardMetric
+  onClick?: () => void
+}) {
+  const content = (
+    <>
       <div className="metric-topline"><span>{metric.label}</span><span className={`metric-icon metric-icon--${metric.tone}`}><Icon name={metric.icon} size={18} /></span></div>
       <strong className="metric-value">{metric.value}</strong>
       <span className={`metric-change metric-change--${metric.tone}`}>{metric.change}</span>
-    </article>
+    </>
+  )
+  return onClick ? (
+    <button type="button" className="metric-card metric-card--interactive" onClick={onClick}>
+      {content}
+    </button>
+  ) : (
+    <article className="metric-card">{content}</article>
   )
 }
 
@@ -185,7 +198,22 @@ export function DashboardLayout({ session, data, onLogout }: DashboardLayoutProp
               ? <button className="outline-button" onClick={() => { setAddUserError(''); setIsAddUserOpen(true) }}><span className="add-user-plus">+</span> Add user</button>
               : <button className="outline-button" onClick={() => setActiveNav('Notifications')}><Icon name="bell" size={17} /> Notifications</button>}
           </section>
-          <section className="metrics-grid" aria-label="Key metrics">{data.metrics.map((metric) => <MetricCard key={metric.label} metric={metric} />)}</section>
+          <section className="metrics-grid" aria-label="Key metrics">{data.metrics.map((metric) => {
+            const destination = session.role === 'coordinator' &&
+              (metric.label === 'Students' || metric.label === 'Applications')
+              ? metric.label
+              : undefined
+            return (
+              <MetricCard
+                key={metric.label}
+                metric={metric}
+                onClick={destination ? () => {
+                  setActiveNav(destination)
+                  setMobileNavOpen(false)
+                } : undefined}
+              />
+            )
+          })}</section>
           <section className="dashboard-columns">
             <article className="panel activity-panel">
               <div className="panel-heading"><div><h2>Recent activity</h2><p>The latest updates from your workspace</p></div><button className="panel-link" onClick={() => setActiveNav(session.role === 'admin' ? 'Notifications' : 'Applications')}>View all <Icon name="arrow" size={15} /></button></div>

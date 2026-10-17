@@ -139,6 +139,9 @@
 .outline-button svg { color: #6586c1; }
 .metrics-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 13px; }
 .metric-card { min-height: 123px; padding: 16px 17px 14px; border: 1px solid #e9edf3; border-radius: 9px; background: #fff; box-shadow: 0 2px 3px #1c38510a; }
+.metric-card--interactive { width: 100%; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+.metric-card--interactive:hover { transform: translateY(-1px); border-color: #cbd9ee; box-shadow: 0 5px 14px #1c385114; }
+.metric-card--interactive:focus-visible { outline: 3px solid #b7ccf2; outline-offset: 2px; }
 .metric-topline { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #8290a1; font-size: 10px; }
 .metric-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; }
 .metric-icon--blue { color: #3971df; background: #edf3ff; }
@@ -302,6 +305,7 @@
 .coordinator-detail-column,.coordinator-detail { display: grid; min-width: 0; gap: 12px; }
 .student-profile-card,.coordinator-subpanel,.coordinator-evaluation { padding: 17px 18px; }
 .student-profile-heading { display: flex; align-items: center; gap: 12px; padding-bottom: 15px; border-bottom: 1px solid #f0f2f6; }
+.student-profile-heading > div { min-width: 0; }
 .student-profile-heading h2 { margin: 7px 0 4px; color: #344357; font-family: Manrope,sans-serif; font-size: 17px; }
 .student-profile-heading p { margin: 0; color: #8793a2; font-size: 9px; }
 .journey-progress-heading { display: flex; justify-content: space-between; gap: 12px; margin: 15px 0 8px; color: #718095; font-size: 9px; }
@@ -430,7 +434,10 @@
   .coordinator-columns { grid-template-columns: 1fr; }
   .coordinator-student-list { position: static; }
   .coordinator-student-items { max-height: 240px; }
+  .journey-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .document-status-grid { grid-template-columns: 1fr; }
+  .document-status-item { display: grid; grid-template-columns: minmax(0,1fr) auto; }
+  .document-status-item > span:first-child { grid-column: 1 / -1; }
   .evaluation-fields { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
