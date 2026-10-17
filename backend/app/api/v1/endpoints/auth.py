@@ -11,7 +11,8 @@ from app.core.security import (
     verify_password,
     create_access_token,
     get_current_user,
-    decode_token
+    decode_token,
+    require_role,
 )
 from app.core.config import settings
 from app.models.user import User, UserRole
@@ -144,12 +145,12 @@ async def login_student(login_data: LoginRequest, db: Session = Depends(get_db))
 @router.post("/register/web", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register_web_user(
     user_data: UserCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
 ):
     """
-    Register a user (Web App Only)
-    - Can create: coordinator, dean, career_center, hte_supervisor, admin
-    - Student role is NOT allowed through this endpoint
+    Legacy web-registration endpoint, restricted to administrators.
+    New faculty accounts should be created through the managed-users endpoint.
     """
     
     # Check if role is allowed for web registration
@@ -196,7 +197,12 @@ async def login_web_user(login_data: LoginRequest, db: Session = Depends(get_db)
     - Students CANNOT login through this endpoint
     """
     
-    user = db.query(User).filter(User.email == login_data.email).first()
+    login_identifier = login_data.email.strip()
+    if login_identifier.lower() == "admin":
+        login_identifier = "admin@aims.local"
+    user = db.query(User).filter(
+        User.email.ilike(login_identifier)
+    ).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import List, Optional
 from datetime import datetime
 from enum import Enum
 
@@ -29,6 +29,22 @@ class UserCreate(UserBase):
     role: Optional[UserRole] = UserRole.STUDENT
 
 
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
+    password: str = Field(..., min_length=6)
+    role: UserRole
+
+    @field_validator("role")
+    @classmethod
+    def reject_student_role(cls, value: UserRole) -> UserRole:
+        if value == UserRole.STUDENT:
+            raise ValueError("Students must register through the student signup flow")
+        return value
+
+
 # Update User
 class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
@@ -47,6 +63,7 @@ class ChangePassword(BaseModel):
 # User Response
 class UserResponse(UserBase):
     id: str
+    email: str
     role: UserRole
     is_active: bool
     is_verified: bool
@@ -56,6 +73,11 @@ class UserResponse(UserBase):
 
     class Config:
         from_attributes = True
+
+
+class UserImportResponse(BaseModel):
+    created_count: int
+    users: List[UserResponse]
 
 
 # Login Request - FIXED: email is now a string to accept both student_id and email

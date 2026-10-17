@@ -5,6 +5,9 @@ import bgImage from './assets/ustp-bg.jpg';
 // Auth
 import LoginPage from './auth/LoginPage';
 
+// Shared Profile
+import ProfileSettingsPage from './common/ProfileSettingsPage';
+
 // Dean Interface
 import DepartmentDashboard from './dean/DepartmentDashboard';
 import CoordinatorsPage from './dean/CoordinatorsPage';
@@ -19,6 +22,7 @@ import StudentDetailPage from './coordinator/StudentDetailPage';
 import CoordinatorReportsPage from './coordinator/CoordinatorReportsPage';
 import CoordinatorEvaluationsPage from './coordinator/CoordinatorEvaluationsPage';
 import CoordinatorAnnouncementsPage from './coordinator/CoordinatorAnnouncementsPage';
+import CoordinatorCompaniesPage from './coordinator/CoordinatorCompaniesPage';
 import CoordinatorSidebar from './coordinator/CoordinatorSidebar';
 
 // Host Company Interface
@@ -149,6 +153,58 @@ export default function App() {
             }
           />
 
+          {/* SHARED PROFILE ROUTES */}
+          <Route
+            path="/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/dean/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/company/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/career-center/profile"
+            element={
+              <ProfileSettingsPage
+                currentUser={currentUser}
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+
           {/* Dean Routes */}
           <Route
             path="/dean/overview"
@@ -194,6 +250,7 @@ export default function App() {
             element={
               <CoordinatorDashboard
                 onOpenSidebar={() => setIsSidebarOpen(true)}
+                onNavigate={(path) => navigate(path)}
                 onLogout={handleLogout}
               />
             }
@@ -240,6 +297,15 @@ export default function App() {
             path="/coordinator/announcements"
             element={
               <CoordinatorAnnouncementsPage
+                onOpenSidebar={() => setIsSidebarOpen(true)}
+                onLogout={handleLogout}
+              />
+            }
+          />
+          <Route
+            path="/coordinator/companies"
+            element={
+              <CoordinatorCompaniesPage
                 onOpenSidebar={() => setIsSidebarOpen(true)}
                 onLogout={handleLogout}
               />
