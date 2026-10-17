@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
+import json
 
 
 class NotificationType(str, Enum):
@@ -34,8 +35,22 @@ class NotificationResponse(NotificationBase):
     read_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    # ✅ Accept string-encoded JSON and deserialize it automatically
+    @field_validator("data", mode="before")
+    @classmethod
+    def _parse_data(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, dict):
+            return v
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
 
 
 class NotificationCountResponse(BaseModel):

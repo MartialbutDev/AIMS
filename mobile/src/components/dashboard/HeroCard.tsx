@@ -43,7 +43,7 @@ export default function HeroCard({
     >
       {/* Background photo */}
       <ImageBackground
-        source={require("../../../assets/images/hero-background.png")}
+        source={require("../../../assets/images/hero-background.jpg")}
         style={styles.backgroundImage}
         resizeMode="cover"
       >

@@ -10,13 +10,17 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.document import Document
 from app.services.document_service import DocumentService
-from app.schemas.document import DocumentResponse
+from app.schemas.document import DocumentResponse, DocumentUploadResponse
 from app.core.config import settings
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
-@router.post("/upload", response_model=dict)
+# ------------------------------------------------------------------
+# Upload — now returns DocumentUploadResponse so `document.id` is real
+# ------------------------------------------------------------------
+
+@router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
     document_type: str = Form(...),
@@ -63,6 +67,10 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
+# ------------------------------------------------------------------
+# List current user's documents
+# ------------------------------------------------------------------
+
 @router.get("/", response_model=List[DocumentResponse])
 async def get_user_documents(
     db: Session = Depends(get_db),
@@ -77,6 +85,10 @@ async def get_user_documents(
     )
     return documents
 
+
+# ------------------------------------------------------------------
+# Single document
+# ------------------------------------------------------------------
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
@@ -99,6 +111,10 @@ async def get_document(
 
     return document
 
+
+# ------------------------------------------------------------------
+# Serve the file with the student's original filename
+# ------------------------------------------------------------------
 
 @router.get("/{document_id}/image")
 async def get_document_image(

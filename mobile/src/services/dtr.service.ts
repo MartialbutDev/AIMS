@@ -1,6 +1,5 @@
 // src/services/dtr.service.ts
 import api from './api';
-// ✅ Use legacy FileSystem to access documentDirectory
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
@@ -30,6 +29,12 @@ export interface DTRSummary {
   approved: number;
   rejected: number;
   total_hours: number;
+
+  // ✅ NEW — dashboard progress card fields
+  required_hours: number;
+  remaining_hours: number;
+  progress_percent: number;
+  current_company: string | null;
 }
 
 export interface CreateDTRData {
@@ -52,11 +57,6 @@ export interface PaginatedDTR {
 }
 
 export const dtrService = {
-  /**
-   * Fetch paginated DTR entries for the current student.
-   * Note: most screens use `usePaginatedData` directly against `api.get`,
-   * so this method is here for convenience / non-paginated callers.
-   */
   async getMyDTR(page: number = 1, limit: number = 10): Promise<PaginatedDTR> {
     try {
       const response = await api.get(`/dtr/?page=${page}&limit=${limit}`);
@@ -80,6 +80,11 @@ export const dtrService = {
         approved: 0,
         rejected: 0,
         total_hours: 0,
+        // ✅ NEW fallbacks
+        required_hours: 486,
+        remaining_hours: 486,
+        progress_percent: 0,
+        current_company: null,
       };
     }
   },
@@ -118,7 +123,6 @@ export const dtrService = {
     }
   },
 
-  // ✅ Export DTR to Excel
   async exportDTRToExcel(): Promise<void> {
     try {
       console.log('📊 Exporting DTR to Excel...');

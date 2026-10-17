@@ -34,7 +34,7 @@ interface Document {
   validation_message?: string;
 }
 
-// ✅ Per-type icons so each doc is visually distinguishable
+// ✅ Per-type icons
 const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   resume: "person-outline",
   application_letter: "mail-outline",
@@ -51,11 +51,29 @@ const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   user_id: "card-outline",
 };
 
+// ✅ Three-tier status: All / Verified / Pending / Rejected
 const FILTERS = [
   { value: "all", label: "All" },
   { value: "verified", label: "Verified" },
+  { value: "pending", label: "Pending" },
   { value: "rejected", label: "Rejected" },
 ];
+
+// ✅ Status → color mapping
+const STATUS_COLORS = {
+  verified: "#10B981", // green
+  pending: "#F59E0B",  // amber
+  rejected: "#EF4444", // red
+};
+
+// ✅ Robust date parser — handles ISO strings, with/without timezone
+const parseDate = (value?: string | null): number => {
+  if (!value) return 0;
+  // Fix the common case where backend returns a datetime without timezone
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const t = new Date(normalized).getTime();
+  return isNaN(t) ? 0 : t;
+};
 
 export default function DocumentsScreen() {
   const { colors, isDark } = useTheme();
@@ -86,20 +104,19 @@ export default function DocumentsScreen() {
     fetchDocuments();
   };
 
+  // ✅ Sort newest first (top) → oldest last (bottom)
+  //    Then apply the status filter on top of the sorted list.
+  const sortedDocuments = [...documents].sort(
+    (a, b) => parseDate(b.created_at) - parseDate(a.created_at)
+  );
+
   const filteredDocuments =
     selectedFilter === "all"
-      ? documents
-      : documents.filter((d) => d.verification_status === selectedFilter);
+      ? sortedDocuments
+      : sortedDocuments.filter((d) => d.verification_status === selectedFilter);
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "verified":
-        return colors.success;
-      case "rejected":
-        return colors.error;
-      default:
-        return colors.warning;
-    }
+    return STATUS_COLORS[status as keyof typeof STATUS_COLORS] || "#F59E0B";
   };
 
   const getStatusIcon = (status: string): keyof typeof Ionicons.glyphMap => {
@@ -108,6 +125,7 @@ export default function DocumentsScreen() {
         return "checkmark-circle-outline";
       case "rejected":
         return "close-circle-outline";
+      case "pending":
       default:
         return "time-outline";
     }
@@ -166,6 +184,14 @@ export default function DocumentsScreen() {
     const displayName = item.type.replace(/_/g, " ").toUpperCase();
     const subtitle = item.original_filename || item.description || null;
     const typeIcon = getTypeIcon(item.type);
+
+    // Confidence badge color reflects status
+    const confidenceColor =
+      item.verification_status === "verified"
+        ? colors.success
+        : item.verification_status === "rejected"
+        ? colors.error
+        : colors.warning;
 
     return (
       <TouchableOpacity
@@ -234,19 +260,23 @@ export default function DocumentsScreen() {
               <View
                 style={[
                   styles.confidenceBadge,
-                  { backgroundColor: `${statusColor}15` },
+                  { backgroundColor: `${confidenceColor}15` },
                 ]}
               >
                 <Ionicons
                   name={
-                    item.validation_confidence >= 50
+                    item.verification_status === "verified"
                       ? "checkmark-circle"
+                      : item.verification_status === "rejected"
+                      ? "close-circle"
                       : "alert-circle"
                   }
                   size={10}
-                  color={statusColor}
+                  color={confidenceColor}
                 />
-                <Text style={[styles.confidenceText, { color: statusColor }]}>
+                <Text
+                  style={[styles.confidenceText, { color: confidenceColor }]}
+                >
                   {item.validation_confidence}%
                 </Text>
               </View>
@@ -258,6 +288,11 @@ export default function DocumentsScreen() {
 
   const renderFilterChip = (filter: { value: string; label: string }) => {
     const isActive = selectedFilter === filter.value;
+    const count =
+      filter.value === "all"
+        ? documents.length
+        : documents.filter((d) => d.verification_status === filter.value).length;
+
     return (
       <TouchableOpacity
         key={filter.value}
@@ -279,7 +314,7 @@ export default function DocumentsScreen() {
         >
           {filter.label}
         </Text>
-        {filter.value !== "all" && (
+        {filter.value !== "all" && count > 0 && (
           <View
             style={[
               styles.filterCountBadge,
@@ -296,10 +331,7 @@ export default function DocumentsScreen() {
                 { color: isActive ? "#FFFFFF" : colors.primary },
               ]}
             >
-              {
-                documents.filter((d) => d.verification_status === filter.value)
-                  .length
-              }
+              {count}
             </Text>
           </View>
         )}
@@ -361,7 +393,9 @@ export default function DocumentsScreen() {
               color={colors.border}
             />
             <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-              {selectedFilter === "all" ? "No Documents" : `No ${selectedFilter} Documents`}
+              {selectedFilter === "all"
+                ? "No Documents"
+                : `No ${selectedFilter} Documents`}
             </Text>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               {selectedFilter === "all"
@@ -370,7 +404,10 @@ export default function DocumentsScreen() {
             </Text>
             {selectedFilter === "all" && (
               <TouchableOpacity
-                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                style={[
+                  styles.emptyButton,
+                  { backgroundColor: colors.primary },
+                ]}
                 onPress={() => router.push("/(student)/documents/upload")}
               >
                 <Text style={styles.emptyButtonText}>Upload Now</Text>
@@ -397,7 +434,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: "700" },
   uploadButton: { padding: 4 },
 
-  // Filters
   filtersWrapper: {
     paddingBottom: 12,
   },

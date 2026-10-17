@@ -192,18 +192,30 @@ export default function UploadDocumentScreen() {
       }
       setVerificationStatus(response.data.status);
 
-      Alert.alert(
-        "Upload Successful",
-        `Document uploaded!\nStatus: ${response.data.status}`,
-        [
-          {
-            text: "View Document",
-            onPress: () =>
-              router.push(`/(student)/documents/${response.data.document.id}` as any),
-          },
-          { text: "OK", style: "default" },
-        ]
-      );
+      // ✅ Safe navigation — only navigate if the backend returned a document ID
+      const docId: string | undefined = response.data?.document?.id;
+
+      const buttons: any[] = [];
+      if (docId) {
+        buttons.push({
+          text: "View Document",
+          onPress: () => router.push(`/(student)/documents/${docId}` as any),
+        });
+      }
+      buttons.push({ text: "OK", style: "default" });
+
+      const statusTitle =
+        response.data.status === "verified"
+          ? "✅ Document Verified"
+          : response.data.status === "pending"
+          ? "⏳ Pending Review"
+          : "❌ Document Rejected";
+
+      const statusBody =
+        response.data?.validation?.message ||
+        "Your document has been uploaded.";
+
+      Alert.alert(statusTitle, statusBody, buttons);
 
       resetFile();
       setSelectedType("");
@@ -515,10 +527,16 @@ export default function UploadDocumentScreen() {
                     styles.ocrStatusText,
                     verificationStatus === "verified"
                       ? [styles.verifiedText, { color: colors.success }]
+                      : verificationStatus === "pending"
+                      ? [styles.pendingText, { color: colors.warning }]
                       : [styles.rejectedText, { color: colors.error }],
                   ]}
                 >
-                  {verificationStatus === "verified" ? "✅ Verified" : "⚠️ Review Needed"}
+                  {verificationStatus === "verified"
+                    ? "✅ Verified"
+                    : verificationStatus === "pending"
+                    ? "⏳ Pending Review"
+                    : "⚠️ Review Needed"}
                 </Text>
               </View>
             </View>
@@ -653,6 +671,7 @@ const styles = StyleSheet.create({
   ocrStatus: { marginTop: 10, paddingTop: 10, borderTopWidth: 1 },
   ocrStatusText: { fontSize: 13, fontWeight: "600" },
   verifiedText: { color: "#22C55E" },
+  pendingText: { color: "#F59E0B" },
   rejectedText: { color: "#EF4444" },
   progressSection: { marginBottom: 20 },
   progressBar: { height: 8, borderRadius: 4, overflow: "hidden" },

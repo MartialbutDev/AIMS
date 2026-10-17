@@ -25,6 +25,7 @@ from app.models.user import User, UserRole
 from app.models.journal import Journal, JournalStatus
 from app.schemas.journal import JournalResponse, JournalUpdate
 from app.schemas.pagination import PaginatedResponse
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 
@@ -103,6 +104,20 @@ def _parse_bool(value) -> bool:
     return str(value).strip().lower() in {"true", "1", "yes", "on"}
 
 
+def _fire_journal_notification(db: Session, journal: Journal, status_value: str) -> None:
+    """Fire a journal notification to the owner. Never raises."""
+    try:
+        NotificationService.create_journal_notification(
+            db=db,
+            user_id=journal.student_id,
+            journal_id=journal.id,
+            status=status_value,
+            week=journal.week,
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to create journal notification: {e}")
+
+
 # ------------------------------------------------------------------
 # Create (multipart upload; supports single-step submit)
 # ------------------------------------------------------------------
@@ -112,24 +127,18 @@ async def create_journal(
     week: int = Form(...),
     title: str = Form(...),
     summary: Optional[str] = Form(None),
-    submit: bool = Form(False),           # ✅ single-step submit flag
+    submit: bool = Form(False),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Student creates a journal by uploading a PDF + metadata.
-
-    - `submit=true` → status goes straight to SUBMITTED and submitted_date is set.
-    - `submit=false` → saved as DRAFT so the student can review later.
-    """
+    """Student creates a journal by uploading a PDF + metadata."""
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(403, "Only students can create journals")
 
     if week < 1 or week > 52:
         raise HTTPException(400, "Week must be between 1 and 52")
 
-    # Duplicate-week guard (only blocks if a non-rejected journal exists)
     existing = (
         db.query(Journal)
         .filter(
@@ -144,7 +153,6 @@ async def create_journal(
 
     relative_path = _save_journal_pdf(file)
 
-    # ✅ Decide status up-front
     wants_submit = _parse_bool(submit)
     if wants_submit:
         journal_status = JournalStatus.SUBMITTED
@@ -166,6 +174,9 @@ async def create_journal(
     db.add(journal)
     db.commit()
     db.refresh(journal)
+
+    # ✅ Notify student of submission / draft save
+    _fire_journal_notification(db, journal, journal.status.value)
 
     student_name = f"{current_user.first_name} {current_user.last_name}"
     return _to_response(journal, student_name)
@@ -360,6 +371,9 @@ async def update_journal(
     if is_owner and not is_staff and journal.status != JournalStatus.DRAFT:
         raise HTTPException(400, "Only draft journals can be edited")
 
+    # ✅ Capture old status before applying the update
+    old_status_val = journal.status
+
     updates = journal_data.model_dump(exclude_unset=True)
 
     if "status" in updates:
@@ -378,7 +392,13 @@ async def update_journal(
     db.commit()
     db.refresh(journal)
 
+    new_status_val = journal.status
     student = db.query(User).filter(User.id == journal.student_id).first()
+
+    # ✅ Notify only if status actually changed
+    if old_status_val != new_status_val:
+        _fire_journal_notification(db, journal, new_status_val.value)
+
     student_name = f"{student.first_name} {student.last_name}" if student else None
     return _to_response(journal, student_name)
 
