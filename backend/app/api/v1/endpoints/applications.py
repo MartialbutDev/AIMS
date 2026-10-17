@@ -18,6 +18,7 @@ from app.schemas.application import (
     ApplicationResponse,
 )
 from app.schemas.pagination import PaginatedResponse
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 
@@ -52,10 +53,8 @@ def _validate_document_ownership(
     student_id: str,
     field_label: str,
 ) -> Document | None:
-    """Ensure a document exists, belongs to the student, and is verified."""
     if not document_id:
         return None
-
     doc = db.query(Document).filter(Document.id == document_id).first()
     if not doc:
         raise HTTPException(
@@ -75,6 +74,28 @@ def _validate_document_ownership(
     return doc
 
 
+def _notify_application_status(
+    db: Session,
+    application: Application,
+    new_status: ApplicationStatus,
+    company_name: str,
+) -> None:
+    """
+    Fire a notification to the student when their application status changes.
+    Never raises — a notification failure must not break the request.
+    """
+    try:
+        NotificationService.create_application_notification(
+            db=db,
+            user_id=application.student_id,
+            application_id=application.id,
+            status=new_status.value,
+            company_name=company_name,
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to create application notification: {e}")
+
+
 # ------------------------------------------------------------------
 # Student: create application
 # ------------------------------------------------------------------
@@ -85,7 +106,6 @@ async def create_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Student applies to a company, optionally attaching resume + letter."""
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -94,10 +114,7 @@ async def create_application(
 
     company = db.query(Company).filter(Company.id == application_data.company_id).first()
     if not company:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company not found",
-        )
+        raise HTTPException(status_code=404, detail="Company not found")
 
     existing = (
         db.query(Application)
@@ -115,11 +132,10 @@ async def create_application(
     )
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=400,
             detail="You already have an active application for this position",
         )
 
-    # ✅ Validate attached documents (must exist, belong to student, be verified)
     _validate_document_ownership(
         db, application_data.resume_id, current_user.id, "Resume"
     )
@@ -141,6 +157,9 @@ async def create_application(
     db.commit()
     db.refresh(application)
 
+    # ✅ Notify student that application was submitted
+    _notify_application_status(db, application, ApplicationStatus.PENDING, company.name)
+
     return _to_response(application, company.name)
 
 
@@ -150,8 +169,8 @@ async def create_application(
 
 @router.get("/", response_model=PaginatedResponse[ApplicationResponse])
 async def get_my_applications(
-    page: int = Query(1, ge=1, description="1-based page number"),
-    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -174,7 +193,7 @@ async def get_my_applications(
 
 # ------------------------------------------------------------------
 # Admin: all applications (paginated)
-# MUST stay declared BEFORE /{application_id}
+# MUST stay before /{application_id}
 # ------------------------------------------------------------------
 
 @router.get("/all", response_model=PaginatedResponse[ApplicationResponse])
@@ -239,6 +258,9 @@ async def update_application_status(
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
 
+    # Capture old status to detect a change
+    old_status = application.status
+
     update_data_dict = update_data.model_dump(exclude_unset=True)
     for key, value in update_data_dict.items():
         setattr(application, key, value)
@@ -248,7 +270,13 @@ async def update_application_status(
     db.refresh(application)
 
     company = db.query(Company).filter(Company.id == application.company_id).first()
-    return _to_response(application, company.name if company else None)
+    company_name = company.name if company else "the company"
+
+    # ✅ Notify only if status actually changed
+    if application.status != old_status:
+        _notify_application_status(db, application, application.status, company_name)
+
+    return _to_response(application, company_name)
 
 
 # ------------------------------------------------------------------
@@ -284,5 +312,10 @@ async def withdraw_application(
     application.status = ApplicationStatus.WITHDRAWN
     application.updated_date = func.now()
     db.commit()
+
+    company = db.query(Company).filter(Company.id == application.company_id).first()
+    company_name = company.name if company else "the company"
+
+    _notify_application_status(db, application, ApplicationStatus.WITHDRAWN, company_name)
 
     return {"message": "Application withdrawn successfully"}

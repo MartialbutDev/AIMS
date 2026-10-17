@@ -16,6 +16,7 @@ from app.models.user import User, UserRole
 from app.models.dtr import DTR, DTRStatus
 from app.schemas.dtr import DTRResponse, DTRUpdate
 from app.schemas.pagination import PaginatedResponse
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 
@@ -45,10 +46,7 @@ def _student_name(user: User | None) -> Optional[str]:
 
 
 def _to_response(entry: DTR, student_name: Optional[str]) -> DTRResponse:
-    """
-    Build a DTRResponse from an ORM object without leaking SQLAlchemy internals
-    into pydantic's `__dict__` view.
-    """
+    """Build a DTRResponse without leaking SQLAlchemy internals."""
     return DTRResponse.model_validate(entry).model_copy(
         update={"student_name": student_name}
     )
@@ -65,6 +63,24 @@ def _student_name_map(db: Session, entries: List[DTR]) -> dict[str, str]:
         .all()
     )
     return {sid: f"{fn} {ln}" for sid, fn, ln in rows}
+
+
+def _fire_dtr_notification(db: Session, dtr: DTR, status_value: str) -> None:
+    """
+    Fire a DTR notification to the owner.
+    Never raises — a notification failure must not break the request.
+    """
+    try:
+        date_str = dtr.date.strftime("%b %d, %Y") if dtr.date else "Unknown date"
+        NotificationService.create_dtr_notification(
+            db=db,
+            user_id=dtr.student_id,
+            dtr_id=dtr.id,
+            status=status_value,
+            date=date_str,
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to create DTR notification: {e}")
 
 
 # ------------------------------------------------------------------
@@ -163,12 +179,14 @@ async def create_dtr(
     db.commit()
     db.refresh(dtr)
 
+    # ✅ Notify student that Time-In was recorded
+    _fire_dtr_notification(db, dtr, dtr_status.value)
+
     return _to_response(dtr, _student_name(current_user))
 
 
 # ------------------------------------------------------------------
 # Student: own DTR list (PAGINATED)
-# MUST be declared before /{dtr_id}
 # ------------------------------------------------------------------
 
 @router.get("/", response_model=PaginatedResponse[DTRResponse])
@@ -227,15 +245,9 @@ async def record_time_out(
 
     dtr = db.query(DTR).filter(DTR.id == dtr_id).first()
     if not dtr:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="DTR entry not found",
-        )
+        raise HTTPException(status_code=404, detail="DTR entry not found")
     if dtr.student_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
+        raise HTTPException(status_code=403, detail="Access denied")
     if dtr.status != DTRStatus.PENDING:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -278,12 +290,15 @@ async def record_time_out(
     db.refresh(dtr)
 
     student = db.query(User).filter(User.id == dtr.student_id).first()
+
+    # ✅ Notify student that Time-Out was recorded (SUBMITTED status)
+    _fire_dtr_notification(db, dtr, dtr.status.value)
+
     return _to_response(dtr, _student_name(student))
 
 
 # ------------------------------------------------------------------
 # Admin: all DTR (PAGINATED)
-# MUST be declared before /{dtr_id}
 # ------------------------------------------------------------------
 
 @router.get("/all", response_model=PaginatedResponse[DTRResponse])
@@ -310,8 +325,7 @@ async def get_all_dtr(
 
 
 # ------------------------------------------------------------------
-# Summary (single aggregate query)
-# MUST be declared before /{dtr_id}
+# Summary — includes progress card fields
 # ------------------------------------------------------------------
 
 @router.get("/summary")
@@ -319,7 +333,7 @@ async def get_dtr_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get DTR summary for current student."""
+    """Get DTR summary for current student, plus progress card data."""
     if current_user.role != UserRole.STUDENT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -347,13 +361,52 @@ async def get_dtr_summary(
         .one()
     )
 
+    # ✅ Current company — from the most recent accepted application
+    from app.models.application import Application, ApplicationStatus
+    from app.models.company import Company
+
+    accepted_app = (
+        db.query(Application)
+        .filter(
+            Application.student_id == current_user.id,
+            Application.status == ApplicationStatus.ACCEPTED,
+        )
+        .order_by(Application.updated_date.desc())
+        .first()
+    )
+
+    current_company = None
+    if accepted_app:
+        company = (
+            db.query(Company)
+            .filter(Company.id == accepted_app.company_id)
+            .first()
+        )
+        current_company = company.name if company else None
+
+    # ✅ Required hours — single source of truth in config.py
+    required_hours = settings.REQUIRED_INTERNSHIP_HOURS
+
+    total_hours = round(float(row.total_hours or 0), 2)
+    remaining_hours = max(0, round(required_hours - total_hours, 2))
+    progress_pct = (
+        min(100, int((total_hours / required_hours) * 100))
+        if required_hours > 0
+        else 0
+    )
+
     return {
         "total_entries": int(row.total_entries or 0),
         "pending": int(row.pending or 0),
         "submitted": int(row.submitted or 0),
         "approved": int(row.approved or 0),
         "rejected": int(row.rejected or 0),
-        "total_hours": round(float(row.total_hours or 0), 2),
+        "total_hours": total_hours,
+        # ✅ NEW — dashboard progress card fields
+        "required_hours": required_hours,
+        "remaining_hours": remaining_hours,
+        "progress_percent": progress_pct,
+        "current_company": current_company,
     }
 
 
@@ -370,16 +423,10 @@ async def get_dtr(
     """Get DTR entry by ID."""
     dtr = db.query(DTR).filter(DTR.id == dtr_id).first()
     if not dtr:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="DTR entry not found",
-        )
+        raise HTTPException(status_code=404, detail="DTR entry not found")
 
     if current_user.role != UserRole.ADMIN and current_user.id != dtr.student_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
+        raise HTTPException(status_code=403, detail="Access denied")
 
     student = db.query(User).filter(User.id == dtr.student_id).first()
     return _to_response(dtr, _student_name(student))
@@ -405,10 +452,10 @@ async def update_dtr_status(
 
     dtr = db.query(DTR).filter(DTR.id == dtr_id).first()
     if not dtr:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="DTR entry not found",
-        )
+        raise HTTPException(status_code=404, detail="DTR entry not found")
+
+    # Capture old status before applying the update
+    old_status_val = dtr.status
 
     update_data_dict = update_data.model_dump(exclude_unset=True)
 
@@ -420,9 +467,14 @@ async def update_dtr_status(
         setattr(dtr, key, value)
 
     dtr.updated_at = func.now()
-
     db.commit()
     db.refresh(dtr)
 
+    new_status_val = dtr.status
     student = db.query(User).filter(User.id == dtr.student_id).first()
+
+    # Notify only if status actually changed
+    if old_status_val != new_status_val:
+        _fire_dtr_notification(db, dtr, new_status_val.value)
+
     return _to_response(dtr, _student_name(student))

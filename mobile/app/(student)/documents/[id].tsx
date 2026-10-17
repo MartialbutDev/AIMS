@@ -24,7 +24,7 @@ interface DocumentDetail {
   id: string;
   type: string;
   description: string;
-  original_filename?: string;      // ✅ NEW
+  original_filename?: string;
   verification_status: string;
   created_at: string;
   file_path?: string;
@@ -41,6 +41,7 @@ export default function DocumentDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [document, setDocument] = useState<DocumentDetail | null>(null);
   const [opening, setOpening] = useState(false);
+  const [showFullOcr, setShowFullOcr] = useState(false);
 
   const fetchDocument = useCallback(
     async (showSpinner = true) => {
@@ -160,6 +161,21 @@ export default function DocumentDetailScreen() {
 
   const statusColor = getStatusColor(document.verification_status);
   const displayName = document.type.replace(/_/g, " ").toUpperCase();
+  const confidence = document.validation_confidence ?? 0;
+
+  const statusLabel =
+    document.verification_status === "verified"
+      ? "Verified"
+      : document.verification_status === "pending"
+      ? "Pending Review"
+      : "Rejected";
+
+  const statusIconName: keyof typeof Ionicons.glyphMap =
+    document.verification_status === "verified"
+      ? "checkmark-circle"
+      : document.verification_status === "pending"
+      ? "time-outline"
+      : "close-circle";
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -195,7 +211,11 @@ export default function DocumentDetailScreen() {
         {/* Header card */}
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.iconContainer}>
-            <Ionicons name="document-text-outline" size={48} color={colors.primary} />
+            <Ionicons
+              name="document-text-outline"
+              size={48}
+              color={colors.primary}
+            />
           </View>
 
           <Text style={[styles.docType, { color: colors.textPrimary }]}>
@@ -212,13 +232,12 @@ export default function DocumentDetailScreen() {
               style={styles.statusIcon}
             />
             <Text style={[styles.statusText, { color: statusColor }]}>
-              {document.verification_status.charAt(0).toUpperCase() +
-                document.verification_status.slice(1)}
+              {statusLabel}
             </Text>
           </View>
         </View>
 
-        {/* ✅ File Name section */}
+        {/* File Name */}
         {document.original_filename && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
@@ -245,65 +264,91 @@ export default function DocumentDetailScreen() {
           </View>
         )}
 
-        {/* Validation */}
+        {/* ✅ Validation Result — with confidence bar and colored status */}
         {document.validation_confidence !== null &&
           document.validation_confidence !== undefined && (
-            <View
-              style={[
-                styles.validationCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
-            >
-              <View style={styles.validationHeader}>
-                <Ionicons
-                  name={
-                    document.validation_confidence >= 50
-                      ? "checkmark-circle"
-                      : "alert-circle"
-                  }
-                  size={20}
-                  color={
-                    document.validation_confidence >= 50
-                      ? colors.success
-                      : colors.warning
-                  }
-                />
-                <Text
-                  style={[styles.validationTitle, { color: colors.textPrimary }]}
-                >
-                  Validation Confidence
-                </Text>
-              </View>
-              <View style={styles.validationRow}>
-                <Text
-                  style={[styles.validationLabel, { color: colors.textSecondary }]}
-                >
-                  Score
-                </Text>
-                <Text
+            <View style={styles.section}>
+              <Text
+                style={[styles.sectionTitle, { color: colors.textPrimary }]}
+              >
+                Validation Result
+              </Text>
+
+              <View
+                style={[
+                  styles.validationCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                ]}
+              >
+                {/* Status badge */}
+                <View
                   style={[
-                    styles.validationScore,
-                    {
-                      color:
-                        document.validation_confidence >= 50
-                          ? colors.success
-                          : colors.warning,
-                    },
+                    styles.validationBadge,
+                    { backgroundColor: `${statusColor}15` },
                   ]}
                 >
-                  {document.validation_confidence}%
-                </Text>
-              </View>
-              {document.validation_message && (
-                <Text
+                  <Ionicons
+                    name={statusIconName}
+                    size={18}
+                    color={statusColor}
+                  />
+                  <Text
+                    style={[
+                      styles.validationBadgeText,
+                      { color: statusColor },
+                    ]}
+                  >
+                    {statusLabel}
+                  </Text>
+                </View>
+
+                {/* Confidence percentage */}
+                <View style={styles.confidenceRow}>
+                  <Text
+                    style={[
+                      styles.confidenceLabel,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    Confidence
+                  </Text>
+                  <Text
+                    style={[styles.confidenceValue, { color: statusColor }]}
+                  >
+                    {confidence}%
+                  </Text>
+                </View>
+
+                {/* Progress bar */}
+                <View
                   style={[
-                    styles.validationMessage,
-                    { color: colors.textSecondary },
+                    styles.confidenceTrack,
+                    { backgroundColor: `${statusColor}20` },
                   ]}
                 >
-                  {document.validation_message}
-                </Text>
-              )}
+                  <View
+                    style={[
+                      styles.confidenceFill,
+                      {
+                        width: `${Math.min(100, Math.max(0, confidence))}%`,
+                        backgroundColor: statusColor,
+                      },
+                    ]}
+                  />
+                </View>
+
+                {/* Validation message from backend */}
+                {document.validation_message ? (
+                  <Text
+                    style={[
+                      styles.validationMessage,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {document.validation_message}
+                  </Text>
+                ) : null}
+              </View>
             </View>
           )}
 
@@ -329,7 +374,7 @@ export default function DocumentDetailScreen() {
           </Text>
         </View>
 
-        {/* OCR text */}
+        {/* ✅ Extracted Text (OCR) with expand/collapse */}
         {document.extracted_text && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
@@ -343,10 +388,33 @@ export default function DocumentDetailScreen() {
             >
               <Text
                 style={[styles.ocrText, { color: colors.textSecondary }]}
-                numberOfLines={10}
+                numberOfLines={showFullOcr ? undefined : 8}
               >
                 {document.extracted_text}
               </Text>
+
+              {document.extracted_text.length > 400 && (
+                <TouchableOpacity
+                  style={styles.showMoreButton}
+                  onPress={() => setShowFullOcr((prev) => !prev)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[styles.showMoreText, { color: colors.primary }]}
+                  >
+                    {showFullOcr ? "Show less" : "Show more"}
+                  </Text>
+                  <Ionicons
+                    name={
+                      showFullOcr
+                        ? "chevron-up-outline"
+                        : "chevron-down-outline"
+                    }
+                    size={16}
+                    color={colors.primary}
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -435,7 +503,7 @@ const styles = StyleSheet.create({
   statusIcon: { marginRight: 6 },
   statusText: { fontSize: 14, fontWeight: "600" },
 
-  // ✅ File name card
+  // File name
   fileNameCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -450,32 +518,67 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
+  // Validation card
   validationCard: {
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
     borderWidth: 1,
   },
-  validationHeader: {
+  validationBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 14,
   },
-  validationTitle: { fontSize: 15, fontWeight: "600" },
-  validationRow: {
+  validationBadgeText: { fontSize: 13, fontWeight: "700" },
+  confidenceRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 6,
   },
-  validationLabel: { fontSize: 13 },
-  validationScore: { fontSize: 18, fontWeight: "700" },
-  validationMessage: { fontSize: 13, marginTop: 6, lineHeight: 18 },
+  confidenceLabel: { fontSize: 13, fontWeight: "500" },
+  confidenceValue: { fontSize: 22, fontWeight: "800" },
+  confidenceTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  confidenceFill: { height: "100%", borderRadius: 4 },
+  validationMessage: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+
   section: { marginBottom: 16 },
   sectionTitle: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
   sectionText: { fontSize: 14, lineHeight: 20 },
-  ocrCard: { padding: 14, borderRadius: 12, borderWidth: 1 },
+
+  // OCR card
+  ocrCard: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
   ocrText: { fontSize: 13, lineHeight: 20 },
+  showMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: "rgba(0,0,0,0.05)",
+  },
+  showMoreText: { fontSize: 13, fontWeight: "600" },
+
+  // Open document button
   previewButton: {
     flexDirection: "row",
     paddingVertical: 16,

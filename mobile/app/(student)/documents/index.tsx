@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import {
   FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -25,7 +26,7 @@ interface Document {
   id: string;
   type: string;
   description: string;
-  original_filename?: string;      // ✅ NEW
+  original_filename?: string;
   verification_status: string;
   created_at: string;
   file_path?: string;
@@ -33,12 +34,54 @@ interface Document {
   validation_message?: string;
 }
 
+// ✅ Per-type icons
+const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  resume: "person-outline",
+  application_letter: "mail-outline",
+  waiver: "document-text-outline",
+  medical_certificate: "medkit-outline",
+  internship_plan: "clipboard-outline",
+  insurance: "shield-checkmark-outline",
+  endorsement_letter: "ribbon-outline",
+  acceptance_letter: "checkmark-done-outline",
+  certificate_of_completion: "trophy-outline",
+  requirements: "list-outline",
+  document: "document-outline",
+  transcript: "school-outline",
+  user_id: "card-outline",
+};
+
+// ✅ Three-tier status: All / Verified / Pending / Rejected
+const FILTERS = [
+  { value: "all", label: "All" },
+  { value: "verified", label: "Verified" },
+  { value: "pending", label: "Pending" },
+  { value: "rejected", label: "Rejected" },
+];
+
+// ✅ Status → color mapping
+const STATUS_COLORS = {
+  verified: "#10B981", // green
+  pending: "#F59E0B",  // amber
+  rejected: "#EF4444", // red
+};
+
+// ✅ Robust date parser — handles ISO strings, with/without timezone
+const parseDate = (value?: string | null): number => {
+  if (!value) return 0;
+  // Fix the common case where backend returns a datetime without timezone
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const t = new Date(normalized).getTime();
+  return isNaN(t) ? 0 : t;
+};
+
 export default function DocumentsScreen() {
   const { colors, isDark } = useTheme();
   const { handleScroll } = useAutoHideTab();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<string>("all");
 
   const fetchDocuments = async () => {
     try {
@@ -61,15 +104,19 @@ export default function DocumentsScreen() {
     fetchDocuments();
   };
 
+  // ✅ Sort newest first (top) → oldest last (bottom)
+  //    Then apply the status filter on top of the sorted list.
+  const sortedDocuments = [...documents].sort(
+    (a, b) => parseDate(b.created_at) - parseDate(a.created_at)
+  );
+
+  const filteredDocuments =
+    selectedFilter === "all"
+      ? sortedDocuments
+      : sortedDocuments.filter((d) => d.verification_status === selectedFilter);
+
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "verified":
-        return colors.success;
-      case "rejected":
-        return colors.error;
-      default:
-        return colors.warning;
-    }
+    return STATUS_COLORS[status as keyof typeof STATUS_COLORS] || "#F59E0B";
   };
 
   const getStatusIcon = (status: string): keyof typeof Ionicons.glyphMap => {
@@ -78,12 +125,16 @@ export default function DocumentsScreen() {
         return "checkmark-circle-outline";
       case "rejected":
         return "close-circle-outline";
+      case "pending":
       default:
         return "time-outline";
     }
   };
 
-  // ✅ Open the document externally with the JWT in the query string
+  const getTypeIcon = (type: string): keyof typeof Ionicons.glyphMap => {
+    return TYPE_ICONS[type.toLowerCase()] || "document-text-outline";
+  };
+
   const handlePreview = async (document: Document) => {
     try {
       const token = await SecureStore.getItemAsync("access_token");
@@ -131,10 +182,16 @@ export default function DocumentsScreen() {
   const renderDocument = ({ item }: { item: Document }) => {
     const statusColor = getStatusColor(item.verification_status);
     const displayName = item.type.replace(/_/g, " ").toUpperCase();
+    const subtitle = item.original_filename || item.description || null;
+    const typeIcon = getTypeIcon(item.type);
 
-    // Prefer the original filename, then description, then nothing
-    const subtitle =
-      item.original_filename || item.description || null;
+    // Confidence badge color reflects status
+    const confidenceColor =
+      item.verification_status === "verified"
+        ? colors.success
+        : item.verification_status === "rejected"
+        ? colors.error
+        : colors.warning;
 
     return (
       <TouchableOpacity
@@ -148,11 +205,7 @@ export default function DocumentsScreen() {
             { backgroundColor: `${colors.primary}10` },
           ]}
         >
-          <Ionicons
-            name="document-text-outline"
-            size={28}
-            color={colors.primary}
-          />
+          <Ionicons name={typeIcon} size={24} color={colors.primary} />
         </View>
 
         <View style={styles.documentInfo}>
@@ -207,24 +260,81 @@ export default function DocumentsScreen() {
               <View
                 style={[
                   styles.confidenceBadge,
-                  { backgroundColor: `${statusColor}15` },
+                  { backgroundColor: `${confidenceColor}15` },
                 ]}
               >
                 <Ionicons
                   name={
-                    item.validation_confidence >= 50
+                    item.verification_status === "verified"
                       ? "checkmark-circle"
+                      : item.verification_status === "rejected"
+                      ? "close-circle"
                       : "alert-circle"
                   }
                   size={10}
-                  color={statusColor}
+                  color={confidenceColor}
                 />
-                <Text style={[styles.confidenceText, { color: statusColor }]}>
+                <Text
+                  style={[styles.confidenceText, { color: confidenceColor }]}
+                >
                   {item.validation_confidence}%
                 </Text>
               </View>
             )}
         </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderFilterChip = (filter: { value: string; label: string }) => {
+    const isActive = selectedFilter === filter.value;
+    const count =
+      filter.value === "all"
+        ? documents.length
+        : documents.filter((d) => d.verification_status === filter.value).length;
+
+    return (
+      <TouchableOpacity
+        key={filter.value}
+        style={[
+          styles.filterChip,
+          {
+            backgroundColor: isActive ? colors.primary : colors.card,
+            borderColor: isActive ? colors.primary : colors.border,
+          },
+        ]}
+        onPress={() => setSelectedFilter(filter.value)}
+        activeOpacity={0.7}
+      >
+        <Text
+          style={[
+            styles.filterChipText,
+            { color: isActive ? "#FFFFFF" : colors.textSecondary },
+          ]}
+        >
+          {filter.label}
+        </Text>
+        {filter.value !== "all" && count > 0 && (
+          <View
+            style={[
+              styles.filterCountBadge,
+              {
+                backgroundColor: isActive
+                  ? "rgba(255,255,255,0.25)"
+                  : `${colors.primary}15`,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterCountText,
+                { color: isActive ? "#FFFFFF" : colors.primary },
+              ]}
+            >
+              {count}
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -248,8 +358,21 @@ export default function DocumentsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Filter chips */}
+      {documents.length > 0 && (
+        <View style={styles.filtersWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersContainer}
+          >
+            {FILTERS.map(renderFilterChip)}
+          </ScrollView>
+        </View>
+      )}
+
       <FlatList
-        data={documents}
+        data={filteredDocuments}
         renderItem={renderDocument}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -270,17 +393,26 @@ export default function DocumentsScreen() {
               color={colors.border}
             />
             <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-              No Documents
+              {selectedFilter === "all"
+                ? "No Documents"
+                : `No ${selectedFilter} Documents`}
             </Text>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Upload your internship documents to get started
+              {selectedFilter === "all"
+                ? "Upload your internship documents to get started"
+                : `Try a different filter or upload a new document`}
             </Text>
-            <TouchableOpacity
-              style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-              onPress={() => router.push("/(student)/documents/upload")}
-            >
-              <Text style={styles.emptyButtonText}>Upload Now</Text>
-            </TouchableOpacity>
+            {selectedFilter === "all" && (
+              <TouchableOpacity
+                style={[
+                  styles.emptyButton,
+                  { backgroundColor: colors.primary },
+                ]}
+                onPress={() => router.push("/(student)/documents/upload")}
+              >
+                <Text style={styles.emptyButtonText}>Upload Now</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
         ListFooterComponent={<View style={styles.listFooter} />}
@@ -301,6 +433,40 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 20, fontWeight: "700" },
   uploadButton: { padding: 4 },
+
+  filtersWrapper: {
+    paddingBottom: 12,
+  },
+  filtersContainer: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  filterCountBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterCountText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 10,

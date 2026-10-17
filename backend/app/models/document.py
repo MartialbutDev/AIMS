@@ -15,15 +15,23 @@ from app.core.database import Base
 
 
 class DocumentType(str, PyEnum):
-    # Types uploaded from the mobile app
+    # ── Student applications ──
     RESUME = "resume"
     APPLICATION_LETTER = "application_letter"
+
+    # ── Pre-deployment / CHED-required ──
+    WAIVER = "waiver"
+    MEDICAL_CERTIFICATE = "medical_certificate"
+    INTERNSHIP_PLAN = "internship_plan"
+    INSURANCE = "insurance"
     ENDORSEMENT_LETTER = "endorsement_letter"
+
+    # ── Post-selection / completion ──
     ACCEPTANCE_LETTER = "acceptance_letter"
     CERTIFICATE_OF_COMPLETION = "certificate_of_completion"
-    REQUIREMENTS = "requirements"
 
-    # Legacy / misc types kept for backward compatibility
+    # ── Misc / flexible ──
+    REQUIREMENTS = "requirements"
     DOCUMENT = "document"
     TRANSCRIPT = "transcript"
     USER_ID = "user_id"
@@ -41,8 +49,7 @@ class Document(Base):
 
     description = Column(String(500), nullable=True)
 
-    # ✅ NEW — original filename as uploaded by the student
-    # (e.g. "my_resume_v2.pdf"). Used for download headers + display.
+    # Original filename as uploaded by the student
     original_filename = Column(String(500), nullable=True)
 
     file_path = Column(String(255), nullable=False)

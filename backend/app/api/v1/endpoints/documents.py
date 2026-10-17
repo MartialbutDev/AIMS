@@ -10,13 +10,17 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.document import Document
 from app.services.document_service import DocumentService
-from app.schemas.document import DocumentResponse
+from app.schemas.document import DocumentResponse, DocumentUploadResponse
 from app.core.config import settings
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
-@router.post("/upload", response_model=dict)
+# ------------------------------------------------------------------
+# Upload — now returns DocumentUploadResponse so `document.id` is real
+# ------------------------------------------------------------------
+
+@router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
     document_type: str = Form(...),
@@ -26,11 +30,20 @@ async def upload_document(
 ):
     """Upload and validate a document."""
     valid_types = [
+        # Application docs
         "resume",
         "application_letter",
+
+        # Pre-deployment / CHED-required
+        "waiver",
+        "medical_certificate",
+        "internship_plan",
+        "insurance",
         "endorsement_letter",
-        "certificate_of_completion",
+
+        # Post-selection
         "acceptance_letter",
+        "certificate_of_completion",
         "requirements",
     ]
 
@@ -54,6 +67,10 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
+# ------------------------------------------------------------------
+# List current user's documents
+# ------------------------------------------------------------------
+
 @router.get("/", response_model=List[DocumentResponse])
 async def get_user_documents(
     db: Session = Depends(get_db),
@@ -68,6 +85,10 @@ async def get_user_documents(
     )
     return documents
 
+
+# ------------------------------------------------------------------
+# Single document
+# ------------------------------------------------------------------
 
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
@@ -90,6 +111,10 @@ async def get_document(
 
     return document
 
+
+# ------------------------------------------------------------------
+# Serve the file with the student's original filename
+# ------------------------------------------------------------------
 
 @router.get("/{document_id}/image")
 async def get_document_image(
@@ -131,11 +156,9 @@ async def get_document_image(
 
     media_type = media_types.get(ext, "application/octet-stream")
 
-    # ✅ Prefer the original filename the student uploaded
     fallback_name = os.path.basename(file_path)
     display_name = document.original_filename or fallback_name
 
-    # Sanitize header value
     safe_name = (
         display_name.replace('"', "")
         .replace("\n", "")
@@ -143,7 +166,6 @@ async def get_document_image(
         .strip()
     )
 
-    # Make sure the extension matches the real file
     if safe_name and not safe_name.lower().endswith(ext):
         safe_name = f"{os.path.splitext(safe_name)[0]}{ext}"
 
