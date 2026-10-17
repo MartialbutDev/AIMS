@@ -1,18 +1,208 @@
 # backend/app/api/v1/endpoints/users.py
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session
+import csv
+import io
+import uuid
 from typing import List
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 import os
 import shutil
 from datetime import datetime
+from sqlalchemy import func
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_role
+from app.core.security import get_current_user, get_password_hash, require_role
 from app.models.user import User, UserRole
-from app.schemas.user import UserResponse, UserUpdate
+from app.schemas.user import (
+    AdminUserCreate,
+    UserImportResponse,
+    UserResponse,
+    UserUpdate,
+)
 from app.core.config import settings
 
 router = APIRouter()
+
+MAX_CSV_BYTES = 2 * 1024 * 1024
+MAX_CSV_ROWS = 500
+CSV_REQUIRED_COLUMNS = {"email", "first_name", "last_name", "role", "password"}
+
+
+def _create_managed_user(user_data: AdminUserCreate) -> User:
+    return User(
+        id=str(uuid.uuid4()),
+        email=str(user_data.email),
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        phone=user_data.phone,
+        hashed_password=get_password_hash(user_data.password),
+        role=UserRole(user_data.role.value),
+        is_active=True,
+        is_verified=True,
+    )
+
+
+def _parse_managed_user_csv(content: bytes) -> List[AdminUserCreate]:
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CSV must be UTF-8 encoded.",
+        ) from exc
+
+    reader = csv.DictReader(io.StringIO(text, newline=""))
+    if not reader.fieldnames:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CSV must include a header row.",
+        )
+
+    headers = {header.strip().lower() for header in reader.fieldnames if header}
+    missing_columns = sorted(CSV_REQUIRED_COLUMNS - headers)
+    if missing_columns:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Missing required CSV columns: {', '.join(missing_columns)}",
+        )
+
+    users = []
+    errors = []
+    seen_emails = set()
+    for row_number, raw_row in enumerate(reader, start=2):
+        if row_number > MAX_CSV_ROWS + 1:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"CSV cannot contain more than {MAX_CSV_ROWS} users.",
+            )
+        if None in raw_row:
+            errors.append(f"Row {row_number}: contains more values than the header.")
+            continue
+
+        row = {
+            (key or "").strip().lower(): (value or "").strip()
+            for key, value in raw_row.items()
+        }
+        if not any(row.values()):
+            continue
+
+        if row.get("role", "").lower() == "company":
+            row["role"] = UserRole.HTE_SUPERVISOR.value
+
+        try:
+            user_data = AdminUserCreate.model_validate(row)
+        except ValidationError as exc:
+            messages = "; ".join(
+                f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+                for error in exc.errors()
+            )
+            errors.append(f"Row {row_number}: {messages}")
+            continue
+
+        normalized_email = str(user_data.email).lower()
+        if normalized_email in seen_emails:
+            errors.append(f"Row {row_number}: duplicate email in CSV.")
+            continue
+        seen_emails.add(normalized_email)
+        users.append(user_data)
+
+    if not users and not errors:
+        errors.append("CSV contains no user rows.")
+    if errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=errors,
+        )
+    return users
+
+
+@router.post(
+    "/managed",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_managed_user(
+    user_data: AdminUserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    """Create a non-student account. The role is assigned by an administrator."""
+    existing_user = db.query(User).filter(
+        func.lower(User.email) == str(user_data.email).lower()
+    ).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered.",
+        )
+
+    user = _create_managed_user(user_data)
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered.",
+        ) from exc
+    db.refresh(user)
+    return user
+
+
+@router.post(
+    "/import-csv",
+    response_model=UserImportResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_managed_users_csv(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    """Import non-student accounts atomically from an administrator-uploaded CSV."""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Upload a .csv file.",
+        )
+
+    content = await file.read(MAX_CSV_BYTES + 1)
+    if len(content) > MAX_CSV_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="CSV file cannot exceed 2 MB.",
+        )
+
+    user_data_rows = _parse_managed_user_csv(content)
+    emails = [str(user_data.email).lower() for user_data in user_data_rows]
+    existing_emails = {
+        email.lower()
+        for (email,) in db.query(User.email).filter(func.lower(User.email).in_(emails)).all()
+    }
+    duplicates = sorted(existing_emails)
+    if duplicates:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Email already registered: {', '.join(duplicates)}",
+        )
+
+    users = [_create_managed_user(user_data) for user_data in user_data_rows]
+    db.add_all(users)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="One or more email addresses are already registered.",
+        ) from exc
+    for user in users:
+        db.refresh(user)
+    return UserImportResponse(created_count=len(users), users=users)
 
 
 @router.get("/", response_model=List[UserResponse])
