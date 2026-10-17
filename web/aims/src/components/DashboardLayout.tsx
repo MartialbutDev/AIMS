@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Brand } from './Brand'
 import { AdminUserDialog, AdminWorkspace } from './AdminWorkspace'
+import { CoordinatorWorkspace } from './CoordinatorWorkspace'
 import { Icon } from './Icons'
 import { roleLabels } from '../types/auth'
 import type { UserSession } from '../types/auth'
@@ -29,6 +30,13 @@ const adminNavItems = [
   { label: 'Users', icon: 'users' as const },
   { label: 'Notifications', icon: 'bell' as const },
   { label: 'Developer info', icon: 'file' as const },
+]
+
+const coordinatorNavItems = [
+  { label: 'Overview', icon: 'grid' as const },
+  { label: 'Students', icon: 'users' as const },
+  { label: 'Applications', icon: 'file' as const },
+  { label: 'Notifications', icon: 'bell' as const },
 ]
 
 function MetricCard({ metric }: { metric: DashboardMetric }) {
@@ -64,7 +72,11 @@ export function DashboardLayout({ session, data, onLogout }: DashboardLayoutProp
   const [isAddingUser, setIsAddingUser] = useState(false)
   const [addUserError, setAddUserError] = useState('')
   const [toastMessage, setToastMessage] = useState('')
-  const navItems = session.role === 'admin' ? adminNavItems : standardNavItems
+  const navItems = session.role === 'admin'
+    ? adminNavItems
+    : session.role === 'coordinator'
+      ? coordinatorNavItems
+      : standardNavItems
   const firstName = session.name
   const chartMaximum = Math.max(...data.chartValues, 0)
 
@@ -157,6 +169,8 @@ export function DashboardLayout({ session, data, onLogout }: DashboardLayoutProp
               usersLoading={isLoadingUsers}
               usersError={usersError}
             />
+          ) : session.role === 'coordinator' && activeNav === 'Students' ? (
+            <CoordinatorWorkspace />
           ) : activeNav === 'Notifications' ? (
             <AdminWorkspace section="Notifications" users={users} onAddUser={() => setIsAddUserOpen(true)} />
           ) : activeNav === 'Applications' ? (
