@@ -56,3 +56,14 @@ export async function apiRequest<T>(
 
   return response.json() as Promise<T>
 }
+
+export async function apiRequestBlob(path: string): Promise<Blob> {
+  const headers = new Headers()
+  const token = getAccessToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers })
+  if (!response.ok) {
+    throw new Error(`Could not load file (${response.status}): ${response.statusText}`)
+  }
+  return response.blob()
+}

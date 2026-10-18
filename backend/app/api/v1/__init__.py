@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, users, companies, applications, dtr, journals, notifications, reports, excel, notification_settings, analytics
+from app.api.v1.endpoints import auth, users, companies, applications, dtr, journals, notifications, reports, excel, notification_settings, analytics, coordinator
 from app.routers.documents import documents_router
 
 # Debug: Print all routes from each router
@@ -13,6 +13,7 @@ router = APIRouter()
 
 router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
+router.include_router(coordinator.router, prefix="/coordinator", tags=["Coordinator"])
 router.include_router(users.router, prefix="/users", tags=["Users"])  # ✅ Contains avatar endpoints
 router.include_router(companies.router, prefix="/companies", tags=["Companies"])
 router.include_router(applications.router, prefix="/applications", tags=["Applications"])

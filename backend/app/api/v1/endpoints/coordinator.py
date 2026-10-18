@@ -1,0 +1,338 @@
+import math
+import mimetypes
+import os
+from datetime import date
+from decimal import Decimal
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.security import get_current_user, require_role
+from app.models.application import Application
+from app.models.company import Company
+from app.models.coordinator_evaluation import CoordinatorEvaluation
+from app.models.document import Document, DocumentType
+from app.models.dtr import DTR, DTRStatus
+from app.models.journal import Journal
+from app.models.user import User, UserRole
+
+router = APIRouter()
+
+REQUIRED_DOCUMENT_TYPES = (
+    DocumentType.RESUME,
+    DocumentType.APPLICATION_LETTER,
+    DocumentType.WAIVER,
+    DocumentType.MEDICAL_CERTIFICATE,
+    DocumentType.INTERNSHIP_PLAN,
+    DocumentType.INSURANCE,
+    DocumentType.ENDORSEMENT_LETTER,
+    DocumentType.ACCEPTANCE_LETTER,
+    DocumentType.CERTIFICATE_OF_COMPLETION,
+)
+
+
+class EvaluationInput(BaseModel):
+    grade: Decimal = Field(ge=Decimal("1.00"), le=Decimal("5.00"), max_digits=3, decimal_places=2)
+    notes: Optional[str] = Field(default=None, max_length=5000)
+
+
+def _hours_summary(records: list[DTR]) -> dict:
+    approved = [entry for entry in records if entry.status == DTRStatus.APPROVED]
+    total_hours = round(sum(entry.total_hours or 0 for entry in approved), 2)
+    required_hours = settings.REQUIRED_INTERNSHIP_HOURS
+    remaining_hours = round(max(0, required_hours - total_hours), 2)
+    progress = min(100, round(total_hours / required_hours * 100)) if required_hours else 0
+    daily_hours: dict[date, float] = {}
+    for entry in approved:
+        if entry.total_hours and entry.total_hours > 0:
+            daily_hours[entry.date.date()] = daily_hours.get(entry.date.date(), 0) + entry.total_hours
+    average_daily_hours = (
+        sum(daily_hours.values()) / len(daily_hours)
+        if daily_hours else None
+    )
+    days_left = (
+        math.ceil(remaining_hours / average_daily_hours)
+        if remaining_hours and average_daily_hours else 0 if not remaining_hours else None
+    )
+    return {
+        "required_hours": required_hours,
+        "approved_hours": total_hours,
+        "remaining_hours": remaining_hours,
+        "progress_percent": progress,
+        "remaining_percent": 100 - progress,
+        "average_approved_hours_per_day": round(average_daily_hours, 2) if average_daily_hours else None,
+        "estimated_days_left": days_left,
+        "approved_dtr_count": len(approved),
+        "pending_dtr_count": sum(entry.status in (DTRStatus.PENDING, DTRStatus.SUBMITTED) for entry in records),
+        "rejected_dtr_count": sum(entry.status == DTRStatus.REJECTED for entry in records),
+    }
+
+
+def _file_response(relative_path: Optional[str], filename: Optional[str]) -> FileResponse:
+    if not relative_path:
+        raise HTTPException(status_code=404, detail="File is not available")
+    asset_root = os.path.realpath(settings.ASSET_DIR)
+    file_path = os.path.realpath(os.path.join(asset_root, relative_path))
+    if os.path.commonpath((asset_root, file_path)) != asset_root or not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="File is not available")
+    return FileResponse(
+        file_path,
+        media_type=mimetypes.guess_type(file_path)[0] or "application/octet-stream",
+        filename=filename or os.path.basename(file_path),
+        content_disposition_type="inline",
+    )
+
+
+@router.get("/students")
+async def list_students(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=500),
+    search: Optional[str] = Query(None, max_length=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    """List system students and their document, application, and OJT progress."""
+    query = db.query(User).filter(User.role == UserRole.STUDENT)
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        query = query.filter(
+            (User.first_name.ilike(term))
+            | (User.last_name.ilike(term))
+            | (User.email.ilike(term))
+            | (User.student_id.ilike(term))
+        )
+    total = query.count()
+    students = query.order_by(User.last_name, User.first_name).offset((page - 1) * limit).limit(limit).all()
+    student_ids = [student.id for student in students]
+    if not student_ids:
+        return {"items": [], "total": total, "page": page, "limit": limit, "total_pages": 0}
+
+    documents = db.query(Document).filter(Document.uploaded_by.in_(student_ids)).order_by(Document.created_at.desc()).all()
+    dtrs = db.query(DTR).filter(DTR.student_id.in_(student_ids)).all()
+    applications = db.query(Application).filter(Application.student_id.in_(student_ids)).all()
+    evaluations = db.query(CoordinatorEvaluation).filter(
+        CoordinatorEvaluation.coordinator_id == current_user.id,
+        CoordinatorEvaluation.student_id.in_(student_ids),
+    ).all()
+
+    docs_by_student: dict[str, list[Document]] = {}
+    dtrs_by_student: dict[str, list[DTR]] = {}
+    apps_by_student: dict[str, list[Application]] = {}
+    evaluations_by_student = {evaluation.student_id: evaluation for evaluation in evaluations}
+    for doc in documents:
+        docs_by_student.setdefault(doc.uploaded_by, []).append(doc)
+    for dtr in dtrs:
+        dtrs_by_student.setdefault(dtr.student_id, []).append(dtr)
+    for application in applications:
+        apps_by_student.setdefault(application.student_id, []).append(application)
+
+    items = []
+    for student in students:
+        student_documents = docs_by_student.get(student.id, [])
+        latest_documents: dict[str, Document] = {}
+        for document in student_documents:
+            latest_documents.setdefault(document.type.value, document)
+        document_statuses = [
+            {
+                "type": document_type.value,
+                "status": latest_documents[document_type.value].verification_status
+                if document_type.value in latest_documents else "missing",
+            }
+            for document_type in REQUIRED_DOCUMENT_TYPES
+        ]
+        verified_count = sum(item["status"] == "verified" for item in document_statuses)
+        student_applications = apps_by_student.get(student.id, [])
+        items.append({
+            "id": student.id,
+            "student_id": student.student_id,
+            "first_name": student.first_name,
+            "last_name": student.last_name,
+            "email": student.email,
+            "phone": student.phone,
+            "is_active": student.is_active,
+            "documents_verified": verified_count,
+            "documents_required": len(REQUIRED_DOCUMENT_TYPES),
+            "documents_progress_percent": round(verified_count / len(REQUIRED_DOCUMENT_TYPES) * 100),
+            "application_count": len(student_applications),
+            "application_statuses": {
+                status: sum(application.status.value == status for application in student_applications)
+                for status in ("pending", "reviewing", "interview", "accepted", "rejected", "withdrawn")
+            },
+            "journey": _hours_summary(dtrs_by_student.get(student.id, [])),
+            "grade": float(evaluations_by_student[student.id].grade) if student.id in evaluations_by_student else None,
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": math.ceil(total / limit) if limit else 0,
+    }
+
+
+@router.get("/students/{student_id}")
+async def get_student_detail(
+    student_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    student = db.query(User).filter(User.id == student_id, User.role == UserRole.STUDENT).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    documents = db.query(Document).filter(Document.uploaded_by == student.id).order_by(Document.created_at.desc()).all()
+    dtrs = db.query(DTR).filter(DTR.student_id == student.id).order_by(DTR.date.desc()).all()
+    application_rows = (
+        db.query(Application, Company.name)
+        .outerjoin(Company, Company.id == Application.company_id)
+        .filter(Application.student_id == student.id)
+        .order_by(Application.applied_date.desc())
+        .all()
+    )
+    journals = db.query(Journal).filter(Journal.student_id == student.id).order_by(Journal.week.desc()).all()
+    evaluation = db.query(CoordinatorEvaluation).filter(
+        CoordinatorEvaluation.coordinator_id == current_user.id,
+        CoordinatorEvaluation.student_id == student.id,
+    ).first()
+    latest_documents: dict[str, Document] = {}
+    for document in documents:
+        latest_documents.setdefault(document.type.value, document)
+
+    return {
+        "student": {
+            "id": student.id,
+            "student_id": student.student_id,
+            "first_name": student.first_name,
+            "last_name": student.last_name,
+            "email": student.email,
+            "phone": student.phone,
+            "is_active": student.is_active,
+        },
+        "journey": _hours_summary(dtrs),
+        "document_statuses": [
+            {
+                "type": document_type.value,
+                "status": latest_documents[document_type.value].verification_status
+                if document_type.value in latest_documents else "missing",
+            }
+            for document_type in REQUIRED_DOCUMENT_TYPES
+        ],
+        "documents": [
+            {
+                "id": document.id,
+                "type": document.type.value,
+                "filename": document.original_filename,
+                "status": document.verification_status,
+                "created_at": document.created_at,
+            }
+            for document in documents
+        ],
+        "applications": [
+            {
+                "id": application.id,
+                "position": application.position,
+                "company": company_name,
+                "status": application.status.value,
+                "applied_date": application.applied_date,
+            }
+            for application, company_name in application_rows
+        ],
+        "dtr_records": [
+            {
+                "id": entry.id,
+                "date": entry.date,
+                "time_in": entry.time_in,
+                "time_out": entry.time_out,
+                "total_hours": entry.total_hours,
+                "status": entry.status.value,
+                "tasks_completed": entry.tasks_completed,
+                "notes": entry.notes,
+                "image_in_available": bool(entry.image_in_path),
+                "image_out_available": bool(entry.image_out_path),
+            }
+            for entry in dtrs
+        ],
+        "journals": [
+            {
+                "id": journal.id,
+                "week": journal.week,
+                "title": journal.title,
+                "status": journal.status.value,
+                "summary": journal.summary,
+            }
+            for journal in journals
+        ],
+        "evaluation": {
+            "grade": float(evaluation.grade),
+            "notes": evaluation.notes,
+            "updated_at": evaluation.updated_at,
+        } if evaluation else None,
+    }
+
+
+@router.put("/students/{student_id}/evaluation")
+async def save_student_evaluation(
+    student_id: str,
+    evaluation_data: EvaluationInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    student = db.query(User).filter(User.id == student_id, User.role == UserRole.STUDENT).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    evaluation = db.query(CoordinatorEvaluation).filter(
+        CoordinatorEvaluation.coordinator_id == current_user.id,
+        CoordinatorEvaluation.student_id == student.id,
+    ).first()
+    if evaluation is None:
+        evaluation = CoordinatorEvaluation(
+            coordinator_id=current_user.id,
+            student_id=student.id,
+            grade=evaluation_data.grade,
+            notes=evaluation_data.notes,
+        )
+        db.add(evaluation)
+    else:
+        evaluation.grade = evaluation_data.grade
+        evaluation.notes = evaluation_data.notes
+    db.commit()
+    db.refresh(evaluation)
+    return {"grade": float(evaluation.grade), "notes": evaluation.notes, "updated_at": evaluation.updated_at}
+
+
+@router.get("/students/{student_id}/documents/{document_id}/file")
+async def get_student_document_file(
+    student_id: str,
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.uploaded_by == student_id,
+    ).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return _file_response(document.file_path, document.original_filename)
+
+
+@router.get("/students/{student_id}/dtr/{dtr_id}/photo/{photo_type}")
+async def get_student_dtr_photo(
+    student_id: str,
+    dtr_id: str,
+    photo_type: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    if photo_type not in {"in", "out"}:
+        raise HTTPException(status_code=400, detail="Photo type must be 'in' or 'out'")
+    entry = db.query(DTR).filter(DTR.id == dtr_id, DTR.student_id == student_id).first()
+    if not entry:
+        raise HTTPException(status_code=404, detail="DTR entry not found")
+    relative_path = entry.image_in_path if photo_type == "in" else entry.image_out_path
+    return _file_response(relative_path, os.path.basename(relative_path or ""))
