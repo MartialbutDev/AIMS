@@ -1,15 +1,56 @@
 import os
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect, text
 import uvicorn
 
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.api.v1 import router as api_v1_router
+from app.services.notification_scheduler import run_notification_scheduler
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+# Additive migration for existing databases created before student gender capture.
+if "gender" not in {column["name"] for column in inspect(engine).get_columns("users")}:
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE users ADD COLUMN gender VARCHAR(24)"))
+
+# Keep the existing PostgreSQL document enum compatible with current document types.
+if engine.dialect.name == "postgresql":
+    with engine.begin() as connection:
+        for enum_type, enum_values in {
+            "documenttype": (
+                "WAIVER",
+                "MEDICAL_CERTIFICATE",
+                "INTERNSHIP_PLAN",
+                "INSURANCE",
+            ),
+            "notificationtype": ("ANNOUNCEMENT",),
+        }.items():
+            for enum_value in enum_values:
+                connection.execute(
+                    text(
+                        f"ALTER TYPE {enum_type} ADD VALUE IF NOT EXISTS '{enum_value}'"
+                    )
+                )
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler_task = asyncio.create_task(run_notification_scheduler())
+    try:
+        yield
+    finally:
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -18,6 +59,7 @@ app = FastAPI(
     description="Academic Internship Management System API",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
+    lifespan=lifespan,
 )
 
 # CORS

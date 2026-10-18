@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'r
 import { Icon } from './Icons'
 import { roleLabels } from '../types/auth'
 import { getNotifications, markAllNotificationsRead } from '../services/notificationService'
+import { AdminNotificationWorkspace } from './AdminNotificationWorkspace'
 import type {
   AdminUser,
   AdminUserRole,
@@ -21,23 +22,23 @@ const adminRoleLabels: Record<AdminUserRole, string> = {
 interface AdminWorkspaceProps {
   section: string
   users: AdminUser[]
+  usersLoading?: boolean
+  usersError?: string
   onAddUser: () => void
   onUploadUsers?: (file: File) => Promise<void>
   isUploadingUsers?: boolean
   uploadUsersError?: string
-  usersLoading?: boolean
-  usersError?: string
 }
 
 export function AdminWorkspace({
   section,
   users,
+  usersLoading = false,
+  usersError = '',
   onAddUser,
   onUploadUsers,
   isUploadingUsers = false,
   uploadUsersError = '',
-  usersLoading = false,
-  usersError = '',
 }: AdminWorkspaceProps) {
   const csvInput = useRef<HTMLInputElement>(null)
 
@@ -66,6 +67,15 @@ export function AdminWorkspace({
           <p className="csv-import-note">CSV headers: <code>email,first_name,last_name,role,password</code> (optional: <code>phone</code>). Student accounts must use student signup. Passwords are hashed by the backend; use HTTPS in production.</p>
         </div>
       </section>
+    )
+  }
+
+  if (section === 'Manage notifications') {
+    return (
+      <>
+        <AdminNotificationWorkspace users={users} usersLoading={usersLoading} usersError={usersError} />
+        <NotificationsWorkspace heading="Your inbox" />
+      </>
     )
   }
 
@@ -110,7 +120,7 @@ export function AdminUserDialog({ isSaving, error, onClose, onCreate }: AdminUse
   )
 }
 
-function NotificationsWorkspace() {
+function NotificationsWorkspace({ heading = 'Notifications' }: { heading?: string } = {}) {
   const [notifications, setNotifications] = useState<UserNotification[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -151,11 +161,13 @@ function NotificationsWorkspace() {
 
   return (
     <section className="workspace-page">
-      <div className="workspace-page-heading"><div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> UPDATES</span><h1>Notifications</h1><p>Important activity and system updates for your workspace.</p></div><button className="outline-button" onClick={() => void markAllRead()} disabled={isMarkingRead || notifications.length === 0 || notifications.every((item) => item.isRead)}>Mark all as read</button></div>
+      <div className="workspace-page-heading"><div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> UPDATES</span><h1>{heading}</h1><p>Important activity and system updates for your workspace.</p></div><button className="outline-button" onClick={() => void markAllRead()} disabled={isMarkingRead || notifications.length === 0 || notifications.every((item) => item.isRead)}>Mark all as read</button></div>
       {error && <p className="form-error user-import-error" role="alert">{error}</p>}
       <div className="panel notification-panel">{isLoading ? <p className="empty-state">Loading notifications…</p> : notifications.length === 0 ? <p className="empty-state">No notifications found.</p> : notifications.map((notification) => {
         const tone = notification.type === 'application' ? 'blue' : notification.type === 'system' ? 'green' : 'amber'
-        return <article className={`notification-row${notification.isRead ? ' notification-row--read' : ''}`} key={notification.id}><span className={`notification-icon notification-icon--${tone}`}><Icon name={notification.type === 'system' ? 'check' : 'bell'} size={17} /></span><div className="notification-copy"><strong>{notification.title}</strong><p>{notification.message}</p><time>{formatCreatedAt(notification.createdAt)}</time></div>{!notification.isRead && <span className="unread-dot" aria-label="Unread" />}</article>
+        const deadline = notification.data?.deadline_at
+        const deadlineText = typeof deadline === 'string' ? formatCreatedAt(deadline) : null
+        return <article className={`notification-row${notification.isRead ? ' notification-row--read' : ''}`} key={notification.id}><span className={`notification-icon notification-icon--${tone}`}><Icon name={notification.type === 'system' ? 'check' : 'bell'} size={17} /></span><div className="notification-copy"><strong>{notification.title}</strong><p>{notification.message}</p>{deadlineText && <p className="notification-deadline">Deadline: {deadlineText}</p>}<time>{formatCreatedAt(notification.createdAt)}</time></div>{!notification.isRead && <span className="unread-dot" aria-label="Unread" />}</article>
       })}</div>
     </section>
   )
@@ -178,6 +190,7 @@ function DeveloperInfoWorkspace() {
     ['Import user CSV (admin)', 'POST /api/v1/users/import-csv'],
     ['Users directory (admin)', 'GET /api/v1/users/'],
     ['Notifications', 'GET /api/v1/notifications/'],
+    ['Create / list / cancel admin notification campaigns', 'POST/GET/DELETE /api/v1/notifications/admin/campaigns'],
     ['Role-aware dashboard data', 'GET /api/v1/analytics/dashboard'],
   ]
 

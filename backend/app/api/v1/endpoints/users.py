@@ -5,7 +5,7 @@ import uuid
 from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 import os
@@ -15,6 +15,7 @@ from sqlalchemy import func
 
 from app.core.database import get_db
 from app.core.security import get_current_user, get_password_hash, require_role
+from app.models.coordinator_assignment import CoordinatorStudentAssignment
 from app.models.user import User, UserRole
 from app.schemas.user import (
     AdminUserCreate,
@@ -29,6 +30,11 @@ router = APIRouter()
 MAX_CSV_BYTES = 2 * 1024 * 1024
 MAX_CSV_ROWS = 500
 CSV_REQUIRED_COLUMNS = {"email", "first_name", "last_name", "role", "password"}
+
+
+class CoordinatorAssignmentInput(BaseModel):
+    coordinator_id: str = Field(min_length=1, max_length=36)
+    student_id: str = Field(min_length=1, max_length=36)
 
 
 def _create_managed_user(user_data: AdminUserCreate) -> User:
@@ -218,6 +224,116 @@ async def get_all_users(
     """
     users = db.query(User).offset(skip).limit(limit).all()
     return users
+
+
+@router.get("/coordinator-assignments")
+async def get_coordinator_assignments(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    """Return coordinators and available students for admin assignment management."""
+    coordinators = db.query(User).filter(
+        User.role == UserRole.COORDINATOR,
+        User.is_active.is_(True),
+    ).order_by(User.last_name, User.first_name).all()
+    students = db.query(User).filter(
+        User.role == UserRole.STUDENT,
+        User.is_active.is_(True),
+    ).order_by(User.last_name, User.first_name).all()
+    assignments = db.query(CoordinatorStudentAssignment, User).join(
+        User,
+        User.id == CoordinatorStudentAssignment.student_id,
+    ).filter(User.role == UserRole.STUDENT).all()
+
+    assignments_by_coordinator: dict[str, list[dict[str, str | None]]] = {}
+    assigned_student_ids = set()
+    for assignment, student in assignments:
+        assigned_student_ids.add(student.id)
+        assignments_by_coordinator.setdefault(assignment.coordinator_id, []).append({
+            "id": student.id,
+            "student_id": student.student_id,
+            "name": f"{student.first_name} {student.last_name}".strip(),
+        })
+
+    return {
+        "coordinators": [
+            {
+                "id": coordinator.id,
+                "name": f"{coordinator.first_name} {coordinator.last_name}".strip(),
+                "students": assignments_by_coordinator.get(coordinator.id, []),
+            }
+            for coordinator in coordinators
+        ],
+        "unassigned_students": [
+            {
+                "id": student.id,
+                "student_id": student.student_id,
+                "name": f"{student.first_name} {student.last_name}".strip(),
+            }
+            for student in students
+            if student.id not in assigned_student_ids
+        ],
+    }
+
+
+@router.post("/coordinator-assignments", status_code=status.HTTP_201_CREATED)
+async def create_coordinator_assignment(
+    assignment_data: CoordinatorAssignmentInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    coordinator = db.query(User).filter(
+        User.id == assignment_data.coordinator_id,
+        User.role == UserRole.COORDINATOR,
+        User.is_active.is_(True),
+    ).first()
+    if coordinator is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active coordinator not found")
+
+    student = db.query(User).filter(
+        User.id == assignment_data.student_id,
+        User.role == UserRole.STUDENT,
+        User.is_active.is_(True),
+    ).first()
+    if student is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active student not found")
+
+    existing_assignment = db.query(CoordinatorStudentAssignment).filter(
+        CoordinatorStudentAssignment.student_id == student.id,
+    ).first()
+    if existing_assignment:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student is already assigned to a coordinator")
+
+    assignment = CoordinatorStudentAssignment(
+        coordinator_id=coordinator.id,
+        student_id=student.id,
+    )
+    db.add(assignment)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student is already assigned to a coordinator") from exc
+
+    return {"coordinator_id": coordinator.id, "student_id": student.id}
+
+
+@router.delete("/coordinator-assignments/{coordinator_id}/{student_id}")
+async def delete_coordinator_assignment(
+    coordinator_id: str,
+    student_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    assignment = db.query(CoordinatorStudentAssignment).filter(
+        CoordinatorStudentAssignment.coordinator_id == coordinator_id,
+        CoordinatorStudentAssignment.student_id == student_id,
+    ).first()
+    if assignment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coordinator assignment not found")
+    db.delete(assignment)
+    db.commit()
+    return {"message": "Student assignment removed"}
 
 
 @router.get("/{user_id}", response_model=UserResponse)

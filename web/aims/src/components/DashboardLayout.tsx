@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Brand } from './Brand'
 import { AdminUserDialog, AdminWorkspace } from './AdminWorkspace'
 import { CoordinatorWorkspace } from './CoordinatorWorkspace'
+import { CoordinatorAssignmentsWorkspace } from './CoordinatorAssignmentsWorkspace'
+import { DeanAnalyticsWorkspace } from './DeanAnalyticsWorkspace'
 import { Icon } from './Icons'
 import { roleLabels } from '../types/auth'
 import type { UserSession } from '../types/auth'
@@ -28,8 +30,14 @@ const standardNavItems = [
 const adminNavItems = [
   { label: 'Overview', icon: 'grid' as const },
   { label: 'Users', icon: 'users' as const },
+  { label: 'Assignments', icon: 'file' as const },
   { label: 'Notifications', icon: 'bell' as const },
   { label: 'Developer info', icon: 'file' as const },
+]
+
+const deanNavItems = [
+  { label: 'Overview', icon: 'grid' as const },
+  { label: 'Notifications', icon: 'bell' as const },
 ]
 
 const coordinatorNavItems = [
@@ -89,7 +97,9 @@ export function DashboardLayout({ session, data, onLogout }: DashboardLayoutProp
     ? adminNavItems
     : session.role === 'coordinator'
       ? coordinatorNavItems
-      : standardNavItems
+      : session.role === 'dean'
+        ? deanNavItems
+        : standardNavItems
   const firstName = session.name
   const chartMaximum = Math.max(...data.chartValues, 0)
 
@@ -171,9 +181,11 @@ export function DashboardLayout({ session, data, onLogout }: DashboardLayoutProp
         </header>
         <div className="dashboard-content">
           {toastMessage && <div className="success-toast" role="status"><Icon name="check" size={17} /><span>{toastMessage}</span><button onClick={() => setToastMessage('')} aria-label="Dismiss message">×</button></div>}
-          {session.role === 'admin' && activeNav !== 'Overview' ? (
+          {session.role === 'admin' && activeNav === 'Assignments' ? (
+            <CoordinatorAssignmentsWorkspace />
+          ) : session.role === 'admin' && activeNav !== 'Overview' ? (
             <AdminWorkspace
-              section={activeNav}
+              section={activeNav === 'Notifications' ? 'Manage notifications' : activeNav}
               users={users}
               onAddUser={() => { setAddUserError(''); setIsAddUserOpen(true) }}
               onUploadUsers={handleUploadUsers}
@@ -184,6 +196,8 @@ export function DashboardLayout({ session, data, onLogout }: DashboardLayoutProp
             />
           ) : session.role === 'coordinator' && activeNav === 'Students' ? (
             <CoordinatorWorkspace />
+          ) : session.role === 'dean' && activeNav === 'Overview' ? (
+            <DeanAnalyticsWorkspace />
           ) : activeNav === 'Notifications' ? (
             <AdminWorkspace section="Notifications" users={users} onAddUser={() => setIsAddUserOpen(true)} />
           ) : activeNav === 'Applications' ? (

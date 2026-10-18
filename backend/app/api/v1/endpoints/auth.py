@@ -74,6 +74,7 @@ async def register_student(user_data: UserCreate, db: Session = Depends(get_db))
         last_name=user_data.last_name,
         phone=user_data.phone,
         student_id=user_data.student_id,
+        gender=user_data.gender,
         hashed_password=get_password_hash(user_data.password),
         role=UserRole.STUDENT,  # Force student role
         is_active=True,
@@ -308,6 +309,8 @@ async def update_current_user(
         current_user.last_name = user_data.last_name
     if user_data.phone is not None:
         current_user.phone = user_data.phone
+    if "gender" in user_data.model_fields_set:
+        current_user.gender = user_data.gender
     if user_data.student_id is not None:
         # Students can update their student_id
         if current_user.role == UserRole.STUDENT:
