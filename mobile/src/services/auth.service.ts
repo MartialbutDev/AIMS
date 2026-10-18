@@ -1,8 +1,12 @@
-// mobile/src/services/auth.service.ts
+
 import api from './api';
 import * as SecureStore from 'expo-secure-store';
 import { isAxiosError } from 'axios';
-import { API_URL, BASE_URL } from '../config/env';
+import { BASE_URL } from '../config/env';
+
+// ============================================================
+// TYPES AND INTERFACES
+// ============================================================
 
 export interface LoginResponse {
   access_token: string;
@@ -27,289 +31,713 @@ export interface RegisterData {
   gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
 }
 
-export const authService = {
-  // Student Login (Mobile)
-  async login(studentId: string, password: string): Promise<LoginResponse> {
-    try {
-      const email = studentId;
-      
-      console.log('🔐 Login attempt:', { email, password: '***' });
-      
-      const response = await api.post('/auth/login/student', {
-        email,
-        password,
-      });
-      
-      console.log('✅ Login successful:', response.data.user);
-      
-      // Store token securely
-      await SecureStore.setItemAsync('access_token', response.data.access_token);
-      await SecureStore.setItemAsync('user', JSON.stringify(response.data.user));
-      
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Login error:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.detail || 'Network error. Please try again.';
-      throw new Error(errorMessage);
-    }
-  },
+// ============================================================
+// ERROR HANDLING HELPERS
+// ============================================================
 
-  // Student Registration (Mobile)
-  async register(data: RegisterData): Promise<any> {
+/**
+ * Extract readable messages from FastAPI responses.
+ *
+ * Supports:
+ * - String errors
+ * - FastAPI 422 validation arrays
+ * - Error objects containing a message
+ * - Nested validation error objects
+ */
+function extractErrorMessage(
+  detail: unknown,
+  fallback: string
+): string {
+  if (typeof detail === 'string') {
+    return detail.trim() || fallback;
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail.map((item: unknown) => {
+      if (typeof item === 'string') {
+        return item;
+      }
+
+      if (item && typeof item === 'object') {
+        const validation = item as Record<string, unknown>;
+
+        const location = Array.isArray(validation.loc)
+          ? validation.loc
+              .filter((part) => part !== 'body')
+              .map(String)
+              .join('.')
+          : '';
+
+        const message =
+          typeof validation.msg === 'string'
+            ? validation.msg
+            : typeof validation.message === 'string'
+              ? validation.message
+              : 'Invalid value';
+
+        return location
+          ? `${location}: ${message}`
+          : message;
+      }
+
+      return String(item);
+    });
+
+    return messages.join('\n') || fallback;
+  }
+
+  if (detail && typeof detail === 'object') {
+    const object = detail as Record<string, unknown>;
+
+    if (typeof object.message === 'string') {
+      return object.message;
+    }
+
+    if (typeof object.detail === 'string') {
+      return object.detail;
+    }
+
+    if (object.errors !== undefined) {
+      return extractErrorMessage(object.errors, fallback);
+    }
+
     try {
-      const response = await api.post('/auth/register/student', {
-        email: data.email,
-        password: data.password,
-        first_name: data.first_name,
-        last_name: data.last_name,
-        student_id: data.student_id,
-        gender: data.gender,
-      });
-      
-      console.log('✅ Registration successful');
-      return response.data;
-      
-    } catch (error: unknown) {
-      if (isAxiosError(error) && !error.response) {
-        const apiOrigin = new URL(API_URL).origin;
-        throw new Error(
-          `Cannot reach the AIMS server at ${apiOrigin}. Make sure your phone and computer are on the same Wi-Fi, the backend is running, and Windows Firewall allows port 8000.`
+      return JSON.stringify(object);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+}
+
+/**
+ * Convert Axios and unexpected errors into readable Error objects.
+ * Does not log passwords or authentication tokens.
+ */
+function formatApiError(
+  error: unknown,
+  fallback: string
+): Error {
+  if (isAxiosError(error)) {
+    const status = error.response?.status;
+    const responseData = error.response?.data;
+
+    console.error('❌ API request failed:', {
+      status: status ?? 'No HTTP response',
+      code: error.code,
+      detail: responseData?.detail ?? null,
+      message: error.message,
+    });
+
+    // Request never received an HTTP response.
+    if (!error.response) {
+      if (error.code === 'ECONNABORTED') {
+        return new Error(
+          'The request timed out. Please check your connection and try again.'
         );
       }
 
-      const errorMessage = isAxiosError(error)
-        ? error.response?.data?.detail || 'Registration failed. Please try again.'
-        : 'Registration failed. Please try again.';
-      throw new Error(errorMessage);
+      return new Error(
+        `Cannot reach the AIMS server at ${BASE_URL}. ` +
+        'Make sure your phone and computer are on the same network, ' +
+        'FastAPI is running, and the firewall allows port 8000.'
+      );
+    }
+
+    const detail =
+      responseData?.detail ??
+      responseData?.message ??
+      responseData?.errors;
+
+    const readableMessage = extractErrorMessage(
+      detail,
+      fallback
+    );
+
+    // Prefer specific backend messages when provided.
+    if (detail !== undefined && detail !== null) {
+      return new Error(readableMessage);
+    }
+
+    switch (status) {
+      case 400:
+        return new Error(
+          'Invalid information. Please review your details.'
+        );
+
+      case 401:
+        return new Error(
+          'Invalid credentials or expired session.'
+        );
+
+      case 403:
+        return new Error(
+          'You do not have permission to perform this action.'
+        );
+
+      case 404:
+        return new Error(
+          'The requested service was not found.'
+        );
+
+      case 409:
+        return new Error(
+          'An account with these details may already exist.'
+        );
+
+      case 422:
+        return new Error(
+          'Some information is invalid. Please check all required fields.'
+        );
+
+      case 500:
+        return new Error(
+          'The server encountered an error. Please try again later.'
+        );
+
+      default:
+        return new Error(fallback);
+    }
+  }
+
+  console.error('❌ Unexpected error:', error);
+
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(fallback);
+}
+
+// ============================================================
+// AVATAR URL HELPER
+// ============================================================
+
+function resolveAvatarUrl(
+  avatarPath: string | null | undefined
+): string | null {
+  if (!avatarPath) {
+    return null;
+  }
+
+  const path = avatarPath.trim();
+
+  if (!path) {
+    return null;
+  }
+
+  // Already a complete URL or a local device URI.
+  if (
+    /^https?:\/\//i.test(path) ||
+    path.startsWith('file://') ||
+    path.startsWith('content://') ||
+    path.startsWith('data:')
+  ) {
+    return path;
+  }
+
+  const base = BASE_URL.replace(/\/+$/, '');
+  const normalizedPath = path.replace(/^\/+/, '');
+
+  // Avoid creating /static/static/...
+  if (normalizedPath.startsWith('static/')) {
+    return `${base}/${normalizedPath}`;
+  }
+
+  return `${base}/static/${normalizedPath}`;
+}
+
+// ============================================================
+// AUTHENTICATION SERVICE
+// ============================================================
+
+export const authService = {
+
+  // ==========================================================
+  // STUDENT LOGIN
+  // ==========================================================
+
+  async login(
+    studentId: string,
+    password: string
+  ): Promise<LoginResponse> {
+    try {
+      console.log('🔐 Student login attempt');
+
+      // Preserve the existing backend request format.
+      const response = await api.post<LoginResponse>(
+        '/auth/login/student',
+        {
+          email: studentId.trim(),
+          password,
+        }
+      );
+
+      const loginData = response.data;
+
+      if (
+        !loginData ||
+        typeof loginData.access_token !== 'string' ||
+        !loginData.access_token ||
+        !loginData.user
+      ) {
+        throw new Error(
+          'The server returned an invalid login response.'
+        );
+      }
+
+      // Save the authenticated session.
+      await SecureStore.setItemAsync(
+        'access_token',
+        loginData.access_token
+      );
+
+      await SecureStore.setItemAsync(
+        'user',
+        JSON.stringify(loginData.user)
+      );
+
+      console.log('✅ Student login successful');
+
+      return loginData;
+
+    } catch (error: unknown) {
+      throw formatApiError(
+        error,
+        'Login failed. Please check your credentials.'
+      );
     }
   },
 
-  // Logout
+  // ==========================================================
+  // STUDENT REGISTRATION
+  // ==========================================================
+
+  async register(data: RegisterData): Promise<any> {
+    try {
+      console.log('📝 Student registration attempt');
+
+      const payload = {
+        email: data.email.trim(),
+        password: data.password,
+        first_name: data.first_name.trim(),
+        last_name: data.last_name.trim(),
+        student_id: data.student_id.trim(),
+        ...(data.gender
+          ? { gender: data.gender }
+          : {}),
+      };
+
+      const response = await api.post(
+        '/auth/register/student',
+        payload
+      );
+
+      console.log('✅ Student registration successful');
+
+      return response.data;
+
+    } catch (error: unknown) {
+      throw formatApiError(
+        error,
+        'Registration failed. Please try again.'
+      );
+    }
+  },
+
+  // ==========================================================
+  // LOGOUT
+  // ==========================================================
+
   async logout(): Promise<void> {
     try {
       await SecureStore.deleteItemAsync('access_token');
       await SecureStore.deleteItemAsync('user');
       await SecureStore.deleteItemAsync('user_avatar');
+
       console.log('✅ Logout successful');
-    } catch (error) {
+
+    } catch (error: unknown) {
       console.error('❌ Logout error:', error);
+      throw error;
     }
   },
 
-  // Get current user with avatar from server
+  // ==========================================================
+  // GET CURRENT USER
+  // ==========================================================
+
   async getCurrentUser(): Promise<any> {
     try {
       const response = await api.get('/auth/me');
-      
-      // If avatar_url exists from server, construct full URL
-      if (response.data.avatar_url) {
-        response.data.avatar_url = `${BASE_URL}/static/${response.data.avatar_url}`;
+
+      const user = { ...response.data };
+
+      if (user.avatar_url) {
+        user.avatar_url = resolveAvatarUrl(
+          user.avatar_url
+        );
       }
-      
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Get user error:', error.response?.data || error.message);
-      throw error;
+
+      return user;
+
+    } catch (error: unknown) {
+      throw formatApiError(
+        error,
+        'Failed to retrieve user information.'
+      );
     }
   },
 
-  // Update Profile
-  async updateProfile(data: { 
-    first_name?: string; 
-    last_name?: string; 
+  // ==========================================================
+  // UPDATE PROFILE
+  // ==========================================================
+
+  async updateProfile(data: {
+    first_name?: string;
+    last_name?: string;
     phone?: string;
   }): Promise<any> {
     try {
-      console.log('📝 Updating profile:', data);
-      
-      const response = await api.put('/auth/me', data);
-      
-      // Update stored user data
-      const storedUser = await SecureStore.getItemAsync('user');
+      console.log('📝 Updating student profile');
+
+      const response = await api.put(
+        '/auth/me',
+        data
+      );
+
+      const storedUser = await SecureStore.getItemAsync(
+        'user'
+      );
+
       if (storedUser) {
         const user = JSON.parse(storedUser);
-        const updatedUser = { ...user, ...response.data };
-        await SecureStore.setItemAsync('user', JSON.stringify(updatedUser));
+
+        const updatedUser = {
+          ...user,
+          ...response.data,
+        };
+
+        await SecureStore.setItemAsync(
+          'user',
+          JSON.stringify(updatedUser)
+        );
       }
-      
-      console.log('✅ Profile updated successfully:', response.data);
+
+      console.log('✅ Profile updated successfully');
+
       return response.data;
-    } catch (error: any) {
-      console.error('❌ Update profile error:', error.response?.data || error.message);
-      throw error;
+
+    } catch (error: unknown) {
+      throw formatApiError(
+        error,
+        'Failed to update your profile.'
+      );
     }
   },
 
-  // Upload Avatar to Server
-  async uploadAvatar(avatarUri: string): Promise<any> {
+  // ==========================================================
+  // UPLOAD AVATAR
+  // ==========================================================
+
+  async uploadAvatar(
+    avatarUri: string
+  ): Promise<any> {
     try {
-      console.log('📤 Uploading avatar...');
-      
-      // Create FormData
+      console.log('📤 Uploading student avatar');
+
       const formData = new FormData();
-      
-      // Get filename from URI
-      const fileName = avatarUri.split('/').pop() || 'avatar.jpg';
-      const fileType = fileName.endsWith('.png') ? 'image/png' : 'image/jpeg';
-      
-      // @ts-ignore - FormData expects this structure for React Native
-      formData.append('file', {
-        uri: avatarUri,
-        name: fileName,
-        type: fileType,
-      });
-      
-      const response = await api.post('/users/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      console.log('✅ Avatar uploaded:', response.data);
-      
-      // Construct full avatar URL
-      const fullAvatarUrl = response.data.avatar_url ? `${BASE_URL}/static/${response.data.avatar_url}` : null;
-      
-      // Update stored user data with full avatar URL
-      const storedUser = await SecureStore.getItemAsync('user');
+
+      const rawFileName =
+        avatarUri.split('/').pop()?.split('?')[0] ||
+        'avatar.jpg';
+
+      const fileName = rawFileName;
+
+      const extension = fileName
+        .split('.')
+        .pop()
+        ?.toLowerCase();
+
+      let fileType = 'image/jpeg';
+
+      if (extension === 'png') {
+        fileType = 'image/png';
+      } else if (extension === 'webp') {
+        fileType = 'image/webp';
+      }
+
+      // React Native FormData supports file objects.
+      formData.append(
+        'file',
+        {
+          uri: avatarUri,
+          name: fileName,
+          type: fileType,
+        } as any
+      );
+
+      const response = await api.post(
+        '/users/avatar',
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 30000,
+        }
+      );
+
+      console.log('✅ Avatar uploaded successfully');
+
+      const fullAvatarUrl = resolveAvatarUrl(
+        response.data?.avatar_url
+      );
+
+      const storedUser = await SecureStore.getItemAsync(
+        'user'
+      );
+
       if (storedUser) {
         const user = JSON.parse(storedUser);
+
         user.avatar_url = fullAvatarUrl;
-        await SecureStore.setItemAsync('user', JSON.stringify(user));
+
+        await SecureStore.setItemAsync(
+          'user',
+          JSON.stringify(user)
+        );
       }
-      
-      // Also store in local cache for quick access
+
       if (fullAvatarUrl) {
-        await SecureStore.setItemAsync('user_avatar', fullAvatarUrl);
+        await SecureStore.setItemAsync(
+          'user_avatar',
+          fullAvatarUrl
+        );
       }
-      
+
       return response.data;
-      
-    } catch (error: any) {
-      console.error('❌ Upload avatar error:', error.response?.data || error.message);
-      throw error;
+
+    } catch (error: unknown) {
+      throw formatApiError(
+        error,
+        'Failed to upload your profile picture.'
+      );
     }
   },
 
-  // ✅ Delete Avatar from Server - Try DELETE first, fallback to POST
+  // ==========================================================
+  // DELETE AVATAR
+  // ==========================================================
+
   async deleteAvatar(): Promise<void> {
     try {
-      // Try DELETE first
-      await api.delete('/users/avatar');
-      console.log('✅ Avatar deleted from server (DELETE)');
-      
-    } catch (error: any) {
-      // If DELETE fails with 403, try POST fallback
-      if (error.response?.status === 403) {
-        console.log('⚠️ DELETE failed with 403, trying POST fallback...');
-        try {
+      try {
+        // Primary endpoint
+        await api.delete('/users/avatar');
+
+        console.log(
+          '✅ Avatar deleted using DELETE'
+        );
+
+      } catch (error: unknown) {
+        // Preserve the existing POST fallback for 403.
+        if (
+          isAxiosError(error) &&
+          error.response?.status === 403
+        ) {
+          console.log(
+            '⚠️ DELETE returned 403, trying POST fallback'
+          );
+
           await api.post('/users/avatar/delete');
-          console.log('✅ Avatar deleted from server (POST fallback)');
-        } catch (postError: any) {
-          console.error('❌ POST fallback also failed:', postError.response?.data || postError.message);
-          throw postError;
+
+          console.log(
+            '✅ Avatar deleted using POST fallback'
+          );
+        } else {
+          throw error;
         }
-      } else {
-        throw error;
       }
-    }
-    
-    // Clear avatar from SecureStore
-    await SecureStore.deleteItemAsync('user_avatar');
-    
-    // Update stored user data
-    const storedUser = await SecureStore.getItemAsync('user');
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-      delete user.avatar_url;
-      await SecureStore.setItemAsync('user', JSON.stringify(user));
+
+      await SecureStore.deleteItemAsync(
+        'user_avatar'
+      );
+
+      const storedUser = await SecureStore.getItemAsync(
+        'user'
+      );
+
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+
+        delete user.avatar_url;
+
+        await SecureStore.setItemAsync(
+          'user',
+          JSON.stringify(user)
+        );
+      }
+
+      console.log('✅ Avatar removed successfully');
+
+    } catch (error: unknown) {
+      throw formatApiError(
+        error,
+        'Failed to delete your profile picture.'
+      );
     }
   },
 
-  // Get Avatar URL (from server or local cache)
+  // ==========================================================
+  // GET AVATAR
+  // ==========================================================
+
   async getAvatar(): Promise<string | null> {
     try {
-      // First try to get from user data (server URL)
-      const userData = await SecureStore.getItemAsync('user');
+      const userData = await SecureStore.getItemAsync(
+        'user'
+      );
+
       if (userData) {
         const user = JSON.parse(userData);
+
         if (user.avatar_url) {
-          // Check if it's already a full URL
-          if (user.avatar_url.startsWith('http')) {
-            return user.avatar_url;
-          }
-          // Construct full URL if it's a relative path
-          return `${BASE_URL}/static/${user.avatar_url}`;
+          return resolveAvatarUrl(
+            user.avatar_url
+          );
         }
       }
-      
-      // Fallback to local avatar
-      const storedAvatar = await SecureStore.getItemAsync('user_avatar');
+
+      const storedAvatar =
+        await SecureStore.getItemAsync(
+          'user_avatar'
+        );
+
       if (storedAvatar) {
-        // Check if it's already a full URL
-        if (storedAvatar.startsWith('http')) {
-          return storedAvatar;
-        }
-        // Construct full URL
-        return `${BASE_URL}/static/${storedAvatar}`;
+        return resolveAvatarUrl(storedAvatar);
       }
-      
+
       return null;
-      
-    } catch (error) {
-      console.error('❌ Get avatar error:', error);
+
+    } catch (error: unknown) {
+      console.error(
+        '❌ Failed to retrieve avatar:',
+        error
+      );
+
       return null;
     }
   },
 
-  // Save Avatar (local cache)
-  async saveAvatar(avatarUri: string): Promise<void> {
+  // ==========================================================
+  // SAVE AVATAR LOCALLY
+  // ==========================================================
+
+  async saveAvatar(
+    avatarUri: string
+  ): Promise<void> {
     try {
-      await SecureStore.setItemAsync('user_avatar', avatarUri);
+      await SecureStore.setItemAsync(
+        'user_avatar',
+        avatarUri
+      );
+
       console.log('✅ Avatar saved locally');
-    } catch (error) {
-      console.error('❌ Save avatar error:', error);
+
+    } catch (error: unknown) {
+      console.error(
+        '❌ Failed to save avatar:',
+        error
+      );
     }
   },
 
-  // Change Password
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  // ==========================================================
+  // CHANGE PASSWORD
+  // ==========================================================
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> {
     try {
-      await api.post('/auth/change-password', {
-        current_password: currentPassword,
-        new_password: newPassword,
-      });
+      await api.post(
+        '/auth/change-password',
+        {
+          current_password: currentPassword,
+          new_password: newPassword,
+        }
+      );
+
       console.log('✅ Password changed successfully');
-    } catch (error: any) {
-      console.error('❌ Change password error:', error.response?.data || error.message);
-      throw error;
+
+    } catch (error: unknown) {
+      throw formatApiError(
+        error,
+        'Failed to change your password.'
+      );
     }
   },
 
-  // Forgot Password
-  async forgotPassword(email: string): Promise<any> {
+  // ==========================================================
+  // FORGOT PASSWORD
+  // ==========================================================
+
+  async forgotPassword(
+    email: string
+  ): Promise<any> {
     try {
-      const response = await api.post('/auth/forgot-password', { email });
-      console.log('✅ Forgot password request sent');
+      const response = await api.post(
+        '/auth/forgot-password',
+        {
+          email: email.trim(),
+        }
+      );
+
+      console.log(
+        '✅ Forgot password request completed'
+      );
+
       return response.data;
-    } catch (error: any) {
-      console.error('❌ Forgot password error:', error.response?.data || error.message);
-      throw error;
+
+    } catch (error: unknown) {
+      throw formatApiError(
+        error,
+        'Failed to process your password reset request.'
+      );
     }
   },
 
-  // Reset Password
-  async resetPassword(token: string, newPassword: string): Promise<any> {
+  // ==========================================================
+  // RESET PASSWORD
+  // ==========================================================
+
+  async resetPassword(
+    token: string,
+    newPassword: string
+  ): Promise<any> {
     try {
-      const response = await api.post('/auth/reset-password', {
-        token,
-        new_password: newPassword,
-      });
-      console.log('✅ Password reset successfully');
+      const response = await api.post(
+        '/auth/reset-password',
+        {
+          token,
+          new_password: newPassword,
+        }
+      );
+
+      console.log(
+        '✅ Password reset successfully'
+      );
+
       return response.data;
-    } catch (error: any) {
-      console.error('❌ Reset password error:', error.response?.data || error.message);
-      throw error;
+
+    } catch (error: unknown) {
+      throw formatApiError(
+        error,
+        'Failed to reset your password.'
+      );
     }
   },
 };

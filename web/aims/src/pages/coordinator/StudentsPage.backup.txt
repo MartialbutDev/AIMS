@@ -1,0 +1,21 @@
+export function StudentsPage() {
+  return (
+    <section className="workspace-page">
+      <div className="workspace-page-heading">
+        <div>
+          <span className="welcome-eyebrow">AIMS WORKSPACE</span>
+          <h1>Students</h1>
+          <p>Manage internship students.</p>
+        </div>
+      </div>
+
+      <article className="panel" style={{ padding: 24 }}>
+        <h2>Migration required</h2>
+        <p>
+          The existing CoordinatorWorkspace implementation
+          needs to be migrated into this page.
+        </p>
+      </article>
+    </section>
+  )
+}

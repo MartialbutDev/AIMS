@@ -1,20 +1,34 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-from datetime import timedelta
-import uuid
-from typing import Optional
 
-from app.core.database import get_db
-from app.core.security import (
-    get_password_hash,
-    verify_password,
-    create_access_token,
-    get_current_user,
-    decode_token,
-    require_role,
-)
+"""AIMS authentication endpoints (mobile + web).
+
+Password reset and email verification require SMTP and frontend action URLs.
+They never return secret tokens to unauthenticated callers.
+"""
+
+import asyncio
+import hashlib
+import logging
+import uuid
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from pydantic import BaseModel, Field
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
+from app.core.database import get_db
+from app.core.mailer import email_is_configured, send_action_email
+from app.core.security import (
+    create_access_token,
+    decode_token,
+    get_current_user,
+    get_password_hash,
+    require_role,
+    verify_password,
+)
 from app.models.user import User, UserRole
 from app.schemas.user import (
     UserCreate,
@@ -24,257 +38,277 @@ from app.schemas.user import (
     ChangePassword,
     ForgotPasswordRequest,
     ResetPasswordRequest,
-    UserUpdate
+    UserUpdate,
 )
 
 router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+logger = logging.getLogger(__name__)
+
+GENERIC_RESET_MESSAGE = (
+    "If your email is registered, you will receive a reset link"
+)
 
 
-# ==================== MOBILE APP ENDPOINTS (STUDENT ONLY) ====================
+class TokenRequest(BaseModel):
+    token: str = Field(min_length=10)
 
-@router.post("/register/student", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register_student(user_data: UserCreate, db: Session = Depends(get_db)):
-    """
-    Register a new student (Mobile App Only)
-    - Students can only register with role = "student"
-    """
-    
-    # Force role to be STUDENT
-    user_data.role = UserRole.STUDENT
-    
-    # Check if email already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    # Student ID is required for students
-    if not user_data.student_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Student ID is required"
-        )
-    
-    # Check if student_id already exists
-    existing_student = db.query(User).filter(User.student_id == user_data.student_id).first()
-    if existing_student:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Student ID already registered"
-        )
-    
-    # Create new user
-    new_user = User(
-        id=str(uuid.uuid4()),
-        email=user_data.email,
-        first_name=user_data.first_name,
-        last_name=user_data.last_name,
-        phone=user_data.phone,
-        student_id=user_data.student_id,
-        gender=user_data.gender,
-        hashed_password=get_password_hash(user_data.password),
-        role=UserRole.STUDENT,  # Force student role
-        is_active=True,
-        is_verified=False
+
+def _token_response(user: User) -> LoginResponse:
+    return LoginResponse(
+        access_token=create_access_token({
+            "sub": user.id,
+            "role": user.role.value,
+            "purpose": "access",
+        }),
+        token_type="bearer",
+        user=user,
     )
-    
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    return new_user
 
 
-@router.post("/login/student", response_model=LoginResponse)
-async def login_student(login_data: LoginRequest, db: Session = Depends(get_db)):
-    """
-    Student Login (Mobile App Only)
-    - Students can login with either email or student_id
-    - Only users with role "student" can login through this endpoint
-    """
-    
-    login_identifier = login_data.email
-    
-    # Try to find user by student_id first (for mobile app login)
-    user = db.query(User).filter(User.student_id == login_identifier).first()
-    
-    # If not found, try by email
-    if not user:
-        user = db.query(User).filter(User.email == login_identifier).first()
-    
-    if not user:
+def _authenticate(
+    db: Session,
+    identifier: str,
+    password: str,
+    mobile: bool,
+) -> User:
+    identifier = identifier.strip()
+
+    if not identifier:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid student ID/email or password"
+            status_code=401,
+            detail="Invalid credentials",
         )
-    
-    # Check if user is a student
-    if user.role != UserRole.STUDENT:
+
+    if mobile:
+        user = db.query(User).filter(
+            User.student_id == identifier
+        ).first()
+
+        if user is None:
+            user = db.query(User).filter(
+                func.lower(User.email) == identifier.lower()
+            ).first()
+    else:
+        if identifier.lower() == "admin":
+            identifier = "admin@aims.local"
+
+        user = db.query(User).filter(
+            func.lower(User.email) == identifier.lower()
+        ).first()
+
+    if user is None or not verify_password(
+        password, user.hashed_password
+    ):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied. Please use the web application."
+            status_code=401,
+            detail="Invalid credentials",
         )
-    
-    if not verify_password(login_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid student ID/email or password"
-        )
-    
+
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is disabled"
+            status_code=403,
+            detail="Account is disabled",
         )
-    
-    access_token = create_access_token(
-        data={"sub": user.id, "role": user.role.value}
+
+    if mobile and user.role != UserRole.STUDENT:
+        raise HTTPException(
+            status_code=403,
+            detail="Please use the web application",
+        )
+
+    if not mobile and user.role == UserRole.STUDENT:
+        raise HTTPException(
+            status_code=403,
+            detail="Please use the mobile application",
+        )
+
+    return user
+
+
+@router.post(
+    "/register/student",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def register_student(
+    user_data: UserCreate,
+    db: Session = Depends(get_db),
+):
+    if not user_data.student_id or not user_data.student_id.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Student ID is required",
+        )
+
+    email = str(user_data.email).strip().lower()
+    student_id = user_data.student_id.strip()
+
+    if db.query(User).filter(
+        func.lower(User.email) == email
+    ).first():
+        raise HTTPException(
+            status_code=409,
+            detail="Email already registered",
+        )
+
+    if db.query(User).filter(
+        User.student_id == student_id
+    ).first():
+        raise HTTPException(
+            status_code=409,
+            detail="Student ID already registered",
+        )
+
+    user = User(
+        id=str(uuid.uuid4()),
+        email=email,
+        first_name=user_data.first_name.strip(),
+        last_name=user_data.last_name.strip(),
+        phone=user_data.phone,
+        student_id=student_id,
+        gender=user_data.gender,
+        hashed_password=get_password_hash(user_data.password),
+        role=UserRole.STUDENT,
+        is_active=True,
+        is_verified=False,
     )
-    
-    return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user=user
+
+    db.add(user)
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Email or student ID already registered",
+        ) from exc
+
+    db.refresh(user)
+    return user
+
+
+@router.post(
+    "/login/student",
+    response_model=LoginResponse,
+)
+async def login_student(
+    login_data: LoginRequest,
+    db: Session = Depends(get_db),
+):
+    user = _authenticate(
+        db,
+        login_data.email,
+        login_data.password,
+        mobile=True,
     )
+    return _token_response(user)
 
 
-# ==================== WEB APP ENDPOINTS (ALL STAKEHOLDERS) ====================
-
-@router.post("/register/web", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register/web",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def register_web_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
-    """
-    Legacy web-registration endpoint, restricted to administrators.
-    New faculty accounts should be created through the managed-users endpoint.
-    """
-    
-    # Check if role is allowed for web registration
-    if user_data.role == UserRole.STUDENT:
+    if user_data.role in (None, UserRole.STUDENT):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Students must register through the mobile app"
+            status_code=400,
+            detail="A non-student role is required",
         )
-    
-    # Check if email already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
+
+    email = str(user_data.email).strip().lower()
+
+    if db.query(User).filter(
+        func.lower(User.email) == email
+    ).first():
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            status_code=409,
+            detail="Email already registered",
         )
-    
-    # Create new user
-    new_user = User(
+
+    user = User(
         id=str(uuid.uuid4()),
-        email=user_data.email,
-        first_name=user_data.first_name,
-        last_name=user_data.last_name,
+        email=email,
+        first_name=user_data.first_name.strip(),
+        last_name=user_data.last_name.strip(),
         phone=user_data.phone,
-        student_id=user_data.student_id,
         hashed_password=get_password_hash(user_data.password),
-        role=user_data.role,
+        role=UserRole(user_data.role),
         is_active=True,
-        is_verified=True  # Web users are pre-verified
+        is_verified=True,
     )
-    
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    return new_user
+
+    db.add(user)
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Email already registered",
+        ) from exc
+
+    db.refresh(user)
+    return user
 
 
-@router.post("/login/web", response_model=LoginResponse)
-async def login_web_user(login_data: LoginRequest, db: Session = Depends(get_db)):
-    """
-    Web App Login
-    - For: coordinator, dean, career_center, hte_supervisor, admin
-    - Students CANNOT login through this endpoint
-    """
-    
-    login_identifier = login_data.email.strip()
-    if login_identifier.lower() == "admin":
-        login_identifier = "admin@aims.local"
-    user = db.query(User).filter(
-        User.email.ilike(login_identifier)
-    ).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
-        )
-    
-    # Check if user is a student
-    if user.role == UserRole.STUDENT:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied. Please use the mobile application."
-        )
-    
-    if not verify_password(login_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
-        )
-    
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is disabled"
-        )
-    
-    access_token = create_access_token(
-        data={"sub": user.id, "role": user.role.value}
+@router.post(
+    "/login/web",
+    response_model=LoginResponse,
+)
+async def login_web_user(
+    login_data: LoginRequest,
+    db: Session = Depends(get_db),
+):
+    user = _authenticate(
+        db,
+        login_data.email,
+        login_data.password,
+        mobile=False,
     )
-    
-    return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
-        user=user
-    )
+    return _token_response(user)
 
 
 @router.post("/login/form")
 async def login_user_form(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    OAuth2 Login (For Swagger UI testing)
-    - Works for all roles
-    """
-    
-    user = db.query(User).filter(User.email == form_data.username).first()
-    if not user:
+    identifier = form_data.username.strip()
+
+    user = db.query(User).filter(
+        func.lower(User.email) == identifier.lower()
+    ).first()
+
+    if user is None:
+        user = db.query(User).filter(
+            User.student_id == identifier
+        ).first()
+
+    if user is None or not verify_password(
+        form_data.password, user.hashed_password
+    ):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            status_code=401,
+            detail="Invalid credentials",
         )
-    
-    if not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
-        )
-    
+
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is disabled"
+            status_code=403,
+            detail="Account is disabled",
         )
-    
-    access_token = create_access_token(
-        data={"sub": user.id, "role": user.role.value}
-    )
-    
+
+    token = _token_response(user)
+
     return {
-        "access_token": access_token,
+        "access_token": token.access_token,
         "token_type": "bearer",
         "user": {
             "id": user.id,
@@ -282,16 +316,15 @@ async def login_user_form(
             "first_name": user.first_name,
             "last_name": user.last_name,
             "role": user.role.value,
-            "student_id": user.student_id
-        }
+            "student_id": user.student_id,
+        },
     }
 
 
-# ==================== SHARED ENDPOINTS ====================
-
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """Get current logged-in user information (Works for all roles)"""
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+):
     return current_user
 
 
@@ -299,35 +332,33 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
 async def update_current_user(
     user_data: UserUpdate,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Update current user information (Works for all roles)"""
-    
-    if user_data.first_name is not None:
-        current_user.first_name = user_data.first_name
-    if user_data.last_name is not None:
-        current_user.last_name = user_data.last_name
-    if user_data.phone is not None:
-        current_user.phone = user_data.phone
-    if "gender" in user_data.model_fields_set:
-        current_user.gender = user_data.gender
-    if user_data.student_id is not None:
-        # Students can update their student_id
-        if current_user.role == UserRole.STUDENT:
-            existing = db.query(User).filter(
-                User.student_id == user_data.student_id,
-                User.id != current_user.id
-            ).first()
-            if existing:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Student ID already taken"
-                )
-            current_user.student_id = user_data.student_id
-    
+    for field in (
+        "first_name",
+        "last_name",
+        "phone",
+        "gender",
+        "avatar_url",
+    ):
+        if field in user_data.model_fields_set:
+            if field == "avatar_url":
+                # Avatar changes must use the authenticated upload API.
+                continue
+
+            setattr(current_user, field, getattr(user_data, field))
+
+    if (
+        "student_id" in user_data.model_fields_set
+        and user_data.student_id != current_user.student_id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Contact your coordinator to correct your student ID",
+        )
+
     db.commit()
     db.refresh(current_user)
-    
     return current_user
 
 
@@ -335,93 +366,223 @@ async def update_current_user(
 async def change_password(
     password_data: ChangePassword,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Change current user's password (Works for all roles)"""
-    
-    if not verify_password(password_data.current_password, current_user.hashed_password):
+    if not verify_password(
+        password_data.current_password,
+        current_user.hashed_password,
+    ):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Current password is incorrect"
+            status_code=401,
+            detail="Current password is incorrect",
         )
-    
-    current_user.hashed_password = get_password_hash(password_data.new_password)
+
+    if verify_password(
+        password_data.new_password,
+        current_user.hashed_password,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="New password must differ from current password",
+        )
+
+    current_user.hashed_password = get_password_hash(
+        password_data.new_password
+    )
+
     db.commit()
-    
     return {"message": "Password changed successfully"}
+
+
+def _password_fingerprint(user: User) -> str:
+    return hashlib.sha256(
+        user.hashed_password.encode("utf-8")
+    ).hexdigest()
 
 
 @router.post("/forgot-password")
 async def forgot_password(
     request: ForgotPasswordRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Request password reset link (Works for all roles)"""
-    
-    user = db.query(User).filter(User.email == request.email).first()
-    if not user:
-        return {"message": "If your email is registered, you will receive a reset link"}
-    
-    reset_token = create_access_token(
-        data={"sub": user.id, "purpose": "password_reset"},
-        expires_delta=timedelta(minutes=15)
-    )
-    
-    return {
-        "message": "If your email is registered, you will receive a reset link",
-        "reset_token": reset_token
-    }
+    if not email_is_configured() or not settings.PASSWORD_RESET_URL:
+        raise HTTPException(
+            status_code=503,
+            detail="Password reset email service is not configured",
+        )
+
+    user = db.query(User).filter(
+        func.lower(User.email) == str(request.email).lower()
+    ).first()
+
+    if user is not None and user.is_active:
+        token = create_access_token(
+            {
+                "sub": user.id,
+                "purpose": "password_reset",
+                "pwd": _password_fingerprint(user),
+            },
+            expires_delta=timedelta(minutes=15),
+        )
+
+        try:
+            await asyncio.to_thread(
+                send_action_email,
+                user.email,
+                "Reset your AIMS password",
+                "This link expires in 15 minutes.",
+                settings.PASSWORD_RESET_URL,
+                token,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to send AIMS password reset email"
+            )
+
+    return {"message": GENERIC_RESET_MESSAGE}
 
 
 @router.post("/reset-password")
 async def reset_password(
     request: ResetPasswordRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Reset password using token (Works for all roles)"""
-    
     try:
         payload = decode_token(request.token)
-        user_id = payload.get("sub")
-        purpose = payload.get("purpose")
-        
-        if purpose != "password_reset":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid token purpose"
-            )
-        
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        
-        user.hashed_password = get_password_hash(request.new_password)
-        db.commit()
-        
-        return {"message": "Password reset successfully"}
-        
-    except Exception:
+    except HTTPException as exc:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired token"
+            status_code=400,
+            detail="Invalid or expired reset token",
+        ) from exc
+
+    if (
+        payload.get("purpose") != "password_reset"
+        or not payload.get("sub")
+        or not payload.get("pwd")
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired reset token",
         )
 
+    user = db.query(User).filter(
+        User.id == payload["sub"],
+        User.is_active.is_(True),
+    ).with_for_update().first()
 
-@router.post("/verify-email/{user_id}")
-async def verify_email(user_id: str, db: Session = Depends(get_db)):
-    """Verify user's email address (Works for all roles)"""
-    
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
+    if user is None or payload["pwd"] != _password_fingerprint(user):
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=400,
+            detail="Invalid or expired reset token",
         )
-    
+
+    if verify_password(
+        request.new_password,
+        user.hashed_password,
+    ):
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="New password must differ from current password",
+        )
+
+    user.hashed_password = get_password_hash(
+        request.new_password
+    )
+
+    db.commit()
+    return {"message": "Password reset successfully"}
+
+
+@router.post("/request-email-verification")
+async def request_email_verification(
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.is_verified:
+        return {"message": "Email is already verified"}
+
+    if not email_is_configured() or not settings.EMAIL_VERIFICATION_URL:
+        raise HTTPException(
+            status_code=503,
+            detail="Email verification service is not configured",
+        )
+
+    token = create_access_token(
+        {
+            "sub": current_user.id,
+            "purpose": "email_verification",
+            "email": current_user.email,
+        },
+        expires_delta=timedelta(hours=24),
+    )
+
+    try:
+        await asyncio.to_thread(
+            send_action_email,
+            current_user.email,
+            "Verify your AIMS email",
+            "This verification link expires in 24 hours.",
+            settings.EMAIL_VERIFICATION_URL,
+            token,
+        )
+    except Exception as exc:
+        logger.exception("Failed to send verification email")
+        raise HTTPException(
+            status_code=503,
+            detail="Could not send verification email",
+        ) from exc
+
+    return {"message": "Verification email sent"}
+
+
+@router.post("/verify-email")
+async def verify_email(
+    request: TokenRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        payload = decode_token(request.token)
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired verification token",
+        ) from exc
+
+    if payload.get("purpose") != "email_verification":
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid verification token",
+        )
+
+    user = db.query(User).filter(
+        User.id == payload.get("sub"),
+        User.is_active.is_(True),
+    ).first()
+
+    if (
+        user is None
+        or user.email.lower()
+        != str(payload.get("email", "")).lower()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid verification token",
+        )
+
     user.is_verified = True
     db.commit()
-    
+
     return {"message": "Email verified successfully"}
+
+
+@router.post(
+    "/verify-email/{user_id}",
+    status_code=410,
+    deprecated=True,
+)
+async def legacy_verify_email_disabled(user_id: str):
+    raise HTTPException(
+        status_code=410,
+        detail="Use /request-email-verification and /verify-email",
+    )

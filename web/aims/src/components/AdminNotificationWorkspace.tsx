@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { createAdminNotificationCampaign, getAdminNotificationCampaigns, cancelAdminNotificationCampaign } from '../services/adminNotificationService'
+import { createNotificationsForGroup, getNotificationGroupRecipients, notificationTargetGroups } from '../services/notificationService'
+import type { NotificationTargetGroup } from '../services/notificationService'
 import type { AdminNotificationCampaign } from '../services/adminNotificationService'
 import type { AdminUser } from '../types/dashboard'
 import { Icon } from './Icons'
@@ -67,6 +69,9 @@ function CampaignRow({
 export function AdminNotificationWorkspace({ users, usersLoading, usersError }: AdminNotificationWorkspaceProps) {
   const [campaigns, setCampaigns] = useState<AdminNotificationCampaign[]>([])
   const [targetUserId, setTargetUserId] = useState('')
+  const [recipientMode, setRecipientMode] = useState<'individual' | 'group'>('individual')
+  const [targetGroup, setTargetGroup] = useState<NotificationTargetGroup>('student')
+  const [sendProgress, setSendProgress] = useState<{ completed: number; total: number } | null>(null)
   const [type, setType] = useState<NotificationKind>('announcement')
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
@@ -79,6 +84,10 @@ export function AdminNotificationWorkspace({ users, usersLoading, usersError }: 
   const [error, setError] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const activeUsers = users.filter((user) => user.isActive)
+  const groupRecipients = getNotificationGroupRecipients(users, targetGroup)
+  const selectedRecipients = recipientMode === 'group'
+    ? groupRecipients
+    : activeUsers.filter((user) => user.id === targetUserId)
 
   async function loadCampaigns() {
     const result = await getAdminNotificationCampaigns()
@@ -108,32 +117,92 @@ export function AdminNotificationWorkspace({ users, usersLoading, usersError }: 
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (isSending) return
     setError('')
     setStatusMessage('')
+    setSendProgress(null)
+
+    if (selectedRecipients.length === 0) {
+      setError('Select an active user or a target group with active accounts.')
+      return
+    }
+    if (usersLoading || usersError) {
+      setError('The user directory must finish loading successfully before sending.')
+      return
+    }
+
+    let deadlineIso: string | undefined
+    let scheduledIso: string | undefined
+    try {
+      deadlineIso = deadlineAt ? toUtcIso(deadlineAt) : undefined
+      scheduledIso = deliveryMode === 'scheduled' ? toUtcIso(scheduledAt) : undefined
+      if (scheduledIso && new Date(scheduledIso).getTime() <= Date.now()) {
+        setError('Scheduled delivery must be in the future.')
+        return
+      }
+    } catch (dateError) {
+      setError(dateError instanceof Error ? dateError.message : 'Invalid date or time.')
+      return
+    }
+
+    if (recipientMode === 'group' && !window.confirm(
+      `${deliveryMode === 'scheduled' ? 'Schedule' : 'Send'} this notification for ${selectedRecipients.length} active users?\n\nEach user will receive a separate notification.`,
+    )) return
+
     setIsSending(true)
     try {
-      const result = await createAdminNotificationCampaign({
-        target_user_id: targetUserId,
+      const input = {
         type,
         title: title.trim(),
         message: message.trim(),
-        ...(deadlineAt ? { deadline_at: toUtcIso(deadlineAt) } : {}),
-        ...(deliveryMode === 'scheduled' ? { scheduled_at: toUtcIso(scheduledAt) } : {}),
-      })
-      setCampaigns((current) => [result, ...current.filter((item) => item.id !== result.id)])
-      setStatusMessage(result.status === 'sent'
-        ? `Notification sent to ${result.target_name}.`
-        : `Notification scheduled for ${formatDate(result.scheduled_at)}.`)
+        ...(deadlineIso ? { deadline_at: deadlineIso } : {}),
+        ...(scheduledIso ? { scheduled_at: scheduledIso } : {}),
+      }
+
+      if (recipientMode === 'individual') {
+        const result = await createAdminNotificationCampaign({
+          ...input,
+          target_user_id: selectedRecipients[0].id,
+        })
+        setCampaigns((current) => [result, ...current.filter((item) => item.id !== result.id)])
+        setStatusMessage(result.status === 'sent'
+          ? `Notification sent to ${result.target_name}.`
+          : `Notification scheduled for ${formatDate(result.scheduled_at)}.`)
+      } else {
+        const result = await createNotificationsForGroup(
+          selectedRecipients,
+          input,
+          (completed, total) => setSendProgress({ completed, total }),
+        )
+        setCampaigns((current) => [
+          ...result.created,
+          ...current.filter((item) => !result.created.some((created) => created.id === item.id)),
+        ])
+        if (result.failed.length) {
+          const failedPreview = result.failed.slice(0, 3)
+            .map(({ user }) => `${user.firstName} ${user.lastName}`.trim()).join(', ')
+          setError(`${result.created.length} of ${selectedRecipients.length} campaigns created; ${result.failed.length} failed (${failedPreview}${result.failed.length > 3 ? ', …' : ''}). Do not resend to the whole group: some users already received a notification.`)
+        } else {
+          setStatusMessage(`${result.created.length} notifications ${deliveryMode === 'scheduled' ? 'scheduled' : 'created'} for the selected group.`)
+        }
+        // Keep the draft when any recipient failed, so you can send it to the failed users individually.
+        if (result.failed.length) {
+          try { await loadCampaigns() } catch { /* created campaigns are already shown locally */ }
+          return
+        }
+      }
+
       setTitle('')
       setMessage('')
       setDeadlineAt('')
       setScheduledAt('')
       setDeliveryMode('now')
-      await loadCampaigns()
+      try { await loadCampaigns() } catch { /* do not misreport successful delivery */ }
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Could not create the notification.')
     } finally {
       setIsSending(false)
+      setSendProgress(null)
     }
   }
 
@@ -159,18 +228,38 @@ export function AdminNotificationWorkspace({ users, usersLoading, usersError }: 
   return (
     <section className="workspace-page">
       <div className="workspace-page-heading">
-        <div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> ADMIN MESSAGING</span><h1>Notifications</h1><p>Send an important update to a selected user now or schedule it for later.</p></div>
+        <div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> ADMIN MESSAGING</span><h1>Notifications</h1><p>Send an important update to one person or an entire target group now, or schedule it for later.</p></div>
       </div>
 
       <section className="panel admin-notification-composer">
-        <div className="panel-heading"><div><h2>Create a notification</h2><p>Choose the recipient, add the details, and select when it should be delivered.</p></div></div>
+        <div className="panel-heading"><div><h2>Create a notification</h2><p>Choose one person or a target group, add the details, and select when it should be delivered.</p></div></div>
         <form className="admin-notification-form" onSubmit={submit}>
-          <label>Target user
-            <select required value={targetUserId} onChange={(event) => setTargetUserId(event.target.value)} disabled={usersLoading || !activeUsers.length}>
-              <option value="">{usersLoading ? 'Loading users…' : 'Select an active user'}</option>
-              {activeUsers.map((user) => <option key={user.id} value={user.id}>{user.firstName} {user.lastName} · {user.email}</option>)}
+          <label>Recipient type
+            <select value={recipientMode} onChange={(event) => setRecipientMode(event.target.value as 'individual' | 'group')} disabled={isSending}>
+              <option value="individual">Specific user</option>
+              <option value="group">Target group (all users in a role)</option>
             </select>
           </label>
+          {recipientMode === 'individual' ? (
+            <label>Target user
+              <select required value={targetUserId} onChange={(event) => setTargetUserId(event.target.value)} disabled={isSending || usersLoading || !activeUsers.length}>
+                <option value="">{usersLoading ? 'Loading users…' : 'Select an active user'}</option>
+                {activeUsers.map((user) => <option key={user.id} value={user.id}>{user.firstName} {user.lastName} · {user.email}</option>)}
+              </select>
+            </label>
+          ) : (
+            <label>Target group
+              <select value={targetGroup} onChange={(event) => setTargetGroup(event.target.value as NotificationTargetGroup)} disabled={isSending || usersLoading}>
+                {notificationTargetGroups.map((group) => (
+                  <option key={group.value} value={group.value}>{group.label}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <p className="admin-notification-wide" aria-live="polite" style={{ margin: '0 0 4px', color: '#64748b', fontSize: 13 }}>
+            {usersLoading ? 'Loading recipients…' : `${selectedRecipients.length} active recipient${selectedRecipients.length === 1 ? '' : 's'} selected.`}
+            {recipientMode === 'group' && !usersLoading && ' Group delivery creates one campaign per user. Only users loaded in the admin directory are included (currently up to 500).'}
+          </p>
           <label>Notification category
             <select value={type} onChange={(event) => setType(event.target.value as NotificationKind)}>
               <option value="announcement">Important announcement</option>
@@ -200,10 +289,11 @@ export function AdminNotificationWorkspace({ users, usersLoading, usersError }: 
           {usersError && <p className="form-error admin-notification-wide" role="alert">{usersError}</p>}
           {error && <p className="form-error admin-notification-wide" role="alert">{error}</p>}
           {statusMessage && <p className="admin-notification-success admin-notification-wide" role="status">{statusMessage}</p>}
+          {isSending && sendProgress && <p className="admin-notification-wide" role="status">Processing {sendProgress.completed} of {sendProgress.total} recipients…</p>}
           <div className="admin-notification-actions admin-notification-wide">
             {activeUsers.length === 0 && !usersLoading && <p className="empty-state">Add an active user account before composing a notification.</p>}
-            <button className="primary-button" type="submit" disabled={isSending || usersLoading || !targetUserId}>
-              {isSending ? 'Saving…' : deliveryMode === 'scheduled' ? 'Schedule notification' : 'Send notification'} <Icon name="arrow" size={15} />
+            <button className="primary-button" type="submit" disabled={isSending || usersLoading || Boolean(usersError) || selectedRecipients.length === 0}>
+              {isSending ? 'Processing…' : deliveryMode === 'scheduled' ? `Schedule for ${selectedRecipients.length}` : `Send to ${selectedRecipients.length}`} <Icon name="arrow" size={15} />
             </button>
           </div>
         </form>

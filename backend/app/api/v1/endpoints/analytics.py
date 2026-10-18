@@ -1,8 +1,11 @@
-from datetime import datetime
 
-from fastapi import APIRouter, Depends
+"""Role-aware analytics for AIMS."""
+
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -17,11 +20,26 @@ from app.models.user import User, UserRole
 router = APIRouter()
 
 ROLE_PRESENTATION = {
-    UserRole.ADMIN: ("System overview", "Live counts and placement activity from the AIMS database."),
-    UserRole.COORDINATOR: ("Placement overview", "Live student and placement activity from the AIMS database."),
-    UserRole.DEAN: ("Department at a glance", "Live student and placement outcomes from the AIMS database."),
-    UserRole.CAREER_CENTER: ("Career center", "Live student, partner, and placement activity from the AIMS database."),
-    UserRole.HTE_SUPERVISOR: ("Hiring dashboard", "Live applications associated with your registered company profile."),
+    UserRole.ADMIN: (
+        "System overview",
+        "Current system totals and application activity.",
+    ),
+    UserRole.COORDINATOR: (
+        "Placement overview",
+        "Activity for your assigned students.",
+    ),
+    UserRole.DEAN: (
+        "Department at a glance",
+        "Department-wide internship progress and placements.",
+    ),
+    UserRole.CAREER_CENTER: (
+        "Career center",
+        "Student, partner, and placement activity.",
+    ),
+    UserRole.HTE_SUPERVISOR: (
+        "Hiring dashboard",
+        "Applications linked to your company profile.",
+    ),
 }
 
 REQUIRED_DOCUMENT_TYPES = (
@@ -37,21 +55,35 @@ REQUIRED_DOCUMENT_TYPES = (
 )
 
 
-def _format_count(count: int) -> str:
-    return f"{count:,}"
+def _months_back(
+    now: datetime,
+    count: int = 6,
+) -> list[datetime]:
+    year, month = now.year, now.month
+    result = []
 
-
-def _months_back(now: datetime, count: int = 6) -> list[datetime]:
-    first_month = datetime(now.year, now.month, 1)
-    months = []
     for offset in reversed(range(count)):
-        month = first_month.month - offset
-        year = first_month.year
-        while month <= 0:
-            month += 12
-            year -= 1
-        months.append(datetime(year, month, 1))
-    return months
+        absolute = year * 12 + month - 1 - offset
+
+        result.append(
+            datetime(
+                absolute // 12,
+                absolute % 12 + 1,
+                1,
+            )
+        )
+
+    return result
+
+
+def _next_month(month: datetime) -> datetime:
+    absolute = month.year * 12 + month.month
+
+    return datetime(
+        absolute // 12,
+        absolute % 12 + 1,
+        1,
+    )
 
 
 @router.get("/dean")
@@ -59,98 +91,223 @@ async def get_dean_analytics(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("dean")),
 ):
-    """Return institution-wide aggregate metrics without individual student data."""
-    students = db.query(User).filter(
+    student_rows = db.query(
+        User.id,
+        User.gender,
+    ).filter(
         User.role == UserRole.STUDENT,
         User.is_active.is_(True),
     ).all()
-    student_ids = [student.id for student in students]
-    genders = ("male", "female", "other", "prefer_not_to_say", "not_provided")
-    gender_counts = {gender: 0 for gender in genders}
-    for student in students:
-        gender = student.gender if student.gender in gender_counts else "not_provided"
+
+    student_ids = {
+        row.id
+        for row in student_rows
+    }
+
+    genders = (
+        "male",
+        "female",
+        "other",
+        "prefer_not_to_say",
+        "not_provided",
+    )
+
+    gender_counts = {
+        gender: 0
+        for gender in genders
+    }
+
+    for row in student_rows:
+        gender = (
+            row.gender
+            if row.gender in gender_counts
+            else "not_provided"
+        )
         gender_counts[gender] += 1
 
     coordinators = db.query(User).filter(
         User.role == UserRole.COORDINATOR,
         User.is_active.is_(True),
-    ).order_by(User.last_name, User.first_name).all()
-    assignments = db.query(CoordinatorStudentAssignment).join(
-        User,
-        User.id == CoordinatorStudentAssignment.student_id,
-    ).filter(
-        User.role == UserRole.STUDENT,
-        User.is_active.is_(True),
+    ).order_by(
+        User.last_name,
+        User.first_name,
     ).all()
-    assignments_by_coordinator: dict[str, list[str]] = {}
+
+    assignments = (
+        db.query(CoordinatorStudentAssignment)
+        .join(
+            User,
+            User.id == CoordinatorStudentAssignment.student_id,
+        )
+        .filter(
+            User.role == UserRole.STUDENT,
+            User.is_active.is_(True),
+        )
+        .all()
+    )
+
+    by_coordinator: dict[str, set[str]] = {}
+
     for assignment in assignments:
-        assignments_by_coordinator.setdefault(assignment.coordinator_id, []).append(assignment.student_id)
+        by_coordinator.setdefault(
+            assignment.coordinator_id,
+            set(),
+        ).add(assignment.student_id)
 
-    assigned_student_ids = {
-        student_id
-        for student_ids_for_coordinator in assignments_by_coordinator.values()
-        for student_id in student_ids_for_coordinator
+    active_coordinator_ids = {
+        coordinator.id
+        for coordinator in coordinators
     }
-    documents_by_student: dict[str, dict[str, str]] = {}
-    if assigned_student_ids:
-        documents = db.query(Document).filter(
-            Document.uploaded_by.in_(assigned_student_ids),
-            Document.type.in_(REQUIRED_DOCUMENT_TYPES),
-        ).order_by(Document.created_at.desc()).all()
-        for document in documents:
-            student_documents = documents_by_student.setdefault(document.uploaded_by, {})
-            student_documents.setdefault(document.type.value, document.verification_status)
 
-    approved_hours_by_student: dict[str, float] = {}
-    if assigned_student_ids:
-        approved_dtrs = db.query(DTR).filter(
-            DTR.student_id.in_(assigned_student_ids),
-            DTR.status == DTRStatus.APPROVED,
+    by_coordinator = {
+        coordinator_id: ids
+        for coordinator_id, ids in by_coordinator.items()
+        if coordinator_id in active_coordinator_ids
+    }
+
+    assigned_ids = (
+        set().union(*by_coordinator.values())
+        if by_coordinator
+        else set()
+    )
+
+    documents_by_student: dict[str, dict[str, str]] = {}
+    hours_by_student: dict[str, float] = {}
+
+    if assigned_ids:
+        documents = db.query(Document).filter(
+            Document.uploaded_by.in_(assigned_ids),
+            Document.type.in_(REQUIRED_DOCUMENT_TYPES),
+        ).order_by(
+            Document.created_at.desc()
         ).all()
-        for record in approved_dtrs:
-            approved_hours_by_student[record.student_id] = (
-                approved_hours_by_student.get(record.student_id, 0.0) + (record.total_hours or 0.0)
+
+        for document in documents:
+            documents_by_student.setdefault(
+                document.uploaded_by,
+                {},
+            ).setdefault(
+                document.type.value,
+                document.verification_status,
             )
 
-    student_metrics: dict[str, tuple[float, float, bool]] = {}
-    for student_id in assigned_student_ids:
-        document_statuses = documents_by_student.get(student_id, {})
-        verified_count = sum(
-            document_statuses.get(document_type.value) == "verified"
-            for document_type in REQUIRED_DOCUMENT_TYPES
+        hours_rows = db.query(
+            DTR.student_id,
+            func.sum(DTR.total_hours),
+        ).filter(
+            DTR.student_id.in_(assigned_ids),
+            DTR.status == DTRStatus.APPROVED,
+        ).group_by(
+            DTR.student_id
+        ).all()
+
+        for student_id, hours in hours_rows:
+            hours_by_student[student_id] = max(
+                0.0,
+                float(hours or 0),
+            )
+
+    student_metrics: dict[
+        str, tuple[float, float, bool]
+    ] = {}
+
+    required_hours = max(
+        0,
+        settings.REQUIRED_INTERNSHIP_HOURS,
+    )
+
+    for student_id in assigned_ids:
+        statuses = documents_by_student.get(
+            student_id,
+            {},
         )
-        document_percent = verified_count / len(REQUIRED_DOCUMENT_TYPES) * 100
-        required_hours = settings.REQUIRED_INTERNSHIP_HOURS
-        ojt_percent = min(100.0, approved_hours_by_student.get(student_id, 0.0) / required_hours * 100) if required_hours else 0.0
-        is_complete = verified_count == len(REQUIRED_DOCUMENT_TYPES) and ojt_percent >= 100
-        student_metrics[student_id] = (document_percent, ojt_percent, is_complete)
+
+        verified = sum(
+            statuses.get(kind.value) == "verified"
+            for kind in REQUIRED_DOCUMENT_TYPES
+        )
+
+        doc_percent = (
+            100 * verified / len(REQUIRED_DOCUMENT_TYPES)
+        )
+
+        ojt_percent = (
+            min(
+                100.0,
+                hours_by_student.get(student_id, 0)
+                * 100 / required_hours,
+            )
+            if required_hours
+            else 0.0
+        )
+
+        is_complete = (
+            verified == len(REQUIRED_DOCUMENT_TYPES)
+            and ojt_percent >= 100
+        )
+
+        student_metrics[student_id] = (
+            doc_percent,
+            ojt_percent,
+            is_complete,
+        )
+
+    def _summary(ids: set[str]) -> dict:
+        rows = [
+            student_metrics[student_id]
+            for student_id in ids
+            if student_id in student_metrics
+        ]
+
+        count = len(rows)
+
+        complete = sum(
+            int(row[2])
+            for row in rows
+        )
+
+        return {
+            "average_document_completion_percent": (
+                round(sum(row[0] for row in rows) / count)
+                if count else 0
+            ),
+            "average_ojt_completion_percent": (
+                round(sum(row[1] for row in rows) / count)
+                if count else 0
+            ),
+            "fully_complete_students": complete,
+            "fully_complete_percent": (
+                round(complete * 100 / count)
+                if count else 0
+            ),
+        }
 
     coordinator_metrics = []
+
     for coordinator in coordinators:
-        coordinator_student_ids = assignments_by_coordinator.get(coordinator.id, [])
-        metrics = [student_metrics[student_id] for student_id in coordinator_student_ids if student_id in student_metrics]
-        count = len(metrics)
+        ids = by_coordinator.get(
+            coordinator.id,
+            set(),
+        )
+
         coordinator_metrics.append({
             "coordinator_id": coordinator.id,
-            "coordinator_name": f"{coordinator.first_name} {coordinator.last_name}".strip(),
-            "student_count": count,
-            "average_document_completion_percent": round(sum(item[0] for item in metrics) / count) if count else 0,
-            "average_ojt_completion_percent": round(sum(item[1] for item in metrics) / count) if count else 0,
-            "fully_complete_students": sum(item[2] for item in metrics),
-            "fully_complete_percent": round(sum(item[2] for item in metrics) / count * 100) if count else 0,
+            "coordinator_name": (
+                f"{coordinator.first_name} "
+                f"{coordinator.last_name}"
+            ).strip(),
+            "student_count": len(ids),
+            **_summary(ids),
         })
 
-    metrics = [student_metrics[student_id] for student_id in assigned_student_ids if student_id in student_metrics]
-    assigned_count = len(metrics)
     return {
-        "enrolled_student_count": len(students),
+        "enrolled_student_count": len(student_rows),
         "gender_distribution": gender_counts,
-        "assigned_student_count": len(assigned_student_ids),
-        "unassigned_student_count": len(set(student_ids) - assigned_student_ids),
-        "average_document_completion_percent": round(sum(item[0] for item in metrics) / assigned_count) if assigned_count else 0,
-        "average_ojt_completion_percent": round(sum(item[1] for item in metrics) / assigned_count) if assigned_count else 0,
-        "fully_complete_students": sum(item[2] for item in metrics),
-        "fully_complete_percent": round(sum(item[2] for item in metrics) / assigned_count * 100) if assigned_count else 0,
+        "assigned_student_count": len(assigned_ids),
+        "unassigned_student_count": len(
+            student_ids - assigned_ids
+        ),
+        **_summary(assigned_ids),
         "coordinators": coordinator_metrics,
     }
 
@@ -160,137 +317,302 @@ async def get_dashboard_analytics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Return role-aware dashboard metrics derived from persisted database rows."""
     role = UserRole(current_user.role)
-    greeting, subtitle = ROLE_PRESENTATION[role]
-    total_students = db.query(User).filter(User.role == UserRole.STUDENT).count()
-    total_staff = db.query(User).filter(User.role != UserRole.STUDENT).count()
-    active_companies = db.query(Company).filter(Company.is_active.is_(True)).count()
-    all_applications = db.query(Application)
 
-    company_ids = None
-    if role == UserRole.HTE_SUPERVISOR:
+    if role not in ROLE_PRESENTATION:
+        raise HTTPException(
+            status_code=403,
+            detail="This dashboard is not available for your role",
+        )
+
+    greeting, subtitle = ROLE_PRESENTATION[role]
+
+    total_students = db.query(User).filter(
+        User.role == UserRole.STUDENT
+    ).count()
+
+    total_staff = db.query(User).filter(
+        User.role.notin_([
+            UserRole.STUDENT,
+            UserRole.ADMIN,
+        ])
+    ).count()
+
+    active_companies = db.query(Company).filter(
+        Company.is_active.is_(True)
+    ).count()
+
+    applications = db.query(Application)
+    company_ids: list[str] = []
+
+    if role == UserRole.COORDINATOR:
+        applications = applications.join(
+            CoordinatorStudentAssignment,
+            CoordinatorStudentAssignment.student_id
+            == Application.student_id,
+        ).filter(
+            CoordinatorStudentAssignment.coordinator_id
+            == current_user.id
+        )
+
+        total_students = db.query(
+            CoordinatorStudentAssignment
+        ).filter(
+            CoordinatorStudentAssignment.coordinator_id
+            == current_user.id
+        ).count()
+
+    elif role == UserRole.HTE_SUPERVISOR:
         company_ids = [
             company_id
             for (company_id,) in db.query(Company.id).filter(
-                func.lower(Company.contact_email) == current_user.email.lower()
+                func.lower(Company.contact_email)
+                == current_user.email.lower()
             ).all()
         ]
-        all_applications = all_applications.filter(Application.company_id.in_(company_ids))
 
-    application_count = all_applications.count()
-    pending_count = all_applications.filter(
-        Application.status.in_([ApplicationStatus.PENDING, ApplicationStatus.REVIEWING])
+        applications = applications.filter(
+            Application.company_id.in_(company_ids)
+        )
+
+    application_count = applications.count()
+
+    pending_count = applications.filter(
+        Application.status.in_([
+            ApplicationStatus.PENDING,
+            ApplicationStatus.REVIEWING,
+        ])
     ).count()
-    placed_count = all_applications.filter(
+
+    accepted_application_count = applications.filter(
         Application.status == ApplicationStatus.ACCEPTED
     ).count()
-    placement_rate = round((placed_count / application_count) * 100) if application_count else 0
+
+    placed_students = (
+        applications.filter(
+            Application.status == ApplicationStatus.ACCEPTED
+        )
+        .with_entities(
+            func.count(
+                func.distinct(Application.student_id)
+            )
+        )
+        .scalar()
+        or 0
+    )
+
+    placement_rate = (
+        round(placed_students / total_students * 100)
+        if total_students
+        else 0
+    )
 
     if role == UserRole.ADMIN:
-        metric_specs = [
+        specs = [
             ("Registered users", db.query(User).count(), "users", "blue"),
             ("Students", total_students, "users", "violet"),
-            ("Faculty & staff", total_staff - db.query(User).filter(User.role == UserRole.ADMIN).count(), "briefcase", "amber"),
+            ("Faculty & staff", total_staff, "briefcase", "amber"),
             ("Active companies", active_companies, "chart", "green"),
         ]
+
     elif role == UserRole.COORDINATOR:
-        metric_specs = [
-            ("Students", total_students, "users", "blue"),
+        specs = [
+            ("Assigned students", total_students, "users", "blue"),
             ("Applications", application_count, "file", "violet"),
             ("Awaiting review", pending_count, "briefcase", "amber"),
-            ("Placements", placed_count, "chart", "green"),
+            ("Placed students", placed_students, "chart", "green"),
         ]
+
     elif role == UserRole.DEAN:
-        metric_specs = [
+        specs = [
             ("Students", total_students, "users", "blue"),
             ("Total applications", application_count, "file", "violet"),
-            ("Placed students", placed_count, "briefcase", "green"),
+            ("Placed students", placed_students, "briefcase", "green"),
             ("Placement rate", f"{placement_rate}%", "chart", "amber"),
         ]
+
     elif role == UserRole.CAREER_CENTER:
-        metric_specs = [
+        specs = [
             ("Students", total_students, "users", "blue"),
             ("Partner companies", active_companies, "briefcase", "violet"),
             ("Applications", application_count, "file", "amber"),
-            ("Placements", placed_count, "chart", "green"),
+            ("Placed students", placed_students, "chart", "green"),
         ]
+
     else:
-        owned_company_count = len(company_ids or [])
-        metric_specs = [
-            ("Registered company profiles", owned_company_count, "briefcase", "violet"),
+        specs = [
+            (
+                "Registered company profiles",
+                len(company_ids),
+                "briefcase",
+                "violet",
+            ),
             ("Applications", application_count, "file", "blue"),
             ("Awaiting review", pending_count, "users", "amber"),
-            ("Placements", placed_count, "chart", "green"),
+            (
+                "Accepted applications",
+                accepted_application_count,
+                "chart",
+                "green",
+            ),
         ]
 
     metrics = [
         {
             "label": label,
-            "value": value if isinstance(value, str) else _format_count(value),
+            "value": (
+                value
+                if isinstance(value, str)
+                else f"{value:,}"
+            ),
             "change": "Current database total",
             "icon": icon,
             "tone": tone,
         }
-        for label, value, icon, tone in metric_specs
+        for label, value, icon, tone in specs
     ]
 
-    now = datetime.utcnow()
-    months = _months_back(now)
-    chart_values = []
-    chart_labels = []
-    for index, month in enumerate(months):
-        next_month = months[index + 1] if index + 1 < len(months) else datetime(
-            month.year + (1 if month.month == 12 else 0),
-            1 if month.month == 12 else month.month + 1,
-            1,
-        )
-        month_count = all_applications.filter(
-            Application.applied_date >= month,
-            Application.applied_date < next_month,
-        ).count()
-        chart_values.append(month_count)
-        chart_labels.append(month.strftime("%b"))
+    now = datetime.now(timezone.utc).replace(
+        tzinfo=None
+    )
 
-    recent_query = db.query(Application).join(
-        Company, Application.company_id == Company.id
-    ).order_by(Application.applied_date.desc())
-    if role == UserRole.HTE_SUPERVISOR:
-        if company_ids:
-            recent_query = recent_query.filter(Application.company_id.in_(company_ids))
-        else:
-            recent_query = recent_query.filter(Application.id == "")
-    recent_applications = recent_query.limit(5).all()
-    activities = [
-        {
+    months = _months_back(now)
+    first = months[0]
+    last = _next_month(months[-1])
+
+    year_expr = func.extract(
+        "year",
+        Application.applied_date,
+    )
+
+    month_expr = func.extract(
+        "month",
+        Application.applied_date,
+    )
+
+    counts = (
+        applications.filter(
+            Application.applied_date >= first,
+            Application.applied_date < last,
+        )
+        .with_entities(
+            year_expr,
+            month_expr,
+            func.count(Application.id),
+        )
+        .group_by(
+            year_expr,
+            month_expr,
+        )
+        .all()
+    )
+
+    counts_by_month = {
+        (int(year), int(month)): count
+        for year, month, count in counts
+    }
+
+    chart_values = [
+        counts_by_month.get(
+            (month.year, month.month),
+            0,
+        )
+        for month in months
+    ]
+
+    chart_labels = [
+        month.strftime("%b")
+        for month in months
+    ]
+
+    recent_query = db.query(Application).options(
+        joinedload(Application.company)
+    ).order_by(
+        Application.applied_date.desc()
+    )
+
+    if role == UserRole.COORDINATOR:
+        recent_query = recent_query.join(
+            CoordinatorStudentAssignment,
+            CoordinatorStudentAssignment.student_id
+            == Application.student_id,
+        ).filter(
+            CoordinatorStudentAssignment.coordinator_id
+            == current_user.id
+        )
+
+    elif role == UserRole.HTE_SUPERVISOR:
+        recent_query = recent_query.filter(
+            Application.company_id.in_(company_ids)
+        )
+
+    recent = recent_query.limit(5).all()
+    activities = []
+
+    for application in recent:
+        company_name = (
+            application.company.name
+            if application.company
+            else "Unknown company"
+        )
+
+        applied = application.applied_date
+
+        hours_ago = (
+            max(
+                0,
+                int((now - applied).total_seconds() // 3600),
+            )
+            if applied
+            else None
+        )
+
+        activities.append({
             "title": f"Application · {application.position}",
-            "detail": f"{application.company.name} · {application.status.value.title()}",
+            "detail": (
+                f"{company_name} · "
+                f"{application.status.value.title()}"
+            ),
             "time": (
-                f"{max(0, int((now - application.applied_date).total_seconds() // 3600))}h ago"
-                if application.applied_date
+                f"{hours_ago}h ago"
+                if hours_ago is not None
                 else "Recently"
             ),
-            "initials": "".join(
-                word[0].upper() for word in application.company.name.split()[:2]
-            ) or "CO",
-            "tone": "blue" if application.status == ApplicationStatus.PENDING else "green",
-        }
-        for application in recent_applications
-    ]
+            "initials": (
+                "".join(
+                    word[0].upper()
+                    for word in company_name.split()[:2]
+                )
+                or "CO"
+            ),
+            "tone": (
+                "blue"
+                if application.status == ApplicationStatus.PENDING
+                else "green"
+            ),
+        })
 
-    tasks = []
-    if pending_count:
-        tasks.append(f"Review {pending_count} pending or in-review applications")
+    tasks = (
+        [
+            f"Review {pending_count} pending or in-review applications"
+        ]
+        if pending_count
+        else []
+    )
 
     return {
         "greeting": greeting,
         "subtitle": subtitle,
         "metrics": metrics,
         "activities": activities,
-        "tasksTitle": "Needs your attention" if tasks else "No pending reviews",
+        "tasksTitle": (
+            "Needs your attention"
+            if tasks
+            else "No pending reviews"
+        ),
         "tasks": tasks,
-        "chartTitle": "Placement activity",
-        "chartCaption": "Applications created per month",
+        "chartTitle": "Application activity",
+        "chartCaption": "Applications submitted per month",
         "chartValues": chart_values,
         "chartLabels": chart_labels,
     }

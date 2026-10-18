@@ -88,3 +88,88 @@ export async function importAdminUsersCsv(file: File): Promise<AdminUser[]> {
   })
   return result.users.map(toAdminUser)
 }
+
+// Search, filter and sort users already loaded from FastAPI.
+// These options are used by the Admin -> Users screen; no extra API call is needed.
+export type AdminUserSort =
+  | 'name-asc'
+  | 'name-desc'
+  | 'role'
+  | 'role-desc'
+  | 'email'
+  | 'email-desc'
+  | 'status'
+  | 'status-inactive'
+
+export interface AdminUserFilters {
+  query?: string
+  role?: 'all' | AdminUserRole
+  status?: 'all' | 'active' | 'inactive'
+  sortBy?: AdminUserSort
+}
+
+const searchableRoleLabels: Record<AdminUserRole, string> = {
+  student: 'Student',
+  coordinator: 'Coordinator',
+  dean: 'Dean',
+  career_center: 'Career Center',
+  company: 'Company Supervisor',
+  admin: 'Admin',
+}
+
+// Group students first, then coordinators, followed by the other workspace roles.
+const roleOrder: Record<AdminUserRole, number> = {
+  student: 0,
+  coordinator: 1,
+  dean: 2,
+  career_center: 3,
+  company: 4,
+  admin: 5,
+}
+
+export function filterAndSortAdminUsers(
+  users: AdminUser[],
+  { query = '', role = 'all', status = 'all', sortBy = 'name-asc' }: AdminUserFilters = {},
+): AdminUser[] {
+  const term = query.trim().toLocaleLowerCase()
+  const compare = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' })
+  const fullName = (user: AdminUser) => `${user.firstName} ${user.lastName}`.trim()
+
+  return users
+    .filter((user) => {
+      if (role !== 'all' && user.role !== role) return false
+      if (status === 'active' && !user.isActive) return false
+      if (status === 'inactive' && user.isActive) return false
+      if (!term) return true
+
+      const searchableText = [
+        fullName(user),
+        user.email,
+        searchableRoleLabels[user.role],
+        user.role,
+      ].join(' ').toLocaleLowerCase()
+      return searchableText.includes(term)
+    })
+    .sort((a, b) => {
+      const byName = compare(fullName(a), fullName(b))
+      switch (sortBy) {
+        case 'name-desc':
+          return -byName
+        case 'role':
+          return roleOrder[a.role] - roleOrder[b.role] || byName
+        case 'role-desc':
+          return roleOrder[b.role] - roleOrder[a.role] || byName
+        case 'email':
+          return compare(a.email, b.email) || byName
+        case 'email-desc':
+          return compare(b.email, a.email) || byName
+        case 'status':
+          return Number(b.isActive) - Number(a.isActive) || byName
+        case 'status-inactive':
+          return Number(a.isActive) - Number(b.isActive) || byName
+        case 'name-asc':
+        default:
+          return byName
+      }
+    })
+}

@@ -1,3 +1,10 @@
+
+"""Bootstrap admin account.
+
+Existing passwords remain unchanged unless --reset-password is used.
+"""
+
+import argparse
 import os
 import sys
 import uuid
@@ -8,33 +15,65 @@ from app.core.database import Base, SessionLocal, engine
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
 
+
 ADMIN_EMAIL = "admin@aims.local"
 
 
 def main() -> int:
-    password = os.environ.get("AIMS_ADMIN_PASSWORD")
-    if not password:
-        print("Set AIMS_ADMIN_PASSWORD in the environment before running this script.")
-        return 2
-    if len(password) < 8:
-        print("The bootstrap password must be at least 8 characters.")
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--reset-password",
+        action="store_true",
+    )
+
+    args = parser.parse_args()
+
+    password = os.environ.get(
+        "AIMS_ADMIN_PASSWORD",
+        "",
+    )
+
+    if not password or len(password) < 8:
+        print(
+            "Set AIMS_ADMIN_PASSWORD to a strong password "
+            "(at least 8 characters)."
+        )
         return 2
 
     Base.metadata.create_all(bind=engine)
+
     db = SessionLocal()
+
     try:
-        user = db.query(User).filter(func.lower(User.email) == ADMIN_EMAIL).first()
+        user = db.query(User).filter(
+            func.lower(User.email) == ADMIN_EMAIL
+        ).first()
+
         if user and user.role != UserRole.ADMIN:
-            print(f"Refusing to change the role of existing account {ADMIN_EMAIL}.")
+            print(
+                "Refusing to change the role "
+                "of the existing account."
+            )
             return 1
 
         if user:
-            user.hashed_password = get_password_hash(password)
-            user.first_name = "Admin"
-            user.last_name = "Administrator"
+            if not args.reset_password:
+                print(
+                    "Admin already exists. Password unchanged. "
+                    "Use --reset-password to change it."
+                )
+                return 0
+
+            user.hashed_password = get_password_hash(
+                password
+            )
+
             user.is_active = True
             user.is_verified = True
-            message = "Updated existing bootstrap administrator."
+
+            message = "Reset bootstrap administrator password."
+
         else:
             user = User(
                 id=str(uuid.uuid4()),
@@ -46,15 +85,19 @@ def main() -> int:
                 is_active=True,
                 is_verified=True,
             )
+
             db.add(user)
             message = "Created bootstrap administrator."
 
         db.commit()
-        print(f"{message} Login identifier: admin (or {ADMIN_EMAIL}).")
+        print(message)
+
         return 0
+
     except Exception:
         db.rollback()
         raise
+
     finally:
         db.close()
 

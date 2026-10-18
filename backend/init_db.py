@@ -1,19 +1,23 @@
-# backend/init_db.py
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from app.core.database import engine, Base
-from app.models.user import User
-from app.models.company import Company
-from app.models.application import Application
-from app.models.document import Document
+"""Development-only database bootstrap.
 
-def init_database():
-    """Create all database tables"""
-    print("📊 Creating database tables...")
+Existing schema changes require Alembic migrations.
+"""
+
+from app.core.database import Base, engine
+import app.models
+
+
+def init_database() -> None:
+    print("Creating missing AIMS database tables...")
+
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created successfully!")
+
+    print(
+        "Done. Existing tables were not migrated; "
+        "use Alembic for schema changes."
+    )
+
 
 if __name__ == "__main__":
     init_database()

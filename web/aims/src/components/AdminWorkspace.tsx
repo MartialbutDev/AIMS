@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Icon } from './Icons'
 import { roleLabels } from '../types/auth'
 import { getNotifications, markAllNotificationsRead } from '../services/notificationService'
 import { AdminNotificationWorkspace } from './AdminNotificationWorkspace'
+import { filterAndSortAdminUsers } from '../services/adminService'
+import type { AdminUserSort } from '../services/adminService'
 import type {
   AdminUser,
   AdminUserRole,
@@ -18,6 +20,126 @@ const adminRoleLabels: Record<AdminUserRole, string> = {
   company: 'Company supervisor',
   admin: roleLabels.admin,
 }
+
+// Styles are embedded here so the user directory works with this single file.
+const userDirectoryStyles = `
+/* Admin user directory — search, filters, sorting */
+.user-directory-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 4px 0 18px;
+}
+
+.user-directory-search,
+.user-directory-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.user-directory-search {
+  flex: 2 1 250px;
+}
+
+.user-directory-filter {
+  flex: 1 1 140px;
+}
+
+.user-directory-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.user-directory-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #64748b;
+}
+
+.user-directory-search-field:focus-within {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.user-directory-search-field input {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+}
+
+.user-directory-filter select {
+  width: 100%;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+}
+
+.user-directory-filter select:focus-visible,
+.user-directory-reset:focus-visible,
+.user-directory-empty button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
+.user-directory-reset {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: transparent;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.user-directory-reset:hover {
+  background: #eff6ff;
+}
+
+.user-directory-empty {
+  padding: 30px 16px !important;
+  text-align: center;
+  color: #64748b;
+}
+
+.user-directory-empty button {
+  display: block;
+  margin: 10px auto 0;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .user-directory-search,
+  .user-directory-filter {
+    flex-basis: 100%;
+  }
+}
+
+`
 
 interface AdminWorkspaceProps {
   section: string
@@ -41,6 +163,29 @@ export function AdminWorkspace({
   uploadUsersError = '',
 }: AdminWorkspaceProps) {
   const csvInput = useRef<HTMLInputElement>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState<'all' | AdminUserRole>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [sortBy, setSortBy] = useState<AdminUserSort>('name-asc')
+
+  const filteredUsers = useMemo(
+    () => filterAndSortAdminUsers(users, {
+      query: searchQuery,
+      role: roleFilter,
+      status: statusFilter,
+      sortBy,
+    }),
+    [users, searchQuery, roleFilter, statusFilter, sortBy],
+  )
+
+  const hasActiveFilters = searchQuery.trim() !== '' || roleFilter !== 'all' || statusFilter !== 'all'
+
+  function clearFilters() {
+    setSearchQuery('')
+    setRoleFilter('all')
+    setStatusFilter('all')
+    setSortBy('name-asc')
+  }
 
   async function handleCsvSelection(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -51,6 +196,7 @@ export function AdminWorkspace({
   if (section === 'Users') {
     return (
       <section className="workspace-page">
+        <style>{userDirectoryStyles}</style>
         <div className="workspace-page-heading">
           <div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> ACCESS MANAGEMENT</span><h1>User management</h1><p>Manage accounts and workspace access.</p></div>
           <div className="user-actions">
@@ -60,10 +206,114 @@ export function AdminWorkspace({
           </div>
         </div>
         <div className="panel user-table-panel">
-          <div className="table-toolbar"><div><h2>All users</h2><p>{usersLoading ? 'Loading user accounts…' : `${users.length} accounts shown`}</p></div><span className="table-search"><Icon name="search" size={15} /> User directory</span></div>
+          <div className="table-toolbar">
+            <div>
+              <h2>All users</h2>
+              <p aria-live="polite">
+                {usersLoading ? 'Loading user accounts…' : `Showing ${filteredUsers.length} of ${users.length} accounts`}
+              </p>
+            </div>
+          </div>
+          <div className="user-directory-controls" role="search" aria-label="Search and filter user accounts">
+            <label className="user-directory-search">
+              <span className="user-directory-label">Search users</span>
+              <span className="user-directory-search-field">
+                <Icon name="search" size={17} />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search name, email, or role…"
+                  aria-label="Search users by name, email, or role"
+                />
+              </span>
+            </label>
+            <label className="user-directory-filter">
+              <span className="user-directory-label">Role</span>
+              <select
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value as 'all' | AdminUserRole)}
+                aria-label="Filter users by role"
+              >
+                <option value="all">All roles</option>
+                {Object.entries(adminRoleLabels).map(([role, label]) => (
+                  <option key={role} value={role}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="user-directory-filter">
+              <span className="user-directory-label">Status</span>
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as 'all' | 'active' | 'inactive')}
+                aria-label="Filter users by status"
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
+            <label className="user-directory-filter">
+              <span className="user-directory-label">Sort by</span>
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as AdminUserSort)}
+                aria-label="Sort users"
+              >
+                <option value="name-asc">Name (A–Z)</option>
+                <option value="name-desc">Name (Z–A)</option>
+                <option value="role">Role (Students first)</option>
+                <option value="role-desc">Role (Admins first)</option>
+                <option value="email">Email (A–Z)</option>
+                <option value="email-desc">Email (Z–A)</option>
+                <option value="status">Active first</option>
+                <option value="status-inactive">Inactive first</option>
+              </select>
+            </label>
+            {hasActiveFilters && (
+              <button className="user-directory-reset" type="button" onClick={clearFilters}>
+                Clear filters
+              </button>
+            )}
+          </div>
           {uploadUsersError && <p className="form-error user-import-error" role="alert">{uploadUsersError}</p>}
           {usersError && <p className="form-error user-import-error" role="alert">{usersError}</p>}
-          <div className="user-table-scroll"><table className="user-table"><thead><tr><th>USER</th><th>ROLE</th><th>STATUS</th></tr></thead><tbody>{users.map((user) => <tr key={user.id}><td><span className="table-user"><span className="table-user-avatar">{user.firstName.slice(0, 1)}{user.lastName.slice(0, 1)}</span><span><strong>{user.firstName} {user.lastName}</strong><small>{user.email}</small></span></span></td><td><span className="role-pill">{adminRoleLabels[user.role]}</span></td><td><span className={`status-pill${user.isActive ? '' : ' status-pill--inactive'}`}><i /> {user.isActive ? 'Active' : 'Inactive'}</span></td></tr>)}</tbody></table></div>
+          <div className="user-table-scroll">
+            <table className="user-table">
+              <thead><tr><th>USER</th><th>ROLE</th><th>STATUS</th></tr></thead>
+              <tbody>
+                {filteredUsers.map((user) => (
+                  <tr key={user.id}>
+                    <td>
+                      <span className="table-user">
+                        <span className="table-user-avatar">{user.firstName.slice(0, 1)}{user.lastName.slice(0, 1)}</span>
+                        <span><strong>{user.firstName} {user.lastName}</strong><small>{user.email}</small></span>
+                      </span>
+                    </td>
+                    <td><span className="role-pill">{adminRoleLabels[user.role]}</span></td>
+                    <td>
+                      <span className={`status-pill${user.isActive ? '' : ' status-pill--inactive'}`}>
+                        <i /> {user.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {!usersLoading && filteredUsers.length === 0 && (
+                  <tr><td colSpan={3} className="user-directory-empty">
+                    {users.length === 0
+                      ? 'No user accounts found.'
+                      : 'No users match your search or filters.'}
+                    {hasActiveFilters && (
+                      <button type="button" onClick={clearFilters}>Clear filters</button>
+                    )}
+                  </td></tr>
+                )}
+                {usersLoading && (
+                  <tr><td colSpan={3} className="user-directory-empty">Loading users…</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
           <p className="csv-import-note">CSV headers: <code>email,first_name,last_name,role,password</code> (optional: <code>phone</code>). Student accounts must use student signup. Passwords are hashed by the backend; use HTTPS in production.</p>
         </div>
       </section>

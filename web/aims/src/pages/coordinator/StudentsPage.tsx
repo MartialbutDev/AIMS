@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Icon } from './Icons'
+﻿import { useEffect, useState, type FormEvent } from 'react'
+import { Icon } from '../../components/Icons'
 import {
   getCoordinatorStudentDetail,
   getCoordinatorStudentFile,
@@ -7,7 +7,7 @@ import {
   saveCoordinatorEvaluation,
   type CoordinatorStudent,
   type CoordinatorStudentDetail,
-} from '../services/coordinatorService'
+} from '../../services/coordinatorService'
 
 const documentLabels: Record<string, string> = {
   resume: 'Resume',
@@ -176,7 +176,7 @@ function StudentDetails({
   )
 }
 
-export function CoordinatorWorkspace() {
+export function StudentsPage() {
   const [students, setStudents] = useState<CoordinatorStudent[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [detail, setDetail] = useState<CoordinatorStudentDetail | null>(null)
@@ -269,3 +269,4 @@ export function CoordinatorWorkspace() {
     </section>
   )
 }
+
