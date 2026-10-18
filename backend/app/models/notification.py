@@ -12,6 +12,7 @@ class NotificationType(str, PyEnum):
     DTR = "dtr"
     JOURNAL = "journal"
     DOCUMENT = "document"
+    ANNOUNCEMENT = "announcement"
     SYSTEM = "system"
 
 

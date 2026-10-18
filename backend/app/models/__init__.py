@@ -5,3 +5,5 @@ from app.models.document import Document
 from app.models.dtr import DTR
 from app.models.journal import Journal
 from app.models.notification import Notification
+from app.models.coordinator_assignment import CoordinatorStudentAssignment
+from app.models.notification_campaign import NotificationCampaign

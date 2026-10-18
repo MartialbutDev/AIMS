@@ -29,6 +29,7 @@ export default function SignUpScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
   const [fullName, setFullName] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other" | "prefer_not_to_say" | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -138,6 +139,7 @@ export default function SignUpScreen() {
         first_name: firstName,
         last_name: lastName,
         student_id: studentId.trim(),
+        gender: gender ?? undefined,
       });
 
       console.log('✅ Registration successful:', response);
@@ -152,6 +154,7 @@ export default function SignUpScreen() {
             onPress: () => {
               setFullName("");
               setStudentId("");
+              setGender(null);
               setEmail("");
               setPassword("");
               setConfirmPassword("");
@@ -358,6 +361,41 @@ export default function SignUpScreen() {
                       />
                     </View>
                     {studentIdError ? <Text style={[styles.errorText, { color: colors.error }]}>{studentIdError}</Text> : null}
+                  </View>
+
+                  <View style={styles.fieldWrapper}>
+                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Gender (optional)</Text>
+                    <View style={styles.genderOptions}>
+                      {([
+                        ["male", "Male"],
+                        ["female", "Female"],
+                        ["other", "Other"],
+                        ["prefer_not_to_say", "Prefer not to say"],
+                      ] as const).map(([value, label]) => {
+                        const selected = gender === value;
+                        return (
+                          <TouchableOpacity
+                            key={value}
+                            style={[
+                              styles.genderOption,
+                              { borderColor: selected ? colors.primary : colors.border },
+                              selected && { backgroundColor: `${colors.primary}15` },
+                            ]}
+                            onPress={() => setGender(selected ? null : value)}
+                            disabled={loading}
+                            accessibilityRole="radio"
+                            accessibilityState={{ checked: selected }}
+                          >
+                            <Text style={{ color: selected ? colors.primary : colors.textSecondary, fontSize: 13 }}>
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    <Text style={[styles.genderNote, { color: colors.textTertiary }]}>
+                      Used only for aggregate internship program reporting. Leave unselected if you prefer not to provide it.
+                    </Text>
                   </View>
 
                   <View style={styles.fieldWrapper}>
@@ -751,6 +789,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 6,
+  },
+
+  genderOptions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  genderOption: {
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: 11,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+
+  genderNote: {
+    marginTop: 7,
+    fontSize: 11,
+    lineHeight: 16,
   },
 
   inputWrapper: {

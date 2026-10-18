@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import List, Optional
+from typing import List, Literal, Optional
 from datetime import datetime
 from enum import Enum
 
@@ -20,6 +20,7 @@ class UserBase(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
     student_id: Optional[str] = Field(None, max_length=50)
+    gender: Optional[Literal["male", "female", "other", "prefer_not_to_say"]] = None
     avatar_url: Optional[str] = None  # ✅ ADDED
 
 
@@ -51,6 +52,7 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
     student_id: Optional[str] = Field(None, max_length=50)
+    gender: Optional[Literal["male", "female", "other", "prefer_not_to_say"]] = None
     avatar_url: Optional[str] = None  # ✅ ADDED
 
 

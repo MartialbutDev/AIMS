@@ -1,7 +1,8 @@
 // mobile/src/services/auth.service.ts
 import api from './api';
 import * as SecureStore from 'expo-secure-store';
-import { Alert } from 'react-native';
+import { isAxiosError } from 'axios';
+import { API_URL, BASE_URL } from '../config/env';
 
 export interface LoginResponse {
   access_token: string;
@@ -23,14 +24,8 @@ export interface RegisterData {
   first_name: string;
   last_name: string;
   student_id: string;
+  gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say';
 }
-
-// ✅ Get Base URL from environment
-const getBaseUrl = (): string => {
-  // You can also hardcode your IP here if env not working
-  // return 'http://192.168.1.45:8000';
-  return process.env.EXPO_PUBLIC_BASE_URL || 'http://localhost:8000';
-};
 
 export const authService = {
   // Student Login (Mobile)
@@ -62,28 +57,29 @@ export const authService = {
   // Student Registration (Mobile)
   async register(data: RegisterData): Promise<any> {
     try {
-      console.log('📝 Registration data:', { 
-        email: data.email, 
-        student_id: data.student_id,
-        first_name: data.first_name,
-        last_name: data.last_name,
-        password: '***' 
-      });
-
       const response = await api.post('/auth/register/student', {
         email: data.email,
         password: data.password,
         first_name: data.first_name,
         last_name: data.last_name,
         student_id: data.student_id,
+        gender: data.gender,
       });
       
-      console.log('✅ Registration successful:', response.data);
+      console.log('✅ Registration successful');
       return response.data;
       
-    } catch (error: any) {
-      console.error('❌ Registration error:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.detail || 'Registration failed. Please try again.';
+    } catch (error: unknown) {
+      if (isAxiosError(error) && !error.response) {
+        const apiOrigin = new URL(API_URL).origin;
+        throw new Error(
+          `Cannot reach the AIMS server at ${apiOrigin}. Make sure your phone and computer are on the same Wi-Fi, the backend is running, and Windows Firewall allows port 8000.`
+        );
+      }
+
+      const errorMessage = isAxiosError(error)
+        ? error.response?.data?.detail || 'Registration failed. Please try again.'
+        : 'Registration failed. Please try again.';
       throw new Error(errorMessage);
     }
   },
@@ -107,7 +103,6 @@ export const authService = {
       
       // If avatar_url exists from server, construct full URL
       if (response.data.avatar_url) {
-        const BASE_URL = getBaseUrl();
         response.data.avatar_url = `${BASE_URL}/static/${response.data.avatar_url}`;
       }
       
@@ -173,7 +168,6 @@ export const authService = {
       console.log('✅ Avatar uploaded:', response.data);
       
       // Construct full avatar URL
-      const BASE_URL = getBaseUrl();
       const fullAvatarUrl = response.data.avatar_url ? `${BASE_URL}/static/${response.data.avatar_url}` : null;
       
       // Update stored user data with full avatar URL
@@ -235,8 +229,6 @@ export const authService = {
   // Get Avatar URL (from server or local cache)
   async getAvatar(): Promise<string | null> {
     try {
-      const BASE_URL = getBaseUrl();
-      
       // First try to get from user data (server URL)
       const userData = await SecureStore.getItemAsync('user');
       if (userData) {

@@ -4,10 +4,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_role
 from app.models.application import Application, ApplicationStatus
 from app.models.company import Company
+from app.models.coordinator_assignment import CoordinatorStudentAssignment
+from app.models.document import Document, DocumentType
+from app.models.dtr import DTR, DTRStatus
 from app.models.user import User, UserRole
 
 router = APIRouter()
@@ -19,6 +23,18 @@ ROLE_PRESENTATION = {
     UserRole.CAREER_CENTER: ("Career center", "Live student, partner, and placement activity from the AIMS database."),
     UserRole.HTE_SUPERVISOR: ("Hiring dashboard", "Live applications associated with your registered company profile."),
 }
+
+REQUIRED_DOCUMENT_TYPES = (
+    DocumentType.RESUME,
+    DocumentType.APPLICATION_LETTER,
+    DocumentType.WAIVER,
+    DocumentType.MEDICAL_CERTIFICATE,
+    DocumentType.INTERNSHIP_PLAN,
+    DocumentType.INSURANCE,
+    DocumentType.ENDORSEMENT_LETTER,
+    DocumentType.ACCEPTANCE_LETTER,
+    DocumentType.CERTIFICATE_OF_COMPLETION,
+)
 
 
 def _format_count(count: int) -> str:
@@ -36,6 +52,107 @@ def _months_back(now: datetime, count: int = 6) -> list[datetime]:
             year -= 1
         months.append(datetime(year, month, 1))
     return months
+
+
+@router.get("/dean")
+async def get_dean_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("dean")),
+):
+    """Return institution-wide aggregate metrics without individual student data."""
+    students = db.query(User).filter(
+        User.role == UserRole.STUDENT,
+        User.is_active.is_(True),
+    ).all()
+    student_ids = [student.id for student in students]
+    genders = ("male", "female", "other", "prefer_not_to_say", "not_provided")
+    gender_counts = {gender: 0 for gender in genders}
+    for student in students:
+        gender = student.gender if student.gender in gender_counts else "not_provided"
+        gender_counts[gender] += 1
+
+    coordinators = db.query(User).filter(
+        User.role == UserRole.COORDINATOR,
+        User.is_active.is_(True),
+    ).order_by(User.last_name, User.first_name).all()
+    assignments = db.query(CoordinatorStudentAssignment).join(
+        User,
+        User.id == CoordinatorStudentAssignment.student_id,
+    ).filter(
+        User.role == UserRole.STUDENT,
+        User.is_active.is_(True),
+    ).all()
+    assignments_by_coordinator: dict[str, list[str]] = {}
+    for assignment in assignments:
+        assignments_by_coordinator.setdefault(assignment.coordinator_id, []).append(assignment.student_id)
+
+    assigned_student_ids = {
+        student_id
+        for student_ids_for_coordinator in assignments_by_coordinator.values()
+        for student_id in student_ids_for_coordinator
+    }
+    documents_by_student: dict[str, dict[str, str]] = {}
+    if assigned_student_ids:
+        documents = db.query(Document).filter(
+            Document.uploaded_by.in_(assigned_student_ids),
+            Document.type.in_(REQUIRED_DOCUMENT_TYPES),
+        ).order_by(Document.created_at.desc()).all()
+        for document in documents:
+            student_documents = documents_by_student.setdefault(document.uploaded_by, {})
+            student_documents.setdefault(document.type.value, document.verification_status)
+
+    approved_hours_by_student: dict[str, float] = {}
+    if assigned_student_ids:
+        approved_dtrs = db.query(DTR).filter(
+            DTR.student_id.in_(assigned_student_ids),
+            DTR.status == DTRStatus.APPROVED,
+        ).all()
+        for record in approved_dtrs:
+            approved_hours_by_student[record.student_id] = (
+                approved_hours_by_student.get(record.student_id, 0.0) + (record.total_hours or 0.0)
+            )
+
+    student_metrics: dict[str, tuple[float, float, bool]] = {}
+    for student_id in assigned_student_ids:
+        document_statuses = documents_by_student.get(student_id, {})
+        verified_count = sum(
+            document_statuses.get(document_type.value) == "verified"
+            for document_type in REQUIRED_DOCUMENT_TYPES
+        )
+        document_percent = verified_count / len(REQUIRED_DOCUMENT_TYPES) * 100
+        required_hours = settings.REQUIRED_INTERNSHIP_HOURS
+        ojt_percent = min(100.0, approved_hours_by_student.get(student_id, 0.0) / required_hours * 100) if required_hours else 0.0
+        is_complete = verified_count == len(REQUIRED_DOCUMENT_TYPES) and ojt_percent >= 100
+        student_metrics[student_id] = (document_percent, ojt_percent, is_complete)
+
+    coordinator_metrics = []
+    for coordinator in coordinators:
+        coordinator_student_ids = assignments_by_coordinator.get(coordinator.id, [])
+        metrics = [student_metrics[student_id] for student_id in coordinator_student_ids if student_id in student_metrics]
+        count = len(metrics)
+        coordinator_metrics.append({
+            "coordinator_id": coordinator.id,
+            "coordinator_name": f"{coordinator.first_name} {coordinator.last_name}".strip(),
+            "student_count": count,
+            "average_document_completion_percent": round(sum(item[0] for item in metrics) / count) if count else 0,
+            "average_ojt_completion_percent": round(sum(item[1] for item in metrics) / count) if count else 0,
+            "fully_complete_students": sum(item[2] for item in metrics),
+            "fully_complete_percent": round(sum(item[2] for item in metrics) / count * 100) if count else 0,
+        })
+
+    metrics = [student_metrics[student_id] for student_id in assigned_student_ids if student_id in student_metrics]
+    assigned_count = len(metrics)
+    return {
+        "enrolled_student_count": len(students),
+        "gender_distribution": gender_counts,
+        "assigned_student_count": len(assigned_student_ids),
+        "unassigned_student_count": len(set(student_ids) - assigned_student_ids),
+        "average_document_completion_percent": round(sum(item[0] for item in metrics) / assigned_count) if assigned_count else 0,
+        "average_ojt_completion_percent": round(sum(item[1] for item in metrics) / assigned_count) if assigned_count else 0,
+        "fully_complete_students": sum(item[2] for item in metrics),
+        "fully_complete_percent": round(sum(item[2] for item in metrics) / assigned_count * 100) if assigned_count else 0,
+        "coordinators": coordinator_metrics,
+    }
 
 
 @router.get("/dashboard")

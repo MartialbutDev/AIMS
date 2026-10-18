@@ -52,11 +52,20 @@ export interface CreateAdminUserInput {
   role: Exclude<AdminUserRole, 'student'>
 }
 
+export type UserNotificationType =
+  | 'application'
+  | 'dtr'
+  | 'journal'
+  | 'document'
+  | 'announcement'
+  | 'system'
+
 export interface UserNotification {
   id: string
-  type: 'application' | 'dtr' | 'journal' | 'document' | 'system'
+  type: UserNotificationType
   title: string
   message: string
+  data?: Record<string, unknown> | null
   isRead: boolean
   createdAt: string
 }

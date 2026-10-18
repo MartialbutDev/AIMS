@@ -54,6 +54,11 @@ class User(Base):
         nullable=True
     )
 
+    gender = Column(
+        String(24),
+        nullable=True
+    )
+
     hashed_password = Column(
         String(255),
         nullable=False
