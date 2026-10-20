@@ -1,0 +1,4101 @@
+﻿===== AIMS COORDINATOR SOURCE CODE =====
+
+
+========================================
+FILE: web\aims\src\pages\coordinator\CoordinatorPages.tsx
+========================================
+
+import type { DashboardData } from '../../types/dashboard'
+import type { UserSession } from '../../types/auth'
+
+// ========================================
+// SHARED UTILITY PAGES
+// ========================================
+
+import {
+  AccountSettingsPage,
+  HelpCenterPage,
+} from '../shared/UtilityPages'
+
+// ========================================
+// COORDINATOR PAGES
+// ========================================
+
+import { CoordinatorDashboardPage } from './CoordinatorDashboardPage'
+import { StudentsPage } from './StudentsPage'
+import { ApplicationsPage } from './ApplicationsPage'
+import { NotificationsPage } from './NotificationsPage'
+
+// ========================================
+// COMPONENT PROPS
+// ========================================
+
+interface CoordinatorPagesProps {
+  section: string
+  session: UserSession
+  data: DashboardData
+  onLogout: () => void
+  onNavigate: (section: string) => void
+}
+
+// ========================================
+// COORDINATOR PAGE ROUTER
+// ========================================
+
+export function CoordinatorPages({
+  section,
+  session,
+  data,
+  onLogout,
+  onNavigate,
+}: CoordinatorPagesProps) {
+  // ========================================
+  // DASHBOARD
+  // ========================================
+
+  switch (section) {
+    case 'dashboard':
+      return (
+        <CoordinatorDashboardPage
+          data={data}
+          name={session.name}
+          onNavigate={onNavigate}
+        />
+      )
+
+    // ========================================
+    // STUDENT MANAGEMENT
+    // ========================================
+
+    case 'students':
+      return <StudentsPage />
+
+    // ========================================
+    // INTERNSHIP APPLICATIONS
+    // ========================================
+
+    case 'applications':
+      return (
+        <ApplicationsPage
+          data={data}
+        />
+      )
+
+    // ========================================
+    // NOTIFICATIONS
+    // ========================================
+
+    case 'notifications':
+      return <NotificationsPage />
+
+    // ========================================
+    // ACCOUNT SETTINGS
+    // ========================================
+
+    case 'settings':
+      return (
+        <AccountSettingsPage
+          session={session}
+          onLogout={onLogout}
+        />
+      )
+
+    // ========================================
+    // HELP CENTER
+    // ========================================
+
+    case 'help-center':
+      return (
+        <HelpCenterPage
+          session={session}
+        />
+      )
+
+    // ========================================
+    // DEFAULT DASHBOARD
+    // ========================================
+
+    default:
+      return (
+        <CoordinatorDashboardPage
+          data={data}
+          name={session.name}
+          onNavigate={onNavigate}
+        />
+      )
+  }
+}
+
+
+========================================
+FILE: web\aims\src\pages\coordinator\CoordinatorDashboardPage.tsx
+========================================
+
+import { useState } from 'react'
+import { Icon } from '../../components/Icons'
+import type { DashboardData, DashboardMetric } from '../../types/dashboard'
+import './coordinator-ui.css'
+
+interface CoordinatorDashboardPageProps {
+  data: DashboardData
+  name: string
+  onNavigate: (section: string) => void
+}
+
+function MetricCard({
+  metric,
+  onClick,
+}: {
+  metric: DashboardMetric
+  onClick?: () => void
+}) {
+  const content = (
+    <>
+      <div className="co-metric-header">
+        <span className="co-metric-label">{metric.label}</span>
+        <span className={`co-metric-icon co-tone-${metric.tone}`}>
+          <Icon name={metric.icon} size={20} />
+        </span>
+      </div>
+
+      <strong className="co-metric-value">{metric.value}</strong>
+
+      <div className="co-metric-footer">
+        <span className={`co-metric-change co-tone-${metric.tone}`}>
+          {metric.change}
+        </span>
+        {onClick && <span className="co-metric-action">View details →</span>}
+      </div>
+    </>
+  )
+
+  return onClick ? (
+    <button type="button" className="co-metric-card co-metric-clickable" onClick={onClick}>
+      {content}
+    </button>
+  ) : (
+    <article className="co-metric-card">{content}</article>
+  )
+}
+
+export function CoordinatorDashboardPage({
+  data,
+  name,
+  onNavigate,
+}: CoordinatorDashboardPageProps) {
+  const [checkedTasks, setCheckedTasks] = useState<string[]>([])
+
+  const chartMaximum = Math.max(...data.chartValues, 1)
+  const pendingCount = data.tasks.filter(
+    (task) => !checkedTasks.includes(task)
+  ).length
+
+  const completedCount = data.tasks.length - pendingCount
+
+  function toggleTask(task: string) {
+    setCheckedTasks((current) =>
+      current.includes(task)
+        ? current.filter((item) => item !== task)
+        : [...current, task]
+    )
+  }
+
+  function metricDestination(metric: DashboardMetric) {
+    const label = metric.label.toLowerCase()
+
+    if (label.includes('student')) return 'students'
+    if (label.includes('application')) return 'applications'
+
+    return undefined
+  }
+
+  return (
+    <main className="co-page co-dashboard">
+      <section className="co-hero">
+        <div className="co-hero-content">
+          <span className="co-hero-eyebrow">
+            <span className="co-live-dot" />
+            COORDINATOR WORKSPACE
+          </span>
+
+          <h1>
+            {data.greeting}, <span>{name}!</span>
+          </h1>
+
+          <p>{data.subtitle}</p>
+
+          <div className="co-hero-actions">
+            <button
+              type="button"
+              className="co-button co-button-primary"
+              onClick={() => onNavigate('students')}
+            >
+              <Icon name="search" size={17} />
+              Manage students
+            </button>
+
+            <button
+              type="button"
+              className="co-button co-button-hero-outline"
+              onClick={() => onNavigate('notifications')}
+            >
+              <Icon name="bell" size={17} />
+              Notifications
+            </button>
+          </div>
+        </div>
+
+        <div className="co-hero-decoration" aria-hidden="true">
+          <div className="co-hero-orbit co-hero-orbit-one" />
+          <div className="co-hero-orbit co-hero-orbit-two" />
+          <div className="co-hero-symbol">
+            <Icon name="check" size={36} />
+          </div>
+        </div>
+      </section>
+
+      <div className="co-section-title">
+        <div>
+          <span className="co-overline">OVERVIEW</span>
+          <h2>Workspace overview</h2>
+          <p>Monitor internship activity and important updates.</p>
+        </div>
+        <span className="co-section-tag">Live workspace data</span>
+      </div>
+
+      <section className="co-metrics-grid" aria-label="Coordinator metrics">
+        {data.metrics.map((metric) => {
+          const destination = metricDestination(metric)
+
+          return (
+            <MetricCard
+              key={metric.label}
+              metric={metric}
+              onClick={
+                destination
+                  ? () => onNavigate(destination)
+                  : undefined
+              }
+            />
+          )
+        })}
+      </section>
+
+      <section className="co-content-grid">
+        <article className="co-card co-activity-card">
+          <header className="co-card-header">
+            <div>
+              <span className="co-overline">LATEST UPDATES</span>
+              <h2>Recent activity</h2>
+              <p>What's happening in your internship workspace</p>
+            </div>
+
+            <button
+              type="button"
+              className="co-text-button"
+              onClick={() => onNavigate('applications')}
+            >
+              View all
+              <Icon name="arrow" size={15} />
+            </button>
+          </header>
+
+          {data.activities.length === 0 ? (
+            <div className="co-empty">
+              <div className="co-empty-icon">
+                <Icon name="bell" size={24} />
+              </div>
+              <strong>No recent activity</strong>
+              <p>New internship activity will appear here.</p>
+            </div>
+          ) : (
+            <div className="co-activity-list">
+              {data.activities.slice(0, 6).map((activity, index) => (
+                <div
+                  className="co-activity-item"
+                  key={`${activity.title}-${index}`}
+                >
+                  <div className={`co-avatar co-tone-${activity.tone}`}>
+                    {activity.initials}
+                  </div>
+
+                  <div className="co-activity-content">
+                    <strong>{activity.title}</strong>
+                    <p>{activity.detail}</p>
+                  </div>
+
+                  <time className="co-activity-time">{activity.time}</time>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
+
+        <article className="co-card co-task-card">
+          <header className="co-card-header">
+            <div>
+              <span className="co-overline">YOUR CHECKLIST</span>
+              <h2>{data.tasksTitle}</h2>
+              <p>Stay organized throughout the day</p>
+            </div>
+
+            <span className="co-count-badge">{pendingCount}</span>
+          </header>
+
+          {data.tasks.length > 0 && (
+            <div className="co-task-progress">
+              <div className="co-task-progress-label">
+                <span>Checklist progress</span>
+                <strong>{completedCount}/{data.tasks.length}</strong>
+              </div>
+              <div className="co-progress-track">
+                <span
+                  style={{
+                    width: `${(completedCount / data.tasks.length) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="co-task-list">
+            {data.tasks.length === 0 ? (
+              <div className="co-empty co-empty-compact">
+                <strong>No tasks available</strong>
+                <p>Your checklist is currently empty.</p>
+              </div>
+            ) : (
+              data.tasks.map((task, index) => {
+                const checked = checkedTasks.includes(task)
+
+                return (
+                  <label className="co-task-item" key={`${task}-${index}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleTask(task)}
+                    />
+                    <span className={`co-task-checkbox ${checked ? 'is-checked' : ''}`}>
+                      {checked && <Icon name="check" size={13} />}
+                    </span>
+                    <span className={checked ? 'co-task-done' : ''}>
+                      {task}
+                    </span>
+                  </label>
+                )
+              })
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="co-button co-button-soft co-full-width"
+            onClick={() => onNavigate('applications')}
+          >
+            View applications
+            <Icon name="arrow" size={16} />
+          </button>
+        </article>
+      </section>
+
+      <section className="co-card co-chart-card">
+        <header className="co-card-header">
+          <div>
+            <span className="co-overline">ANALYTICS</span>
+            <h2>{data.chartTitle}</h2>
+            <p>{data.chartCaption}</p>
+          </div>
+          <span className="co-section-tag">Last 6 months</span>
+        </header>
+
+        <div className="co-chart-container">
+          <div className="co-chart-y-axis">
+            {[1, 0.75, 0.5, 0.25, 0].map((fraction) => (
+              <span key={fraction}>
+                {Math.round(chartMaximum * fraction)}
+              </span>
+            ))}
+          </div>
+
+          <div className="co-chart-main">
+            <div className="co-chart-grid" aria-hidden="true">
+              {[0, 1, 2, 3, 4].map((line) => (
+                <span key={line} />
+              ))}
+            </div>
+
+            <div className="co-chart-bars">
+              {data.chartValues.map((value, index) => (
+                <div className="co-chart-column" key={index}>
+                  <div className="co-chart-bar-area">
+                    <div
+                      className={`co-chart-bar ${
+                        index === data.chartValues.length - 1
+                          ? 'co-chart-bar-active'
+                          : ''
+                      }`}
+                      style={{
+                        height: `${Math.max(0, (value / chartMaximum) * 100)}%`,
+                      }}
+                      title={`${value} applications`}
+                    />
+                  </div>
+                  <span>{data.chartLabels[index] ?? ''}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="co-footer">
+        <span>© 2026 USTP AIMS · Academic Internship Management System</span>
+        <span>Coordinator Portal</span>
+      </footer>
+    </main>
+  )
+}
+
+
+========================================
+FILE: web\aims\src\pages\coordinator\StudentsPage.tsx
+========================================
+import { useEffect, useState, type FormEvent } from 'react'
+import { Icon } from '../../components/Icons'
+import {
+  getCoordinatorStudentDetail,
+  getCoordinatorStudentFile,
+  getCoordinatorStudents,
+  saveCoordinatorEvaluation,
+  type CoordinatorStudent,
+  type CoordinatorStudentDetail,
+} from '../../services/coordinatorService'
+
+const documentLabels: Record<string, string> = {
+  resume: 'Resume',
+  application_letter: 'Application letter',
+  waiver: 'Waiver',
+  medical_certificate: 'Medical certificate',
+  internship_plan: 'Internship plan',
+  insurance: 'Insurance',
+  endorsement_letter: 'Endorsement letter',
+  acceptance_letter: 'Acceptance letter',
+  certificate_of_completion: 'Certificate of completion',
+}
+
+function formatDate(value: string) {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date)
+}
+
+function ProgressBar({ value, label }: { value: number; label: string }) {
+  const percent = Math.max(0, Math.min(100, value))
+  return (
+    <div className="student-progress" aria-label={`${label}: ${percent}%`}>
+      <div className="student-progress-track"><span style={{ width: `${percent}%` }} /></div>
+      <strong>{percent}%</strong>
+    </div>
+  )
+}
+
+function EvaluationPanel({
+  studentId,
+  evaluation,
+  onSaved,
+}: {
+  studentId: string
+  evaluation: CoordinatorStudentDetail['evaluation']
+  onSaved: (grade: number, notes: string) => void
+}) {
+  const [grade, setGrade] = useState(evaluation ? evaluation.grade.toFixed(2) : '')
+  const [notes, setNotes] = useState(evaluation?.notes ?? '')
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIsSaving(true)
+    setError('')
+    setSaved(false)
+    try {
+      const result = await saveCoordinatorEvaluation(studentId, Number(grade), notes)
+      onSaved(result.grade, result.notes ?? '')
+      setSaved(true)
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save the evaluation.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <form className="panel coordinator-evaluation" onSubmit={submit}>
+      <div className="panel-heading"><div><h2>Coordinator summary & grade</h2><p>Grade scale: 1.00 is highest; 5.00 is lowest.</p></div></div>
+      <div className="evaluation-fields">
+        <label>Final grade
+          <input aria-label="Final grade" type="number" min="1" max="5" step="0.01" required value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="e.g. 1.25" />
+        </label>
+        <label>Evaluation notes
+          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={5000} rows={3} placeholder="Add a concise OJT performance summary…" />
+        </label>
+      </div>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {saved && <p className="evaluation-saved" role="status">Evaluation saved.</p>}
+      <button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save grade'} <Icon name="check" size={15} /></button>
+    </form>
+  )
+}
+
+function StudentDetails({
+  detail,
+  onEvaluationSaved,
+}: {
+  detail: CoordinatorStudentDetail
+  onEvaluationSaved: (grade: number, notes: string) => void
+}) {
+  const [preview, setPreview] = useState<{ url: string; title: string; contentType: string } | null>(null)
+  const [fileError, setFileError] = useState('')
+  const [loadingFile, setLoadingFile] = useState('')
+
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview.url)
+  }, [preview])
+
+  async function openFile(path: string, title: string) {
+    setLoadingFile(title)
+    setFileError('')
+    try {
+      const file = await getCoordinatorStudentFile(detail.student.id, path)
+      setPreview({ ...file, title })
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : 'Could not open this file.')
+    } finally {
+      setLoadingFile('')
+    }
+  }
+
+  const { student, journey } = detail
+  const fullName = `${student.first_name} ${student.last_name}`
+  return (
+    <div className="coordinator-detail">
+      <section className="panel student-profile-card">
+        <div className="student-profile-heading">
+          <span className="student-profile-avatar">{student.first_name.slice(0, 1)}{student.last_name.slice(0, 1)}</span>
+          <div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> STUDENT SUMMARY</span><h2>{fullName}</h2><p>{student.student_id || 'No student ID'} · {student.email}</p></div>
+        </div>
+        <div className="journey-progress-heading"><span>OJT completion</span><strong>{journey.progress_percent}% complete</strong></div>
+        <ProgressBar value={journey.progress_percent} label="OJT completion" />
+        <div className="journey-stats">
+          <div><strong>{journey.approved_hours.toLocaleString()}h</strong><span>approved</span></div>
+          <div><strong>{journey.remaining_hours.toLocaleString()}h</strong><span>hours remaining</span></div>
+          <div><strong>{journey.estimated_days_left ?? '—'}</strong><span>estimated working days left</span></div>
+          <div><strong>{journey.pending_dtr_count}</strong><span>DTRs awaiting review</span></div>
+        </div>
+        <p className="journey-estimate-note">{journey.average_approved_hours_per_day
+          ? `Days estimate uses the student's approved-record average of ${journey.average_approved_hours_per_day} hours per working day.`
+          : journey.remaining_hours
+            ? 'A days-left estimate will appear after approved DTR hours are recorded.'
+            : 'Required OJT hours are complete.'}</p>
+      </section>
+
+      <section className="panel coordinator-subpanel">
+        <div className="panel-heading"><div><h2>Application progress</h2><p>{detail.applications.length} application record{detail.applications.length === 1 ? '' : 's'}</p></div></div>
+        {detail.applications.length === 0 ? <p className="empty-state">No applications found.</p> : <div className="coordinator-record-list">{detail.applications.map((application) => <div className="coordinator-record-row" key={application.id}><span><strong>{application.position}</strong><small>{application.company || 'Company unavailable'} · {formatDate(application.applied_date)}</small></span><span className="status-pill"><i />{application.status}</span></div>)}</div>}
+      </section>
+
+      <section className="panel coordinator-subpanel">
+        <div className="panel-heading"><div><h2>Required documents</h2><p>{detail.documents.filter((document) => document.status === 'verified').length} verified file(s)</p></div></div>
+        <div className="document-status-grid">{detail.document_statuses.map((item) => {
+          const uploaded = detail.documents.find((document) => document.type === item.type)
+          const label = documentLabels[item.type] ?? item.type.replaceAll('_', ' ')
+          return <div className="document-status-item" key={item.type}><span>{label}</span>{uploaded && <button type="button" className="document-file-button" onClick={() => void openFile(`documents/${uploaded.id}/file`, uploaded.filename || `${label}.file`)} disabled={loadingFile !== ''}>{loadingFile === (uploaded.filename || `${label}.file`) ? 'Opening…' : 'View file'}</button>}<span className={`document-state document-state--${item.status}`}>{item.status.replaceAll('_', ' ')}</span></div>
+        })}</div>
+      </section>
+
+      <section className="panel coordinator-subpanel">
+        <div className="panel-heading"><div><h2>DTR summary & photos</h2><p>{journey.approved_dtr_count} approved · {journey.pending_dtr_count} pending · {journey.rejected_dtr_count} rejected</p></div></div>
+        {detail.dtr_records.length === 0 ? <p className="empty-state">No daily time records found.</p> : <div className="coordinator-record-list">{detail.dtr_records.map((record) => <div className="coordinator-dtr-row" key={record.id}><div className="coordinator-record-row"><span><strong>{formatDate(record.date)}</strong><small>{record.time_in}{record.time_out ? ` – ${record.time_out}` : ''} · {record.total_hours ?? 0}h</small></span><span className="status-pill"><i />{record.status}</span></div>{record.tasks_completed && <p>{record.tasks_completed}</p>}<div className="dtr-photo-actions">{record.image_in_available && <button className="document-file-button" onClick={() => void openFile(`dtr/${record.id}/photo/in`, `DTR ${formatDate(record.date)} check-in`)} disabled={loadingFile !== ''}>View check-in photo</button>}{record.image_out_available && <button className="document-file-button" onClick={() => void openFile(`dtr/${record.id}/photo/out`, `DTR ${formatDate(record.date)} check-out`)} disabled={loadingFile !== ''}>View check-out photo</button>}</div></div>)}</div>}
+        {fileError && <p className="form-error" role="alert">{fileError}</p>}
+      </section>
+
+      <section className="panel coordinator-subpanel">
+        <div className="panel-heading"><div><h2>OJT journals</h2><p>Weekly learning records</p></div></div>
+        {detail.journals.length === 0 ? <p className="empty-state">No journals found.</p> : <div className="coordinator-record-list">{detail.journals.map((journal) => <div className="coordinator-record-row" key={journal.id}><span><strong>Week {journal.week}: {journal.title}</strong><small>{journal.summary || 'No summary provided'}</small></span><span className="status-pill"><i />{journal.status}</span></div>)}</div>}
+      </section>
+
+      <EvaluationPanel
+        key={student.id}
+        studentId={student.id}
+        evaluation={detail.evaluation}
+        onSaved={onEvaluationSaved}
+      />
+
+      {preview && <div className="dialog-backdrop coordinator-file-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null) }}><section className="coordinator-file-dialog" role="dialog" aria-modal="true" aria-label={preview.title}><div className="coordinator-file-heading"><strong>{preview.title}</strong><button className="dialog-close" onClick={() => setPreview(null)} aria-label="Close file preview">×</button></div>{preview.contentType === 'application/pdf' ? <iframe title={preview.title} src={preview.url} /> : preview.contentType.startsWith('image/') ? <img src={preview.url} alt={preview.title} /> : <p className="empty-state">Preview is not available for this file type.</p>}</section></div>}
+    </div>
+  )
+}
+
+export function StudentsPage() {
+  const [students, setStudents] = useState<CoordinatorStudent[]>([])
+  const [selectedId, setSelectedId] = useState('')
+  const [detail, setDetail] = useState<CoordinatorStudentDetail | null>(null)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  const [isLoadingList, setIsLoadingList] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let current = true
+    getCoordinatorStudents(page, search)
+      .then((result) => {
+        if (!current) return
+        setStudents((existing) => page === 1 ? result.items : [...existing, ...result.items])
+        setTotal(result.total)
+        setTotalPages(result.total_pages)
+        setSelectedId((currentId) => result.items.some((student) => student.id === currentId)
+          ? currentId
+          : result.items[0]?.id ?? '')
+      })
+      .catch((loadError: unknown) => {
+        if (current) setError(loadError instanceof Error ? loadError.message : 'Could not load students.')
+      })
+      .finally(() => { if (current) setIsLoadingList(false) })
+    return () => { current = false }
+  }, [page, search])
+
+  useEffect(() => {
+    if (!selectedId) return
+    let current = true
+    getCoordinatorStudentDetail(selectedId)
+      .then((studentDetail) => {
+        if (!current) return
+        setDetail(studentDetail)
+      })
+      .catch((loadError: unknown) => {
+        if (!current) return
+        setError(loadError instanceof Error ? loadError.message : 'Could not load student details.')
+      })
+    return () => { current = false }
+  }, [selectedId])
+
+  function searchStudents(value: string) {
+    setStudents([])
+    setSelectedId('')
+    setDetail(null)
+    setPage(1)
+    setIsLoadingList(true)
+    setError('')
+    setSearch(value)
+  }
+
+  function loadMoreStudents() {
+    setIsLoadingList(true)
+    setError('')
+    setPage((current) => current + 1)
+  }
+
+  function selectStudent(studentId: string) {
+    setError('')
+    setSelectedId(studentId)
+  }
+
+  function handleEvaluationSaved(grade: number, notes: string) {
+    setDetail((current) => current ? {
+      ...current,
+      evaluation: { grade, notes, updated_at: new Date().toISOString() },
+    } : current)
+    setStudents((current) => current.map((student) => student.id === selectedId ? { ...student, grade } : student))
+  }
+
+  return (
+    <section className="workspace-page coordinator-workspace">
+      <div className="workspace-page-heading"><div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> COORDINATOR WORKSPACE</span><h1>Students</h1><p>Review student documents, applications, OJT hours, DTR photos, and evaluations.</p></div><span className="coordinator-student-count">{total.toLocaleString()} students</span></div>
+      {error && <p className="form-error user-import-error" role="alert">{error}</p>}
+      <div className="coordinator-columns">
+        <aside className="panel coordinator-student-list">
+          <label className="coordinator-search"><Icon name="search" size={16} /><input value={search} onChange={(event) => searchStudents(event.target.value)} placeholder="Search name, email, or ID" /></label>
+          {isLoadingList && students.length === 0 ? <p className="empty-state">Loading student records…</p> : students.length === 0 ? <p className="empty-state">No students found.</p> : <div className="coordinator-student-items">          {students.map((student) => <button key={student.id} className={`coordinator-student-item${student.id === selectedId ? ' coordinator-student-item--active' : ''}`} onClick={() => selectStudent(student.id)}><span className="student-profile-avatar">{student.first_name.slice(0, 1)}{student.last_name.slice(0, 1)}</span><span className="coordinator-student-copy"><strong>{student.first_name} {student.last_name}</strong><small>{student.student_id || student.email}</small><span className="student-progress-inline"><i style={{ width: `${student.journey.progress_percent}%` }} /></span></span><span className="coordinator-student-percent">{student.journey.progress_percent}%</span></button>)}</div>}
+          {page < totalPages && <button className="load-more-students" onClick={loadMoreStudents} disabled={isLoadingList}>{isLoadingList ? 'Loading…' : 'Load more students'}</button>}
+        </aside>
+        <div className="coordinator-detail-column">
+          {selectedId && detail?.student.id !== selectedId && !error && <div className="panel empty-state">Loading selected student…</div>}
+          {detail?.student.id === selectedId && <StudentDetails detail={detail} onEvaluationSaved={handleEvaluationSaved} />}
+          {!selectedId && !isLoadingList && <div className="panel empty-state">Select a student to view their OJT record.</div>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+
+
+========================================
+FILE: web\aims\src\pages\coordinator\ApplicationsPage.tsx
+========================================
+
+import { Icon } from '../../components/Icons'
+
+import type {
+  DashboardData,
+  DashboardMetric,
+} from '../../types/dashboard'
+
+// ========================================
+// TYPES
+// ========================================
+
+interface ApplicationsPageProps {
+  data: DashboardData
+}
+
+// ========================================
+// METRIC CARD
+// ========================================
+
+function MetricCard({
+  metric,
+}: {
+  metric: DashboardMetric
+}) {
+  return (
+    <article className="metric-card">
+      <div className="metric-topline">
+        <span>{metric.label}</span>
+
+        <span
+          className={`metric-icon metric-icon--${metric.tone}`}
+        >
+          <Icon name={metric.icon} size={18} />
+        </span>
+      </div>
+
+      <strong className="metric-value">
+        {metric.value}
+      </strong>
+
+      <span
+        className={`metric-change metric-change--${metric.tone}`}
+      >
+        {metric.change}
+      </span>
+    </article>
+  )
+}
+
+// ========================================
+// COORDINATOR APPLICATIONS PAGE
+// ========================================
+
+export function ApplicationsPage({
+  data,
+}: ApplicationsPageProps) {
+  return (
+    <section className="workspace-page">
+
+      {/* PAGE HEADER */}
+
+      <div className="workspace-page-heading">
+        <div>
+          <span className="welcome-eyebrow">
+            <span className="eyebrow-dot" />
+            LIVE DATABASE DATA
+          </span>
+
+          <h1>Applications &amp; placements</h1>
+
+          <p>
+            Recent application records and current
+            placement totals.
+          </p>
+        </div>
+      </div>
+
+      {/* APPLICATION METRICS */}
+
+      <section
+        className="metrics-grid"
+        aria-label="Application metrics"
+      >
+        {data.metrics.map((metric) => (
+          <MetricCard
+            key={metric.label}
+            metric={metric}
+          />
+        ))}
+      </section>
+
+      {/* APPLICATION ACTIVITY */}
+
+      <article className="panel activity-panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Recent application activity</h2>
+
+            <p>
+              Latest records available to your workspace
+            </p>
+          </div>
+        </div>
+
+        <div className="activity-list">
+          {data.activities.length === 0 ? (
+            <p className="empty-state">
+              No application activity yet.
+            </p>
+          ) : (
+            data.activities.map((activity, index) => (
+              <div
+                className="activity-row"
+                key={`${activity.title}-${index}`}
+              >
+                <span
+                  className={`activity-avatar activity-avatar--${activity.tone}`}
+                >
+                  {activity.initials}
+                </span>
+
+                <span className="activity-copy">
+                  <strong>{activity.title}</strong>
+
+                  <small>{activity.detail}</small>
+                </span>
+
+                <time>{activity.time}</time>
+              </div>
+            ))
+          )}
+        </div>
+      </article>
+    </section>
+  )
+}
+
+
+========================================
+FILE: web\aims\src\pages\coordinator\NotificationsPage.tsx
+========================================
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Icon } from '../../components/Icons'
+import {
+  getNotifications,
+  markAllNotificationsRead,
+} from '../../services/notificationService'
+import type { UserNotification } from '../../types/dashboard'
+import './coordinator-ui.css'
+
+type NotificationFilter = 'all' | 'unread' | 'read'
+
+function formatDate(value: string) {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}
+
+export function NotificationsPage() {
+  const [notifications, setNotifications] = useState<UserNotification[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isMarkingRead, setIsMarkingRead] = useState(false)
+  const [error, setError] = useState('')
+  const [filter, setFilter] = useState<NotificationFilter>('all')
+  const [search, setSearch] = useState('')
+
+  const loadNotifications = useCallback(async () => {
+    setIsLoading(true)
+    setError('')
+
+    try {
+      const result = await getNotifications()
+      setNotifications(result)
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to load notifications.'
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadNotifications()
+  }, [loadNotifications])
+
+  const unreadCount = notifications.filter(
+    (notification) => !notification.isRead
+  ).length
+
+  const filteredNotifications = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    return notifications.filter((notification) => {
+      if (filter === 'unread' && notification.isRead) return false
+      if (filter === 'read' && !notification.isRead) return false
+
+      if (!query) return true
+
+      return `${notification.title} ${notification.message}`
+        .toLowerCase()
+        .includes(query)
+    })
+  }, [notifications, filter, search])
+
+  async function handleMarkAllRead() {
+    if (isMarkingRead || unreadCount === 0) return
+
+    setIsMarkingRead(true)
+    setError('')
+
+    try {
+      await markAllNotificationsRead()
+
+      setNotifications((current) =>
+        current.map((notification) => ({
+          ...notification,
+          isRead: true,
+        }))
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to mark notifications as read.'
+      )
+    } finally {
+      setIsMarkingRead(false)
+    }
+  }
+
+  return (
+    <main className="co-page">
+      <header className="co-page-header">
+        <div>
+          <span className="co-overline">
+            <span className="co-live-dot" />
+            COORDINATOR INBOX
+          </span>
+
+          <h1>Notifications</h1>
+
+          <p>
+            Stay informed about internship announcements,
+            important reminders, and student updates.
+          </p>
+        </div>
+
+        <div className="co-header-actions">
+          <button
+            type="button"
+            className="co-button co-button-outline"
+            onClick={() => void loadNotifications()}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
+
+          <button
+            type="button"
+            className="co-button co-button-primary"
+            disabled={isLoading || isMarkingRead || unreadCount === 0}
+            onClick={() => void handleMarkAllRead()}
+          >
+            <Icon name="check" size={16} />
+            {isMarkingRead ? 'Updating...' : 'Mark all as read'}
+          </button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="co-alert co-alert-error" role="alert">
+          {error}
+        </div>
+      )}
+
+      <section className="co-notification-summary">
+        <div className="co-notification-summary-icon">
+          <Icon name="bell" size={23} />
+        </div>
+
+        <div>
+          <strong>{unreadCount} unread notifications</strong>
+          <p>
+            {unreadCount === 0
+              ? "You're all caught up with your notifications."
+              : 'Review your latest unread updates below.'}
+          </p>
+        </div>
+
+        <span className="co-section-tag">
+          {notifications.length} total
+        </span>
+      </section>
+
+      <section className="co-card co-notification-card">
+        <div className="co-notification-toolbar">
+          <div
+            className="co-tabs"
+            role="group"
+            aria-label="Notification filters"
+          >
+            {(['all', 'unread', 'read'] as NotificationFilter[]).map(
+              (item) => (
+                <button
+                  type="button"
+                  key={item}
+                  className={`co-tab ${
+                    filter === item ? 'co-tab-active' : ''
+                  }`}
+                  onClick={() => setFilter(item)}
+                  aria-pressed={filter === item}
+                >
+                  {item === 'all'
+                    ? 'All'
+                    : item === 'unread'
+                      ? 'Unread'
+                      : 'Read'}
+
+                  {item === 'unread' && unreadCount > 0 && (
+                    <span className="co-tab-count">{unreadCount}</span>
+                  )}
+                </button>
+              )
+            )}
+          </div>
+
+          <label className="co-search-field co-notification-search">
+            <Icon name="search" size={17} />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search notifications..."
+              aria-label="Search notifications"
+            />
+          </label>
+        </div>
+
+        {isLoading ? (
+          <div className="co-empty" role="status">
+            <strong>Loading notifications...</strong>
+            <p>Please wait while we retrieve your updates.</p>
+          </div>
+        ) : filteredNotifications.length === 0 ? (
+          <div className="co-empty">
+            <div className="co-empty-icon">
+              <Icon name="bell" size={24} />
+            </div>
+            <strong>No notifications found</strong>
+            <p>
+              {search
+                ? 'Try a different search keyword.'
+                : filter === 'unread'
+                  ? 'You have no unread notifications.'
+                  : 'No notifications are available in this category.'}
+            </p>
+          </div>
+        ) : (
+          <div className="co-notification-list">
+            {filteredNotifications.map((notification) => {
+              const deadline = notification.data?.deadline_at
+              const deadlineText =
+                typeof deadline === 'string'
+                  ? formatDate(deadline)
+                  : null
+
+              return (
+                <article
+                  key={notification.id}
+                  className={`co-notification-item ${
+                    !notification.isRead
+                      ? 'co-notification-unread'
+                      : ''
+                  }`}
+                >
+                  <div className="co-notification-item-icon">
+                    <Icon name="bell" size={19} />
+                  </div>
+
+                  <div className="co-notification-body">
+                    <div className="co-notification-title-row">
+                      <strong>{notification.title}</strong>
+
+                      {!notification.isRead && (
+                        <span
+                          className="co-unread-dot"
+                          aria-label="Unread"
+                        />
+                      )}
+                    </div>
+
+                    <p>{notification.message}</p>
+
+                    {deadlineText && (
+                      <div className="co-notification-deadline">
+                        Deadline: {deadlineText}
+                      </div>
+                    )}
+
+                    <time>
+                      {formatDate(notification.createdAt)}
+                    </time>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
+    </main>
+  )
+}
+
+
+========================================
+FILE: web\aims\src\services\coordinatorService.ts
+========================================
+import { getDashboardAnalytics } from './analyticsService'
+import { apiRequest, apiRequestBlob } from './apiClient'
+import type { DashboardData } from '../types/dashboard'
+
+export interface CoordinatorStudent {
+  id: string
+  student_id: string | null
+  first_name: string
+  last_name: string
+  email: string
+  phone: string | null
+  is_active: boolean
+  documents_verified: number
+  documents_required: number
+  documents_progress_percent: number
+  application_count: number
+  application_statuses: Record<string, number>
+  journey: CoordinatorJourney
+  grade: number | null
+}
+
+export interface CoordinatorJourney {
+  required_hours: number
+  approved_hours: number
+  remaining_hours: number
+  progress_percent: number
+  remaining_percent: number
+  average_approved_hours_per_day: number | null
+  estimated_days_left: number | null
+  approved_dtr_count: number
+  pending_dtr_count: number
+  rejected_dtr_count: number
+}
+
+export interface CoordinatorStudentDetail {
+  student: Pick<CoordinatorStudent, 'id' | 'student_id' | 'first_name' | 'last_name' | 'email' | 'phone' | 'is_active'>
+  journey: CoordinatorJourney
+  document_statuses: Array<{ type: string; status: string }>
+  documents: Array<{ id: string; type: string; filename: string | null; status: string; created_at: string }>
+  applications: Array<{ id: string; position: string; company: string | null; status: string; applied_date: string }>
+  dtr_records: Array<{
+    id: string
+    date: string
+    time_in: string
+    time_out: string | null
+    total_hours: number | null
+    status: string
+    tasks_completed: string | null
+    notes: string | null
+    image_in_available: boolean
+    image_out_available: boolean
+  }>
+  journals: Array<{ id: string; week: number; title: string; status: string; summary: string | null }>
+  evaluation: { grade: number; notes: string | null; updated_at: string } | null
+}
+
+interface StudentPage {
+  items: CoordinatorStudent[]
+  total: number
+  page: number
+  limit: number
+  total_pages: number
+}
+
+export function getCoordinatorDashboard(): Promise<DashboardData> {
+  return getDashboardAnalytics()
+}
+
+export function getCoordinatorStudents(page: number, search: string): Promise<StudentPage> {
+  const params = new URLSearchParams({ page: String(page), limit: '100' })
+  if (search.trim()) params.set('search', search.trim())
+  return apiRequest<StudentPage>(`/api/v1/coordinator/students?${params}`)
+}
+
+export function getCoordinatorStudentDetail(studentId: string): Promise<CoordinatorStudentDetail> {
+  return apiRequest<CoordinatorStudentDetail>(`/api/v1/coordinator/students/${encodeURIComponent(studentId)}`)
+}
+
+export function saveCoordinatorEvaluation(
+  studentId: string,
+  grade: number,
+  notes: string,
+): Promise<{ grade: number; notes: string | null; updated_at: string }> {
+  return apiRequest(`/api/v1/coordinator/students/${encodeURIComponent(studentId)}/evaluation`, {
+    method: 'PUT',
+    body: JSON.stringify({ grade, notes: notes || null }),
+  })
+}
+
+export async function getCoordinatorStudentFile(
+  studentId: string,
+  filePath: string,
+): Promise<{ url: string; contentType: string }> {
+  const blob = await apiRequestBlob(
+    `/api/v1/coordinator/students/${encodeURIComponent(studentId)}/${filePath}`,
+  )
+  return { url: URL.createObjectURL(blob), contentType: blob.type }
+}
+
+
+========================================
+FILE: web\aims\src\services\coordinatorAssignmentService.ts
+========================================
+import { apiRequest } from './apiClient'
+
+export interface AssignedStudent {
+  id: string
+  student_id: string | null
+  name: string
+}
+
+export interface CoordinatorAssignmentGroup {
+  id: string
+  name: string
+  students: AssignedStudent[]
+}
+
+export interface CoordinatorAssignments {
+  coordinators: CoordinatorAssignmentGroup[]
+  unassigned_students: AssignedStudent[]
+}
+
+export function getCoordinatorAssignments(): Promise<CoordinatorAssignments> {
+  return apiRequest<CoordinatorAssignments>('/api/v1/users/coordinator-assignments')
+}
+
+export function assignStudentToCoordinator(
+  coordinatorId: string,
+  studentId: string,
+): Promise<{ coordinator_id: string; student_id: string }> {
+  return apiRequest('/api/v1/users/coordinator-assignments', {
+    method: 'POST',
+    body: JSON.stringify({ coordinator_id: coordinatorId, student_id: studentId }),
+  })
+}
+
+export function removeStudentCoordinatorAssignment(
+  coordinatorId: string,
+  studentId: string,
+): Promise<{ message: string }> {
+  return apiRequest(
+    `/api/v1/users/coordinator-assignments/${encodeURIComponent(coordinatorId)}/${encodeURIComponent(studentId)}`,
+    { method: 'DELETE' },
+  )
+}
+
+
+========================================
+FILE: web\aims\src\services\notificationService.ts
+========================================
+import { apiRequest } from './apiClient'
+import { createAdminNotificationCampaign } from './adminNotificationService'
+import type { AdminNotificationCampaign } from './adminNotificationService'
+import type { AdminUser, AdminUserRole, UserNotification, UserNotificationType } from '../types/dashboard'
+
+interface BackendNotification {
+  id: string
+  type: UserNotificationType
+  title: string
+  message: string
+  data: Record<string, unknown> | null
+  is_read: boolean
+  created_at: string
+}
+
+export async function getNotifications(): Promise<UserNotification[]> {
+  const notifications = await apiRequest<BackendNotification[]>('/api/v1/notifications/?limit=50')
+  return notifications.map((notification) => ({
+    id: notification.id,
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    data: notification.data,
+    isRead: notification.is_read,
+    createdAt: notification.created_at,
+  }))
+}
+
+export function markAllNotificationsRead(): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>('/api/v1/notifications/read-all', {
+    method: 'PUT',
+  })
+}
+
+// Admin audience choices. Each group includes ACTIVE users only.
+export const notificationTargetGroups: ReadonlyArray<{
+  value: 'all' | AdminUserRole
+  label: string
+}> = [
+  { value: 'all', label: 'All active users' },
+  { value: 'student', label: 'All students' },
+  { value: 'coordinator', label: 'All coordinators' },
+  { value: 'dean', label: 'All deans' },
+  { value: 'career_center', label: 'All Career Center users' },
+  { value: 'company', label: 'All company supervisors' },
+  { value: 'admin', label: 'All administrators' },
+]
+
+export type NotificationTargetGroup = 'all' | AdminUserRole
+
+export function getNotificationGroupRecipients(
+  users: AdminUser[],
+  group: NotificationTargetGroup,
+): AdminUser[] {
+  const seen = new Set<string>()
+  return users.filter((user) => {
+    if (!user.isActive || (group !== 'all' && user.role !== group) || seen.has(user.id)) {
+      return false
+    }
+    seen.add(user.id)
+    return true
+  })
+}
+
+// The current FastAPI campaign endpoint accepts ONE target_user_id per request.
+// This helper creates one campaign per user, with at most 4 concurrent requests.
+type CampaignInput = Parameters<typeof createAdminNotificationCampaign>[0]
+export type GroupCampaignInput = Omit<CampaignInput, 'target_user_id'>
+
+export interface NotificationGroupSendResult {
+  created: AdminNotificationCampaign[]
+  failed: Array<{ user: AdminUser; reason: string }>
+}
+
+export async function createNotificationsForGroup(
+  recipients: AdminUser[],
+  input: GroupCampaignInput,
+  onProgress?: (completed: number, total: number) => void,
+): Promise<NotificationGroupSendResult> {
+  if (recipients.length === 0) throw new Error('There are no active recipients in this group.')
+
+  const created: AdminNotificationCampaign[] = []
+  const failed: NotificationGroupSendResult['failed'] = []
+  let completed = 0
+  const uniqueRecipients = [...new Map(recipients.map((user) => [user.id, user])).values()]
+
+  for (let index = 0; index < uniqueRecipients.length; index += 4) {
+    const batch = uniqueRecipients.slice(index, index + 4)
+    await Promise.all(batch.map(async (user) => {
+      try {
+        const campaign = await createAdminNotificationCampaign({
+          ...input,
+          target_user_id: user.id,
+        })
+        created.push(campaign)
+      } catch (error) {
+        failed.push({
+          user,
+          reason: error instanceof Error ? error.message : 'Request failed',
+        })
+      } finally {
+        completed += 1
+        onProgress?.(completed, uniqueRecipients.length)
+      }
+    }))
+  }
+
+  return { created, failed }
+}
+
+
+========================================
+FILE: web\aims\src\services\apiClient.ts
+========================================
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+
+function getAccessToken(): string | undefined {
+  try {
+    const session: unknown = JSON.parse(localStorage.getItem('aims-session') ?? 'null')
+    if (
+      typeof session === 'object' &&
+      session !== null &&
+      'accessToken' in session &&
+      typeof session.accessToken === 'string'
+    ) {
+      return session.accessToken
+    }
+  } catch {
+    return undefined
+  }
+  return undefined
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const headers = new Headers(options.headers)
+  const isMultipart = typeof FormData !== 'undefined' && options.body instanceof FormData
+  if (!headers.has('Content-Type') && !isMultipart) {
+    headers.set('Content-Type', 'application/json')
+  }
+  const token = getAccessToken()
+  if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  })
+
+  if (!response.ok) {
+    let message = `Request failed (${response.status}): ${response.statusText}`
+    try {
+      const errorBody: unknown = await response.json()
+      if (
+        typeof errorBody === 'object' &&
+        errorBody !== null &&
+        'detail' in errorBody
+      ) {
+        const detail = errorBody.detail
+        message = Array.isArray(detail)
+          ? detail.map((item) => typeof item === 'string' ? item : JSON.stringify(item)).join('; ')
+          : typeof detail === 'string' ? detail : JSON.stringify(detail)
+      }
+    } catch {
+      // Keep the HTTP status message when the response does not contain JSON.
+    }
+    throw new Error(message)
+  }
+
+  return response.json() as Promise<T>
+}
+
+export async function apiRequestBlob(path: string): Promise<Blob> {
+  const headers = new Headers()
+  const token = getAccessToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  const response = await fetch(`${API_BASE_URL}${path}`, { headers })
+  if (!response.ok) {
+    throw new Error(`Could not load file (${response.status}): ${response.statusText}`)
+  }
+  return response.blob()
+}
+
+
+========================================
+FILE: backend\app\api\v1\endpoints\coordinator.py
+========================================
+
+"""Coordinator endpoints with assignment-based access control."""
+
+import math
+import mimetypes
+import os
+from datetime import date
+from decimal import Decimal
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.security import require_role
+from app.models.application import Application
+from app.models.company import Company
+from app.models.coordinator_assignment import CoordinatorStudentAssignment
+from app.models.coordinator_evaluation import CoordinatorEvaluation
+from app.models.document import Document, DocumentType
+from app.models.dtr import DTR, DTRStatus
+from app.models.journal import Journal
+from app.models.user import User, UserRole
+
+router = APIRouter()
+
+REQUIRED_DOCUMENT_TYPES = (
+    DocumentType.RESUME,
+    DocumentType.APPLICATION_LETTER,
+    DocumentType.WAIVER,
+    DocumentType.MEDICAL_CERTIFICATE,
+    DocumentType.INTERNSHIP_PLAN,
+    DocumentType.INSURANCE,
+    DocumentType.ENDORSEMENT_LETTER,
+    DocumentType.ACCEPTANCE_LETTER,
+    DocumentType.CERTIFICATE_OF_COMPLETION,
+)
+
+
+class EvaluationInput(BaseModel):
+    grade: Decimal = Field(
+        ge=Decimal("1.00"),
+        le=Decimal("5.00"),
+        max_digits=3,
+        decimal_places=2,
+    )
+    notes: Optional[str] = Field(
+        default=None,
+        max_length=5000,
+    )
+
+
+def require_assigned_student(
+    db: Session,
+    actor: User,
+    student_id: str,
+) -> User:
+    """Return a student only when assigned to this coordinator."""
+
+    query = db.query(User).filter(
+        User.id == student_id,
+        User.role == UserRole.STUDENT,
+    )
+
+    if actor.role != UserRole.ADMIN:
+        query = query.join(
+            CoordinatorStudentAssignment,
+            CoordinatorStudentAssignment.student_id == User.id,
+        ).filter(
+            CoordinatorStudentAssignment.coordinator_id == actor.id
+        )
+
+    student = query.first()
+
+    if student is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Student not found",
+        )
+
+    return student
+
+
+def _hours_summary(records: list[DTR]) -> dict:
+    approved = [
+        record
+        for record in records
+        if record.status == DTRStatus.APPROVED
+    ]
+
+    total_hours = round(
+        sum(
+            max(0.0, float(record.total_hours or 0))
+            for record in approved
+        ),
+        2,
+    )
+
+    required_hours = max(
+        0,
+        settings.REQUIRED_INTERNSHIP_HOURS,
+    )
+
+    remaining_hours = round(
+        max(0, required_hours - total_hours),
+        2,
+    )
+
+    progress = (
+        min(100, round(total_hours / required_hours * 100))
+        if required_hours
+        else 0
+    )
+
+    daily_hours: dict[date, float] = {}
+
+    for entry in approved:
+        if entry.date is not None and (entry.total_hours or 0) > 0:
+            day = entry.date.date()
+
+            daily_hours[day] = (
+                daily_hours.get(day, 0.0)
+                + float(entry.total_hours)
+            )
+
+    average_daily_hours = (
+        sum(daily_hours.values()) / len(daily_hours)
+        if daily_hours
+        else None
+    )
+
+    days_left = (
+        math.ceil(remaining_hours / average_daily_hours)
+        if remaining_hours and average_daily_hours
+        else 0 if not remaining_hours else None
+    )
+
+    return {
+        "required_hours": required_hours,
+        "approved_hours": total_hours,
+        "remaining_hours": remaining_hours,
+        "progress_percent": progress,
+        "remaining_percent": 100 - progress,
+        "average_approved_hours_per_day": (
+            round(average_daily_hours, 2)
+            if average_daily_hours is not None
+            else None
+        ),
+        "estimated_days_left": days_left,
+        "approved_dtr_count": len(approved),
+        "pending_dtr_count": sum(
+            record.status in (
+                DTRStatus.PENDING,
+                DTRStatus.SUBMITTED,
+            )
+            for record in records
+        ),
+        "rejected_dtr_count": sum(
+            record.status == DTRStatus.REJECTED
+            for record in records
+        ),
+    }
+
+
+def _file_response(
+    relative_path: Optional[str],
+    filename: Optional[str],
+) -> FileResponse:
+    if not relative_path or os.path.isabs(relative_path):
+        raise HTTPException(
+            status_code=404,
+            detail="File is not available",
+        )
+
+    asset_root = os.path.realpath(settings.ASSET_DIR)
+    file_path = os.path.realpath(
+        os.path.join(asset_root, relative_path)
+    )
+
+    try:
+        is_contained = (
+            os.path.commonpath((asset_root, file_path))
+            == asset_root
+        )
+    except ValueError:
+        is_contained = False
+
+    if not is_contained or not os.path.isfile(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail="File is not available",
+        )
+
+    return FileResponse(
+        file_path,
+        media_type=(
+            mimetypes.guess_type(file_path)[0]
+            or "application/octet-stream"
+        ),
+        filename=os.path.basename(filename or file_path),
+        content_disposition_type="inline",
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/students")
+async def list_students(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=500),
+    search: Optional[str] = Query(None, max_length=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    query = db.query(User).filter(
+        User.role == UserRole.STUDENT
+    )
+
+    if current_user.role != UserRole.ADMIN:
+        query = query.join(
+            CoordinatorStudentAssignment,
+            CoordinatorStudentAssignment.student_id == User.id,
+        ).filter(
+            CoordinatorStudentAssignment.coordinator_id
+            == current_user.id
+        )
+
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+
+        query = query.filter(
+            User.first_name.ilike(term)
+            | User.last_name.ilike(term)
+            | User.email.ilike(term)
+            | User.student_id.ilike(term)
+        )
+
+    total = query.count()
+
+    students = (
+        query.order_by(User.last_name, User.first_name)
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+
+    student_ids = [student.id for student in students]
+
+    if not student_ids:
+        return {
+            "items": [],
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": math.ceil(total / limit),
+        }
+
+    documents = (
+        db.query(Document)
+        .filter(Document.uploaded_by.in_(student_ids))
+        .order_by(Document.created_at.desc())
+        .all()
+    )
+
+    dtrs = db.query(DTR).filter(
+        DTR.student_id.in_(student_ids)
+    ).all()
+
+    applications = db.query(Application).filter(
+        Application.student_id.in_(student_ids)
+    ).all()
+
+    evaluations = db.query(CoordinatorEvaluation).filter(
+        CoordinatorEvaluation.coordinator_id == current_user.id,
+        CoordinatorEvaluation.student_id.in_(student_ids),
+    ).all()
+
+    docs_by_student: dict[str, list[Document]] = {}
+    dtrs_by_student: dict[str, list[DTR]] = {}
+    apps_by_student: dict[str, list[Application]] = {}
+
+    evaluations_by_student = {
+        evaluation.student_id: evaluation
+        for evaluation in evaluations
+    }
+
+    for document in documents:
+        docs_by_student.setdefault(
+            document.uploaded_by, []
+        ).append(document)
+
+    for dtr in dtrs:
+        dtrs_by_student.setdefault(
+            dtr.student_id, []
+        ).append(dtr)
+
+    for application in applications:
+        apps_by_student.setdefault(
+            application.student_id, []
+        ).append(application)
+
+    items = []
+
+    for student in students:
+        latest: dict[str, Document] = {}
+
+        for document in docs_by_student.get(student.id, []):
+            latest.setdefault(
+                document.type.value,
+                document,
+            )
+
+        statuses = [
+            {
+                "type": kind.value,
+                "status": (
+                    latest[kind.value].verification_status
+                    if kind.value in latest
+                    else "missing"
+                ),
+            }
+            for kind in REQUIRED_DOCUMENT_TYPES
+        ]
+
+        verified = sum(
+            item["status"] == "verified"
+            for item in statuses
+        )
+
+        student_apps = apps_by_student.get(student.id, [])
+
+        items.append({
+            "id": student.id,
+            "student_id": student.student_id,
+            "first_name": student.first_name,
+            "last_name": student.last_name,
+            "email": student.email,
+            "phone": student.phone,
+            "is_active": student.is_active,
+            "documents_verified": verified,
+            "documents_required": len(REQUIRED_DOCUMENT_TYPES),
+            "documents_progress_percent": round(
+                verified / len(REQUIRED_DOCUMENT_TYPES) * 100
+            ),
+            "application_count": len(student_apps),
+            "application_statuses": {
+                status: sum(
+                    application.status.value == status
+                    for application in student_apps
+                )
+                for status in (
+                    "pending",
+                    "reviewing",
+                    "interview",
+                    "accepted",
+                    "rejected",
+                    "withdrawn",
+                )
+            },
+            "journey": _hours_summary(
+                dtrs_by_student.get(student.id, [])
+            ),
+            "grade": (
+                float(evaluations_by_student[student.id].grade)
+                if student.id in evaluations_by_student
+                else None
+            ),
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": math.ceil(total / limit),
+    }
+
+
+@router.get("/students/{student_id}")
+async def get_student_detail(
+    student_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    student = require_assigned_student(
+        db, current_user, student_id
+    )
+
+    documents = (
+        db.query(Document)
+        .filter(Document.uploaded_by == student.id)
+        .order_by(Document.created_at.desc())
+        .all()
+    )
+
+    dtrs = (
+        db.query(DTR)
+        .filter(DTR.student_id == student.id)
+        .order_by(DTR.date.desc())
+        .all()
+    )
+
+    application_rows = (
+        db.query(Application, Company.name)
+        .outerjoin(
+            Company,
+            Company.id == Application.company_id,
+        )
+        .filter(Application.student_id == student.id)
+        .order_by(Application.applied_date.desc())
+        .all()
+    )
+
+    journals = (
+        db.query(Journal)
+        .filter(Journal.student_id == student.id)
+        .order_by(Journal.week.desc())
+        .all()
+    )
+
+    evaluation = db.query(CoordinatorEvaluation).filter(
+        CoordinatorEvaluation.coordinator_id == current_user.id,
+        CoordinatorEvaluation.student_id == student.id,
+    ).first()
+
+    latest: dict[str, Document] = {}
+
+    for document in documents:
+        latest.setdefault(
+            document.type.value,
+            document,
+        )
+
+    return {
+        "student": {
+            "id": student.id,
+            "student_id": student.student_id,
+            "first_name": student.first_name,
+            "last_name": student.last_name,
+            "email": student.email,
+            "phone": student.phone,
+            "is_active": student.is_active,
+        },
+        "journey": _hours_summary(dtrs),
+        "document_statuses": [
+            {
+                "type": kind.value,
+                "status": (
+                    latest[kind.value].verification_status
+                    if kind.value in latest
+                    else "missing"
+                ),
+            }
+            for kind in REQUIRED_DOCUMENT_TYPES
+        ],
+        "documents": [
+            {
+                "id": document.id,
+                "type": document.type.value,
+                "filename": document.original_filename,
+                "status": document.verification_status,
+                "created_at": document.created_at,
+            }
+            for document in documents
+        ],
+        "applications": [
+            {
+                "id": application.id,
+                "position": application.position,
+                "company": company_name,
+                "status": application.status.value,
+                "applied_date": application.applied_date,
+            }
+            for application, company_name in application_rows
+        ],
+        "dtr_records": [
+            {
+                "id": entry.id,
+                "date": entry.date,
+                "time_in": entry.time_in,
+                "time_out": entry.time_out,
+                "total_hours": entry.total_hours,
+                "status": entry.status.value,
+                "tasks_completed": entry.tasks_completed,
+                "notes": entry.notes,
+                "image_in_available": bool(entry.image_in_path),
+                "image_out_available": bool(entry.image_out_path),
+            }
+            for entry in dtrs
+        ],
+        "journals": [
+            {
+                "id": journal.id,
+                "week": journal.week,
+                "title": journal.title,
+                "status": journal.status.value,
+                "summary": journal.summary,
+            }
+            for journal in journals
+        ],
+        "evaluation": (
+            {
+                "grade": float(evaluation.grade),
+                "notes": evaluation.notes,
+                "updated_at": evaluation.updated_at,
+            }
+            if evaluation
+            else None
+        ),
+    }
+
+
+@router.put("/students/{student_id}/evaluation")
+async def save_student_evaluation(
+    student_id: str,
+    evaluation_data: EvaluationInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    student = require_assigned_student(
+        db, current_user, student_id
+    )
+
+    evaluation = db.query(CoordinatorEvaluation).filter(
+        CoordinatorEvaluation.coordinator_id == current_user.id,
+        CoordinatorEvaluation.student_id == student.id,
+    ).first()
+
+    if evaluation is None:
+        evaluation = CoordinatorEvaluation(
+            coordinator_id=current_user.id,
+            student_id=student.id,
+            grade=evaluation_data.grade,
+            notes=evaluation_data.notes,
+        )
+        db.add(evaluation)
+    else:
+        evaluation.grade = evaluation_data.grade
+        evaluation.notes = evaluation_data.notes
+
+    db.commit()
+    db.refresh(evaluation)
+
+    return {
+        "grade": float(evaluation.grade),
+        "notes": evaluation.notes,
+        "updated_at": evaluation.updated_at,
+    }
+
+
+@router.get("/students/{student_id}/documents/{document_id}/file")
+async def get_student_document_file(
+    student_id: str,
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    require_assigned_student(
+        db, current_user, student_id
+    )
+
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.uploaded_by == student_id,
+    ).first()
+
+    if document is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
+
+    return _file_response(
+        document.file_path,
+        document.original_filename,
+    )
+
+
+@router.get("/students/{student_id}/dtr/{dtr_id}/photo/{photo_type}")
+async def get_student_dtr_photo(
+    student_id: str,
+    dtr_id: str,
+    photo_type: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    require_assigned_student(
+        db, current_user, student_id
+    )
+
+    if photo_type not in ("in", "out"):
+        raise HTTPException(
+            status_code=400,
+            detail="Photo type must be 'in' or 'out'",
+        )
+
+    entry = db.query(DTR).filter(
+        DTR.id == dtr_id,
+        DTR.student_id == student_id,
+    ).first()
+
+    if entry is None:
+        raise HTTPException(
+            status_code=404,
+            detail="DTR entry not found",
+        )
+
+    relative_path = (
+        entry.image_in_path
+        if photo_type == "in"
+        else entry.image_out_path
+    )
+
+    return _file_response(
+        relative_path,
+        os.path.basename(relative_path or ""),
+    )
+
+
+========================================
+FILE: backend\app\api\v1\endpoints\applications.py
+========================================
+# backend/app/api/v1/endpoints/applications.py
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from typing import List
+import math
+import uuid
+
+from app.core.database import get_db
+from app.core.security import get_current_user, require_role
+from app.models.user import User, UserRole
+from app.models.company import Company
+from app.models.application import Application, ApplicationStatus
+from app.models.document import Document
+from app.schemas.application import (
+    ApplicationCreate,
+    ApplicationUpdate,
+    ApplicationResponse,
+)
+from app.schemas.pagination import PaginatedResponse
+from app.services.notification_service import NotificationService
+
+router = APIRouter()
+
+
+# ------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------
+
+def _to_response(app: Application, company_name: str | None) -> ApplicationResponse:
+    return ApplicationResponse.model_validate(app).model_copy(
+        update={"company_name": company_name}
+    )
+
+
+def _company_name_map(db: Session, items: List[Application]) -> dict[str, str]:
+    ids = {a.company_id for a in items if a.company_id}
+    if not ids:
+        return {}
+    rows = db.query(Company.id, Company.name).filter(Company.id.in_(ids)).all()
+    return {cid: cname for cid, cname in rows}
+
+
+def _paginate(query, page: int, limit: int):
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
+    return items, total
+
+
+def _validate_document_ownership(
+    db: Session,
+    document_id: str | None,
+    student_id: str,
+    field_label: str,
+) -> Document | None:
+    if not document_id:
+        return None
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_label}: document not found",
+        )
+    if doc.uploaded_by != student_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"{field_label}: you can only attach your own documents",
+        )
+    if doc.verification_status != "verified":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_label}: document must be verified before attaching",
+        )
+    return doc
+
+
+def _notify_application_status(
+    db: Session,
+    application: Application,
+    new_status: ApplicationStatus,
+    company_name: str,
+) -> None:
+    """
+    Fire a notification to the student when their application status changes.
+    Never raises — a notification failure must not break the request.
+    """
+    try:
+        NotificationService.create_application_notification(
+            db=db,
+            user_id=application.student_id,
+            application_id=application.id,
+            status=new_status.value,
+            company_name=company_name,
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to create application notification: {e}")
+
+
+# ------------------------------------------------------------------
+# Student: create application
+# ------------------------------------------------------------------
+
+@router.post("/", response_model=ApplicationResponse, status_code=status.HTTP_201_CREATED)
+async def create_application(
+    application_data: ApplicationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can apply",
+        )
+
+    company = db.query(Company).filter(Company.id == application_data.company_id).first()
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    existing = (
+        db.query(Application)
+        .filter(
+            Application.student_id == current_user.id,
+            Application.company_id == application_data.company_id,
+            Application.position == application_data.position,
+            Application.status.in_([
+                ApplicationStatus.PENDING,
+                ApplicationStatus.REVIEWING,
+                ApplicationStatus.INTERVIEW,
+            ]),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="You already have an active application for this position",
+        )
+
+    _validate_document_ownership(
+        db, application_data.resume_id, current_user.id, "Resume"
+    )
+    _validate_document_ownership(
+        db, application_data.application_letter_id, current_user.id, "Application letter"
+    )
+
+    application = Application(
+        id=str(uuid.uuid4()),
+        student_id=current_user.id,
+        company_id=application_data.company_id,
+        position=application_data.position,
+        cover_letter=application_data.cover_letter,
+        resume_id=application_data.resume_id,
+        application_letter_id=application_data.application_letter_id,
+        status=ApplicationStatus.PENDING,
+    )
+    db.add(application)
+    db.commit()
+    db.refresh(application)
+
+    # ✅ Notify student that application was submitted
+    _notify_application_status(db, application, ApplicationStatus.PENDING, company.name)
+
+    return _to_response(application, company.name)
+
+
+# ------------------------------------------------------------------
+# Student: own applications (paginated)
+# ------------------------------------------------------------------
+
+@router.get("/", response_model=PaginatedResponse[ApplicationResponse])
+async def get_my_applications(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = (
+        db.query(Application)
+        .filter(Application.student_id == current_user.id)
+        .order_by(Application.applied_date.desc())
+    )
+    items, total = _paginate(query, page, limit)
+    companies = _company_name_map(db, items)
+
+    return PaginatedResponse[ApplicationResponse](
+        items=[_to_response(a, companies.get(a.company_id)) for a in items],
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 0,
+    )
+
+
+# ------------------------------------------------------------------
+# Admin: all applications (paginated)
+# MUST stay before /{application_id}
+# ------------------------------------------------------------------
+
+@router.get("/all", response_model=PaginatedResponse[ApplicationResponse])
+async def get_all_applications(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    query = db.query(Application).order_by(Application.applied_date.desc())
+    items, total = _paginate(query, page, limit)
+    companies = _company_name_map(db, items)
+
+    return PaginatedResponse[ApplicationResponse](
+        items=[_to_response(a, companies.get(a.company_id)) for a in items],
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 0,
+    )
+
+
+# ------------------------------------------------------------------
+# Single application
+# ------------------------------------------------------------------
+
+@router.get("/{application_id}", response_model=ApplicationResponse)
+async def get_application(
+    application_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    if current_user.role != UserRole.ADMIN and current_user.id != application.student_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    company = db.query(Company).filter(Company.id == application.company_id).first()
+    return _to_response(application, company.name if company else None)
+
+
+# ------------------------------------------------------------------
+# Update status (coordinator/admin)
+# ------------------------------------------------------------------
+
+@router.put("/{application_id}", response_model=ApplicationResponse)
+async def update_application_status(
+    application_id: str,
+    update_data: ApplicationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role not in [UserRole.COORDINATOR, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only coordinators and admins can update status",
+        )
+
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    # Capture old status to detect a change
+    old_status = application.status
+
+    update_data_dict = update_data.model_dump(exclude_unset=True)
+    for key, value in update_data_dict.items():
+        setattr(application, key, value)
+
+    application.updated_date = func.now()
+    db.commit()
+    db.refresh(application)
+
+    company = db.query(Company).filter(Company.id == application.company_id).first()
+    company_name = company.name if company else "the company"
+
+    # ✅ Notify only if status actually changed
+    if application.status != old_status:
+        _notify_application_status(db, application, application.status, company_name)
+
+    return _to_response(application, company_name)
+
+
+# ------------------------------------------------------------------
+# Withdraw
+# ------------------------------------------------------------------
+
+@router.post("/{application_id}/withdraw")
+async def withdraw_application(
+    application_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    if current_user.id != application.student_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only withdraw your own applications",
+        )
+
+    if application.status in [
+        ApplicationStatus.ACCEPTED,
+        ApplicationStatus.REJECTED,
+        ApplicationStatus.WITHDRAWN,
+    ]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot withdraw this application",
+        )
+
+    application.status = ApplicationStatus.WITHDRAWN
+    application.updated_date = func.now()
+    db.commit()
+
+    company = db.query(Company).filter(Company.id == application.company_id).first()
+    company_name = company.name if company else "the company"
+
+    _notify_application_status(db, application, ApplicationStatus.WITHDRAWN, company_name)
+
+    return {"message": "Application withdrawn successfully"}
+
+
+========================================
+FILE: backend\app\api\v1\endpoints\documents.py
+========================================
+# backend/app/api/v1/endpoints/documents.py
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+from typing import List
+import os
+
+from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import User
+from app.models.document import Document
+from app.services.document_service import DocumentService
+from app.schemas.document import DocumentResponse, DocumentUploadResponse
+from app.core.config import settings
+
+router = APIRouter(prefix="/documents", tags=["Documents"])
+
+
+# ------------------------------------------------------------------
+# Upload — now returns DocumentUploadResponse so `document.id` is real
+# ------------------------------------------------------------------
+
+@router.post("/upload", response_model=DocumentUploadResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    document_type: str = Form(...),
+    description: str = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload and validate a document."""
+    valid_types = [
+        # Application docs
+        "resume",
+        "application_letter",
+
+        # Pre-deployment / CHED-required
+        "waiver",
+        "medical_certificate",
+        "internship_plan",
+        "insurance",
+        "endorsement_letter",
+
+        # Post-selection
+        "acceptance_letter",
+        "certificate_of_completion",
+        "requirements",
+    ]
+
+    if document_type not in valid_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid document type. Must be one of: {', '.join(valid_types)}",
+        )
+
+    try:
+        return DocumentService.upload_document(
+            db=db,
+            file=file,
+            document_type=document_type,
+            description=description or "",
+            uploaded_by=current_user.id,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+# ------------------------------------------------------------------
+# List current user's documents
+# ------------------------------------------------------------------
+
+@router.get("/", response_model=List[DocumentResponse])
+async def get_user_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get current user's documents."""
+    documents = (
+        db.query(Document)
+        .filter(Document.uploaded_by == current_user.id)
+        .order_by(Document.created_at.desc())
+        .all()
+    )
+    return documents
+
+
+# ------------------------------------------------------------------
+# Single document
+# ------------------------------------------------------------------
+
+@router.get("/{document_id}", response_model=DocumentResponse)
+async def get_document(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a specific document."""
+    document = (
+        db.query(Document)
+        .filter(
+            Document.id == document_id,
+            Document.uploaded_by == current_user.id,
+        )
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return document
+
+
+# ------------------------------------------------------------------
+# Serve the file with the student's original filename
+# ------------------------------------------------------------------
+
+@router.get("/{document_id}/image")
+async def get_document_image(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Stream the document file with the student's original filename."""
+    document = (
+        db.query(Document)
+        .filter(
+            Document.id == document_id,
+            Document.uploaded_by == current_user.id,
+        )
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = os.path.join(settings.ASSET_DIR, document.file_path)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    media_types = {
+        ".pdf": "application/pdf",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".heic": "image/heic",
+        ".bmp": "image/bmp",
+        ".tiff": "image/tiff",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    }
+
+    media_type = media_types.get(ext, "application/octet-stream")
+
+    fallback_name = os.path.basename(file_path)
+    display_name = document.original_filename or fallback_name
+
+    safe_name = (
+        display_name.replace('"', "")
+        .replace("\n", "")
+        .replace("\r", "")
+        .strip()
+    )
+
+    if safe_name and not safe_name.lower().endswith(ext):
+        safe_name = f"{os.path.splitext(safe_name)[0]}{ext}"
+
+    print(f'📄 Serving file: {fallback_name} as "{safe_name}" ({media_type})')
+
+    return FileResponse(
+        file_path,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{safe_name}"',
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=3600",
+        },
+    )
+
+
+========================================
+FILE: backend\app\api\v1\endpoints\dtr.py
+========================================
+# backend/app/api/v1/endpoints/dtr.py
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import func, case
+from typing import List, Optional
+import uuid
+import os
+import shutil
+import math
+from datetime import datetime, time
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.security import get_current_user, require_role
+from app.models.user import User, UserRole
+from app.models.dtr import DTR, DTRStatus
+from app.schemas.dtr import DTRResponse, DTRUpdate
+from app.schemas.pagination import PaginatedResponse
+from app.services.notification_service import NotificationService
+
+router = APIRouter()
+
+
+# ------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------
+
+def save_upload_file(upload_file: UploadFile, folder: str) -> str:
+    """Persist an uploaded file to `folder` and return its relative path."""
+    os.makedirs(folder, exist_ok=True)
+    file_id = str(uuid.uuid4())
+    file_extension = os.path.splitext(upload_file.filename)[1]
+    file_name = f"{file_id}{file_extension}"
+    file_path = os.path.join(folder, file_name)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(upload_file.file, buffer)
+
+    return os.path.join("dtr_uploads", file_name)
+
+
+def _student_name(user: User | None) -> Optional[str]:
+    if not user:
+        return None
+    return f"{user.first_name} {user.last_name}"
+
+
+def _to_response(entry: DTR, student_name: Optional[str]) -> DTRResponse:
+    """Build a DTRResponse without leaking SQLAlchemy internals."""
+    return DTRResponse.model_validate(entry).model_copy(
+        update={"student_name": student_name}
+    )
+
+
+def _student_name_map(db: Session, entries: List[DTR]) -> dict[str, str]:
+    """Batch-fetch student names for a list of DTR entries (avoids N+1)."""
+    ids = {e.student_id for e in entries if e.student_id}
+    if not ids:
+        return {}
+    rows = (
+        db.query(User.id, User.first_name, User.last_name)
+        .filter(User.id.in_(ids))
+        .all()
+    )
+    return {sid: f"{fn} {ln}" for sid, fn, ln in rows}
+
+
+def _fire_dtr_notification(db: Session, dtr: DTR, status_value: str) -> None:
+    """
+    Fire a DTR notification to the owner.
+    Never raises — a notification failure must not break the request.
+    """
+    try:
+        date_str = dtr.date.strftime("%b %d, %Y") if dtr.date else "Unknown date"
+        NotificationService.create_dtr_notification(
+            db=db,
+            user_id=dtr.student_id,
+            dtr_id=dtr.id,
+            status=status_value,
+            date=date_str,
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to create DTR notification: {e}")
+
+
+# ------------------------------------------------------------------
+# Create DTR (Time-In)
+# ------------------------------------------------------------------
+
+@router.post("/", response_model=DTRResponse, status_code=status.HTTP_201_CREATED)
+async def create_dtr(
+    date: str = Form(...),
+    time_in: str = Form(...),
+    time_out: Optional[str] = Form(None),
+    tasks_completed: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
+    location_address: Optional[str] = Form(None),
+    image_in: UploadFile = File(...),
+    image_out: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Submit a new DTR entry with images (Time-In)."""
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can submit DTR",
+        )
+
+    # Parse date/time strings
+    try:
+        date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+        time_in_obj = datetime.strptime(time_in, "%H:%M:%S").time()
+        time_out_obj = (
+            datetime.strptime(time_out, "%H:%M:%S").time() if time_out else None
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid date or time format: {str(e)}",
+        )
+
+    if time_out_obj and time_in_obj >= time_out_obj:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Time in must be before time out",
+        )
+
+    # Prevent duplicate entries for the same day
+    existing = (
+        db.query(DTR)
+        .filter(DTR.student_id == current_user.id, DTR.date == date_obj)
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="DTR already submitted for this date",
+        )
+
+    # Save images
+    upload_folder = os.path.join(settings.ASSET_DIR, "dtr_uploads")
+    image_in_path = save_upload_file(image_in, upload_folder)
+    image_out_path = save_upload_file(image_out, upload_folder) if image_out else None
+
+    # Compute total hours if time_out given
+    total_hours: Optional[float] = None
+    dtr_status = DTRStatus.PENDING
+    submitted_date = None
+    if time_out_obj:
+        dt_in = datetime.combine(date_obj, time_in_obj)
+        dt_out = datetime.combine(date_obj, time_out_obj)
+        total_seconds = (dt_out - dt_in).total_seconds()
+        total_hours = round(total_seconds / 3600, 2)
+        dtr_status = DTRStatus.SUBMITTED
+        submitted_date = datetime.utcnow()
+
+    dtr = DTR(
+        id=str(uuid.uuid4()),
+        student_id=current_user.id,
+        date=date_obj,
+        time_in=time_in_obj,
+        time_out=time_out_obj,
+        total_hours=total_hours,
+        tasks_completed=tasks_completed,
+        notes=notes,
+        latitude=latitude,
+        longitude=longitude,
+        location_address=location_address,
+        image_in_path=image_in_path,
+        image_out_path=image_out_path,
+        status=dtr_status,
+        submitted_date=submitted_date,
+    )
+
+    db.add(dtr)
+    db.commit()
+    db.refresh(dtr)
+
+    # ✅ Notify student that Time-In was recorded
+    _fire_dtr_notification(db, dtr, dtr_status.value)
+
+    return _to_response(dtr, _student_name(current_user))
+
+
+# ------------------------------------------------------------------
+# Student: own DTR list (PAGINATED)
+# ------------------------------------------------------------------
+
+@router.get("/", response_model=PaginatedResponse[DTRResponse])
+async def get_my_dtr(
+    page: int = Query(1, ge=1, description="1-based page number"),
+    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get current student's DTR entries (paginated)."""
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can view their DTR entries",
+        )
+
+    query = (
+        db.query(DTR)
+        .filter(DTR.student_id == current_user.id)
+        .order_by(DTR.date.desc())
+    )
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
+
+    student_name = _student_name(current_user)
+    return PaginatedResponse[DTRResponse](
+        items=[_to_response(e, student_name) for e in items],
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 0,
+    )
+
+
+# ------------------------------------------------------------------
+# Record Time-Out (PENDING → SUBMITTED)
+# ------------------------------------------------------------------
+
+@router.post("/{dtr_id}/time-out", response_model=DTRResponse)
+async def record_time_out(
+    dtr_id: str,
+    time_out: str = Form(...),
+    image_out: UploadFile = File(...),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
+    location_address: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Record Time-Out for an existing PENDING DTR entry."""
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can record time-out",
+        )
+
+    dtr = db.query(DTR).filter(DTR.id == dtr_id).first()
+    if not dtr:
+        raise HTTPException(status_code=404, detail="DTR entry not found")
+    if dtr.student_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if dtr.status != DTRStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="DTR is not in PENDING status, cannot record time-out",
+        )
+
+    try:
+        time_out_obj = datetime.strptime(time_out, "%H:%M:%S").time()
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid time format",
+        )
+
+    if dtr.time_in >= time_out_obj:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Time in must be before time out",
+        )
+
+    upload_folder = os.path.join(settings.ASSET_DIR, "dtr_uploads")
+    image_out_path = save_upload_file(image_out, upload_folder)
+
+    dt_in = datetime.combine(dtr.date, dtr.time_in)
+    dt_out = datetime.combine(dtr.date, time_out_obj)
+    total_seconds = (dt_out - dt_in).total_seconds()
+    total_hours = round(total_seconds / 3600, 2)
+
+    dtr.time_out = time_out_obj
+    dtr.image_out_path = image_out_path
+    dtr.latitude = latitude
+    dtr.longitude = longitude
+    dtr.location_address = location_address
+    dtr.total_hours = total_hours
+    dtr.status = DTRStatus.SUBMITTED
+    dtr.submitted_date = datetime.utcnow()
+    dtr.updated_at = func.now()
+
+    db.commit()
+    db.refresh(dtr)
+
+    student = db.query(User).filter(User.id == dtr.student_id).first()
+
+    # ✅ Notify student that Time-Out was recorded (SUBMITTED status)
+    _fire_dtr_notification(db, dtr, dtr.status.value)
+
+    return _to_response(dtr, _student_name(student))
+
+
+# ------------------------------------------------------------------
+# Admin: all DTR (PAGINATED)
+# ------------------------------------------------------------------
+
+@router.get("/all", response_model=PaginatedResponse[DTRResponse])
+async def get_all_dtr(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    """Get all DTR entries (admin only, paginated)."""
+    query = db.query(DTR).order_by(DTR.date.desc())
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
+
+    names = _student_name_map(db, items)
+
+    return PaginatedResponse[DTRResponse](
+        items=[_to_response(e, names.get(e.student_id)) for e in items],
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 0,
+    )
+
+
+# ------------------------------------------------------------------
+# Summary — includes progress card fields
+# ------------------------------------------------------------------
+
+@router.get("/summary")
+async def get_dtr_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get DTR summary for current student, plus progress card data."""
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only students can view their DTR summary",
+        )
+
+    row = (
+        db.query(
+            func.count(DTR.id).label("total_entries"),
+            func.sum(case((DTR.status == DTRStatus.PENDING, 1), else_=0)).label("pending"),
+            func.sum(case((DTR.status == DTRStatus.SUBMITTED, 1), else_=0)).label("submitted"),
+            func.sum(case((DTR.status == DTRStatus.APPROVED, 1), else_=0)).label("approved"),
+            func.sum(case((DTR.status == DTRStatus.REJECTED, 1), else_=0)).label("rejected"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (DTR.status == DTRStatus.APPROVED, DTR.total_hours),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("total_hours"),
+        )
+        .filter(DTR.student_id == current_user.id)
+        .one()
+    )
+
+    # ✅ Current company — from the most recent accepted application
+    from app.models.application import Application, ApplicationStatus
+    from app.models.company import Company
+
+    accepted_app = (
+        db.query(Application)
+        .filter(
+            Application.student_id == current_user.id,
+            Application.status == ApplicationStatus.ACCEPTED,
+        )
+        .order_by(Application.updated_date.desc())
+        .first()
+    )
+
+    current_company = None
+    if accepted_app:
+        company = (
+            db.query(Company)
+            .filter(Company.id == accepted_app.company_id)
+            .first()
+        )
+        current_company = company.name if company else None
+
+    # ✅ Required hours — single source of truth in config.py
+    required_hours = settings.REQUIRED_INTERNSHIP_HOURS
+
+    total_hours = round(float(row.total_hours or 0), 2)
+    remaining_hours = max(0, round(required_hours - total_hours, 2))
+    progress_pct = (
+        min(100, int((total_hours / required_hours) * 100))
+        if required_hours > 0
+        else 0
+    )
+
+    return {
+        "total_entries": int(row.total_entries or 0),
+        "pending": int(row.pending or 0),
+        "submitted": int(row.submitted or 0),
+        "approved": int(row.approved or 0),
+        "rejected": int(row.rejected or 0),
+        "total_hours": total_hours,
+        # ✅ NEW — dashboard progress card fields
+        "required_hours": required_hours,
+        "remaining_hours": remaining_hours,
+        "progress_percent": progress_pct,
+        "current_company": current_company,
+    }
+
+
+# ------------------------------------------------------------------
+# Single entry
+# ------------------------------------------------------------------
+
+@router.get("/{dtr_id}", response_model=DTRResponse)
+async def get_dtr(
+    dtr_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get DTR entry by ID."""
+    dtr = db.query(DTR).filter(DTR.id == dtr_id).first()
+    if not dtr:
+        raise HTTPException(status_code=404, detail="DTR entry not found")
+
+    if current_user.role != UserRole.ADMIN and current_user.id != dtr.student_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    student = db.query(User).filter(User.id == dtr.student_id).first()
+    return _to_response(dtr, _student_name(student))
+
+
+# ------------------------------------------------------------------
+# Update status (coordinator/admin only)
+# ------------------------------------------------------------------
+
+@router.put("/{dtr_id}", response_model=DTRResponse)
+async def update_dtr_status(
+    dtr_id: str,
+    update_data: DTRUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update DTR status (coordinator/admin only)."""
+    if current_user.role not in [UserRole.COORDINATOR, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only coordinators and admins can update DTR status",
+        )
+
+    dtr = db.query(DTR).filter(DTR.id == dtr_id).first()
+    if not dtr:
+        raise HTTPException(status_code=404, detail="DTR entry not found")
+
+    # Capture old status before applying the update
+    old_status_val = dtr.status
+
+    update_data_dict = update_data.model_dump(exclude_unset=True)
+
+    if "status" in update_data_dict:
+        if update_data_dict["status"] in [DTRStatus.APPROVED, DTRStatus.REJECTED]:
+            dtr.approved_date = datetime.utcnow()
+
+    for key, value in update_data_dict.items():
+        setattr(dtr, key, value)
+
+    dtr.updated_at = func.now()
+    db.commit()
+    db.refresh(dtr)
+
+    new_status_val = dtr.status
+    student = db.query(User).filter(User.id == dtr.student_id).first()
+
+    # Notify only if status actually changed
+    if old_status_val != new_status_val:
+        _fire_dtr_notification(db, dtr, new_status_val.value)
+
+    return _to_response(dtr, _student_name(student))
+
+
+========================================
+FILE: backend\app\api\v1\endpoints\journals.py
+========================================
+# backend/app/api/v1/endpoints/journals.py
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    Query,
+    File,
+    UploadFile,
+    Form,
+)
+from sqlalchemy.orm import Session
+from sqlalchemy import func, case
+from typing import Optional, List
+import math
+import os
+import uuid
+import shutil
+from datetime import datetime
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.security import get_current_user, require_role
+from app.models.user import User, UserRole
+from app.models.journal import Journal, JournalStatus
+from app.schemas.journal import JournalResponse, JournalUpdate
+from app.schemas.pagination import PaginatedResponse
+from app.services.notification_service import NotificationService
+
+router = APIRouter()
+
+
+# ------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------
+
+ALLOWED_JOURNAL_EXT = {".pdf"}
+MAX_JOURNAL_SIZE_BYTES = 15 * 1024 * 1024  # 15 MB
+
+
+def _save_journal_pdf(upload: UploadFile) -> str:
+    """Save an uploaded PDF to `journal_uploads/`. Returns the relative path."""
+    ext = os.path.splitext(upload.filename or "")[1].lower()
+    if ext not in ALLOWED_JOURNAL_EXT:
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed for journals",
+        )
+
+    content = upload.file.read()
+    if len(content) > MAX_JOURNAL_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Max {MAX_JOURNAL_SIZE_BYTES // (1024 * 1024)} MB",
+        )
+    upload.file.seek(0)
+
+    folder = os.path.join(settings.ASSET_DIR, "journal_uploads")
+    os.makedirs(folder, exist_ok=True)
+
+    filename = f"{uuid.uuid4()}{ext}"
+    file_path = os.path.join(folder, filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(upload.file, buffer)
+
+    return os.path.join("journal_uploads", filename)
+
+
+def _delete_file_if_exists(relative_path: Optional[str]) -> None:
+    if not relative_path:
+        return
+    full = os.path.join(settings.ASSET_DIR, relative_path)
+    if os.path.exists(full):
+        try:
+            os.remove(full)
+        except OSError:
+            pass
+
+
+def _to_response(journal: Journal, student_name: Optional[str]) -> JournalResponse:
+    return JournalResponse.model_validate(journal).model_copy(
+        update={"student_name": student_name}
+    )
+
+
+def _student_name_map(db: Session, items: List[Journal]) -> dict[str, str]:
+    ids = {j.student_id for j in items if j.student_id}
+    if not ids:
+        return {}
+    rows = (
+        db.query(User.id, User.first_name, User.last_name)
+        .filter(User.id.in_(ids))
+        .all()
+    )
+    return {sid: f"{fn} {ln}" for sid, fn, ln in rows}
+
+
+def _parse_bool(value) -> bool:
+    """FormData sends 'true'/'false' as strings; treat truthy strings as True."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"true", "1", "yes", "on"}
+
+
+def _fire_journal_notification(db: Session, journal: Journal, status_value: str) -> None:
+    """Fire a journal notification to the owner. Never raises."""
+    try:
+        NotificationService.create_journal_notification(
+            db=db,
+            user_id=journal.student_id,
+            journal_id=journal.id,
+            status=status_value,
+            week=journal.week,
+        )
+    except Exception as e:
+        print(f"⚠️ Failed to create journal notification: {e}")
+
+
+# ------------------------------------------------------------------
+# Create (multipart upload; supports single-step submit)
+# ------------------------------------------------------------------
+
+@router.post("/", response_model=JournalResponse, status_code=status.HTTP_201_CREATED)
+async def create_journal(
+    week: int = Form(...),
+    title: str = Form(...),
+    summary: Optional[str] = Form(None),
+    submit: bool = Form(False),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Student creates a journal by uploading a PDF + metadata."""
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(403, "Only students can create journals")
+
+    if week < 1 or week > 52:
+        raise HTTPException(400, "Week must be between 1 and 52")
+
+    existing = (
+        db.query(Journal)
+        .filter(
+            Journal.student_id == current_user.id,
+            Journal.week == week,
+            Journal.status != JournalStatus.REJECTED,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(400, f"Journal for week {week} already exists")
+
+    relative_path = _save_journal_pdf(file)
+
+    wants_submit = _parse_bool(submit)
+    if wants_submit:
+        journal_status = JournalStatus.SUBMITTED
+        submitted_date = datetime.utcnow()
+    else:
+        journal_status = JournalStatus.DRAFT
+        submitted_date = None
+
+    journal = Journal(
+        id=str(uuid.uuid4()),
+        student_id=current_user.id,
+        week=week,
+        title=title.strip(),
+        summary=(summary or "").strip() or None,
+        file_path=relative_path,
+        status=journal_status,
+        submitted_date=submitted_date,
+    )
+    db.add(journal)
+    db.commit()
+    db.refresh(journal)
+
+    # ✅ Notify student of submission / draft save
+    _fire_journal_notification(db, journal, journal.status.value)
+
+    student_name = f"{current_user.first_name} {current_user.last_name}"
+    return _to_response(journal, student_name)
+
+
+# ------------------------------------------------------------------
+# Student list (PAGINATED)
+# ------------------------------------------------------------------
+
+@router.get("/", response_model=PaginatedResponse[JournalResponse])
+async def get_my_journals(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(403, "Only students can view their journals")
+
+    query = (
+        db.query(Journal)
+        .filter(Journal.student_id == current_user.id)
+        .order_by(Journal.week.desc())
+    )
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
+
+    student_name = f"{current_user.first_name} {current_user.last_name}"
+    return PaginatedResponse[JournalResponse](
+        items=[_to_response(j, student_name) for j in items],
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 0,
+    )
+
+
+# ------------------------------------------------------------------
+# Admin: all journals (PAGINATED)
+# MUST stay BEFORE /{journal_id}
+# ------------------------------------------------------------------
+
+@router.get("/all", response_model=PaginatedResponse[JournalResponse])
+async def get_all_journals(
+    page: int = Query(1, ge=1),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    query = db.query(Journal).order_by(Journal.week.desc())
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
+
+    names = _student_name_map(db, items)
+    return PaginatedResponse[JournalResponse](
+        items=[_to_response(j, names.get(j.student_id)) for j in items],
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 0,
+    )
+
+
+# ------------------------------------------------------------------
+# Summary
+# ------------------------------------------------------------------
+
+@router.get("/summary")
+async def get_journal_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(403, "Only students can view their journal summary")
+
+    row = (
+        db.query(
+            func.count(Journal.id).label("total"),
+            func.sum(case((Journal.status == JournalStatus.DRAFT, 1), else_=0)).label("draft"),
+            func.sum(case((Journal.status == JournalStatus.SUBMITTED, 1), else_=0)).label("submitted"),
+            func.sum(case((Journal.status == JournalStatus.REVIEWING, 1), else_=0)).label("reviewing"),
+            func.sum(case((Journal.status == JournalStatus.APPROVED, 1), else_=0)).label("approved"),
+            func.sum(case((Journal.status == JournalStatus.REJECTED, 1), else_=0)).label("rejected"),
+        )
+        .filter(Journal.student_id == current_user.id)
+        .one()
+    )
+
+    return {
+        "total": int(row.total or 0),
+        "draft": int(row.draft or 0),
+        "submitted": int(row.submitted or 0),
+        "reviewing": int(row.reviewing or 0),
+        "approved": int(row.approved or 0),
+        "rejected": int(row.rejected or 0),
+    }
+
+
+# ------------------------------------------------------------------
+# File serving (inline PDF preview)
+# ------------------------------------------------------------------
+
+@router.get("/{journal_id}/file")
+async def get_journal_file(
+    journal_id: str,
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Stream the journal PDF. Token goes in the query string for viewers."""
+    from app.core.security import decode_token
+    from fastapi.responses import FileResponse
+
+    user_id = None
+    if token:
+        try:
+            payload = decode_token(token)
+            user_id = payload.get("sub")
+        except Exception:
+            user_id = None
+
+    if not user_id:
+        raise HTTPException(401, "Not authenticated")
+
+    journal = db.query(Journal).filter(Journal.id == journal_id).first()
+    if not journal:
+        raise HTTPException(404, "Journal not found")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(401, "User not found")
+
+    if user.role == UserRole.STUDENT and journal.student_id != user.id:
+        raise HTTPException(403, "Access denied")
+
+    full_path = os.path.join(settings.ASSET_DIR, journal.file_path)
+    if not os.path.exists(full_path):
+        raise HTTPException(404, "File not found")
+
+    return FileResponse(
+        full_path,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="journal_week_{journal.week}.pdf"',
+            "Cache-Control": "private, max-age=300",
+        },
+    )
+
+
+# ------------------------------------------------------------------
+# Single journal
+# ------------------------------------------------------------------
+
+@router.get("/{journal_id}", response_model=JournalResponse)
+async def get_journal(
+    journal_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    journal = db.query(Journal).filter(Journal.id == journal_id).first()
+    if not journal:
+        raise HTTPException(404, "Journal not found")
+
+    if current_user.role != UserRole.ADMIN and current_user.id != journal.student_id:
+        raise HTTPException(403, "Access denied")
+
+    student = db.query(User).filter(User.id == journal.student_id).first()
+    student_name = f"{student.first_name} {student.last_name}" if student else None
+    return _to_response(journal, student_name)
+
+
+# ------------------------------------------------------------------
+# Update (metadata + status; file replacement is a separate endpoint)
+# ------------------------------------------------------------------
+
+@router.put("/{journal_id}", response_model=JournalResponse)
+async def update_journal(
+    journal_id: str,
+    journal_data: JournalUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    journal = db.query(Journal).filter(Journal.id == journal_id).first()
+    if not journal:
+        raise HTTPException(404, "Journal not found")
+
+    is_owner = current_user.id == journal.student_id
+    is_staff = current_user.role in [UserRole.COORDINATOR, UserRole.ADMIN]
+
+    if not is_owner and not is_staff:
+        raise HTTPException(403, "Access denied")
+
+    if is_owner and not is_staff and journal.status != JournalStatus.DRAFT:
+        raise HTTPException(400, "Only draft journals can be edited")
+
+    # ✅ Capture old status before applying the update
+    old_status_val = journal.status
+
+    updates = journal_data.model_dump(exclude_unset=True)
+
+    if "status" in updates:
+        new_status = updates["status"]
+        if is_owner and not is_staff and new_status != JournalStatus.SUBMITTED:
+            raise HTTPException(403, "Students can only submit journals")
+        if new_status == JournalStatus.SUBMITTED:
+            journal.submitted_date = datetime.utcnow()
+        elif new_status in (JournalStatus.APPROVED, JournalStatus.REJECTED):
+            journal.approved_date = datetime.utcnow()
+
+    for key, value in updates.items():
+        setattr(journal, key, value)
+
+    journal.updated_at = func.now()
+    db.commit()
+    db.refresh(journal)
+
+    new_status_val = journal.status
+    student = db.query(User).filter(User.id == journal.student_id).first()
+
+    # ✅ Notify only if status actually changed
+    if old_status_val != new_status_val:
+        _fire_journal_notification(db, journal, new_status_val.value)
+
+    student_name = f"{student.first_name} {student.last_name}" if student else None
+    return _to_response(journal, student_name)
+
+
+# ------------------------------------------------------------------
+# Replace file (only while draft)
+# ------------------------------------------------------------------
+
+@router.put("/{journal_id}/file", response_model=JournalResponse)
+async def replace_journal_file(
+    journal_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    journal = db.query(Journal).filter(Journal.id == journal_id).first()
+    if not journal:
+        raise HTTPException(404, "Journal not found")
+    if journal.student_id != current_user.id:
+        raise HTTPException(403, "You can only edit your own journals")
+    if journal.status != JournalStatus.DRAFT:
+        raise HTTPException(400, "Only draft journals can be edited")
+
+    old_path = journal.file_path
+    journal.file_path = _save_journal_pdf(file)
+    db.commit()
+    db.refresh(journal)
+
+    _delete_file_if_exists(old_path)
+
+    student = db.query(User).filter(User.id == journal.student_id).first()
+    student_name = f"{student.first_name} {student.last_name}" if student else None
+    return _to_response(journal, student_name)
+
+
+# ------------------------------------------------------------------
+# Delete (only while draft)
+# ------------------------------------------------------------------
+
+@router.delete("/{journal_id}")
+async def delete_journal(
+    journal_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    journal = db.query(Journal).filter(Journal.id == journal_id).first()
+    if not journal:
+        raise HTTPException(404, "Journal not found")
+    if current_user.id != journal.student_id:
+        raise HTTPException(403, "You can only delete your own journals")
+    if journal.status != JournalStatus.DRAFT:
+        raise HTTPException(400, "Only draft journals can be deleted")
+
+    file_path = journal.file_path
+    db.delete(journal)
+    db.commit()
+    _delete_file_if_exists(file_path)
+
+    return {"message": "Journal deleted successfully"}
+
+
+========================================
+FILE: backend\app\api\v1\endpoints\notifications.py
+========================================
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+from typing import List
+
+from app.core.database import get_db
+from app.core.security import get_current_user, require_role
+from app.models.notification import Notification, NotificationType
+from app.models.notification_campaign import NotificationCampaign
+from app.models.user import User
+from app.schemas.notification import (
+    AdminNotificationCampaignCreate,
+    AdminNotificationCampaignResponse,
+    NotificationResponse,
+    NotificationCountResponse
+)
+from app.services.notification_campaign_service import deliver_campaign
+from app.services.notification_service import NotificationService
+
+router = APIRouter()
+
+
+def _to_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+@router.get(
+    "/admin/campaigns",
+    response_model=List[AdminNotificationCampaignResponse],
+)
+async def get_admin_notification_campaigns(
+    limit: int = Query(default=100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    return db.query(NotificationCampaign).order_by(
+        NotificationCampaign.created_at.desc(),
+    ).limit(limit).all()
+
+
+@router.post(
+    "/admin/campaigns",
+    response_model=AdminNotificationCampaignResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_admin_notification_campaign(
+    campaign_data: AdminNotificationCampaignCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    recipient = db.query(User).filter(
+        User.id == campaign_data.target_user_id,
+        User.is_active.is_(True),
+    ).first()
+    if recipient is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Active target user not found.",
+        )
+
+    now = datetime.utcnow()
+    deadline_at = (
+        _to_utc_naive(campaign_data.deadline_at)
+        if campaign_data.deadline_at is not None
+        else None
+    )
+    if deadline_at is not None and deadline_at <= now:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="The deadline must be in the future.",
+        )
+
+    scheduled_at = (
+        _to_utc_naive(campaign_data.scheduled_at)
+        if campaign_data.scheduled_at is not None
+        else now
+    )
+    is_scheduled = campaign_data.scheduled_at is not None
+    if is_scheduled and scheduled_at <= now:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Choose a future time to schedule this notification.",
+        )
+
+    campaign = NotificationCampaign(
+        created_by=current_user.id,
+        target_user_id=recipient.id,
+        target_name=f"{recipient.first_name} {recipient.last_name}".strip(),
+        target_email=recipient.email,
+        type=campaign_data.type,
+        title=campaign_data.title,
+        message=campaign_data.message,
+        deadline_at=deadline_at,
+        scheduled_at=scheduled_at,
+        status="scheduled",
+    )
+    db.add(campaign)
+    db.flush()
+    if not is_scheduled:
+        deliver_campaign(db, campaign, now)
+    db.commit()
+    db.refresh(campaign)
+    return campaign
+
+
+@router.delete(
+    "/admin/campaigns/{campaign_id}",
+    response_model=AdminNotificationCampaignResponse,
+)
+async def cancel_admin_notification_campaign(
+    campaign_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    campaign = db.query(NotificationCampaign).filter(
+        NotificationCampaign.id == campaign_id,
+    ).with_for_update().first()
+    if campaign is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification campaign not found.",
+        )
+    if campaign.status != "scheduled":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only scheduled notifications can be cancelled.",
+        )
+    campaign.status = "cancelled"
+    db.commit()
+    db.refresh(campaign)
+    return campaign
+
+
+@router.get("/", response_model=List[NotificationResponse])
+async def get_notifications(
+    skip: int = 0,
+    limit: int = 50,
+    unread_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get user's notifications"""
+    
+    notifications = NotificationService.get_user_notifications(
+        db=db,
+        user_id=current_user.id,
+        skip=skip,
+        limit=limit,
+        unread_only=unread_only
+    )
+    
+    return notifications
+
+
+@router.get("/count", response_model=NotificationCountResponse)
+async def get_notification_count(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get notification counts"""
+    
+    total = db.query(Notification).filter(Notification.user_id == current_user.id).count()
+    unread = NotificationService.get_unread_count(db=db, user_id=current_user.id)
+    
+    return NotificationCountResponse(total=total, unread=unread)
+
+
+@router.put("/{notification_id}/read", response_model=NotificationResponse)
+async def mark_as_read(
+    notification_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark a notification as read"""
+    
+    notification = NotificationService.mark_as_read(
+        db=db,
+        notification_id=notification_id,
+        user_id=current_user.id
+    )
+    
+    if not notification:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found"
+        )
+    
+    return notification
+
+
+@router.put("/read-all")
+async def mark_all_as_read(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark all notifications as read"""
+    
+    count = NotificationService.mark_all_as_read(
+        db=db,
+        user_id=current_user.id
+    )
+    
+    return {"message": f"{count} notifications marked as read"}
+
+
+@router.delete("/{notification_id}")
+async def delete_notification(
+    notification_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a notification"""
+    
+    deleted = NotificationService.delete_notification(
+        db=db,
+        notification_id=notification_id,
+        user_id=current_user.id
+    )
+    
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found"
+        )
+    
+    return {"message": "Notification deleted successfully"}
+
+
+========================================
+FILE: backend\app\core\security.py
+========================================
+
+"""Authentication helpers for AIMS."""
+
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
+
+from fastapi import Depends, HTTPException, Query, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.database import get_db
+from app.models.user import User, UserRole
+
+
+pwd_context = CryptContext(
+    schemes=["argon2", "bcrypt"],
+    deprecated="auto"
+)
+
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login/form"
+)
+
+optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login/form",
+    auto_error=False
+)
+
+
+def verify_password(
+    plain_password: str,
+    hashed_password: str
+) -> bool:
+    return pwd_context.verify(
+        plain_password,
+        hashed_password
+    )
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def create_access_token(
+    data: Dict[str, Any],
+    expires_delta: Optional[timedelta] = None
+) -> str:
+    claims = data.copy()
+
+    claims["exp"] = datetime.now(timezone.utc) + (
+        expires_delta
+        if expires_delta is not None
+        else timedelta(
+            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
+    )
+
+    return jwt.encode(
+        claims,
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM
+    )
+
+
+def decode_token(token: str) -> Dict[str, Any]:
+    try:
+        return jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+
+    except JWTError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"}
+        ) from exc
+
+
+def _user_from_access_token(
+    token: str,
+    db: Session
+) -> User:
+    payload = decode_token(token)
+
+    # Password-reset and verification tokens cannot access APIs.
+    if payload.get("purpose") not in (None, "access"):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid access token"
+        )
+
+    user_id = payload.get("sub")
+
+    if not isinstance(user_id, str) or not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid access token"
+        )
+
+    user = db.query(User).filter(
+        User.id == user_id
+    ).first()
+
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication credentials"
+        )
+
+    return user
+
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> User:
+    return _user_from_access_token(token, db)
+
+
+async def get_current_user_from_token(
+    token: Optional[str] = Query(default=None),
+    header_token: Optional[str] = Depends(
+        optional_oauth2_scheme
+    ),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Legacy image endpoints.
+
+    Prefer Authorization headers.
+    Query-string tokens should be phased out because
+    they can leak through URLs and server logs.
+    """
+
+    chosen = header_token or token
+
+    if not chosen:
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated"
+        )
+
+    return _user_from_access_token(chosen, db)
+
+
+def require_role(required_role: str):
+    """Require a role, with an administrator override."""
+
+    async def role_checker(
+        current_user: User = Depends(get_current_user)
+    ) -> User:
+        role = UserRole(current_user.role)
+
+        if role not in (
+            UserRole(required_role),
+            UserRole.ADMIN
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions"
+            )
+
+        return current_user
+
+    return role_checker
+
+
+========================================
+FILE: backend\app\models\user.py
+========================================
+from sqlalchemy import Column, String, Boolean, DateTime, Enum
+from sqlalchemy.sql import func
+import enum
+import uuid
+
+# IMPORTANT: Use the same Base as app.core.database
+from app.core.database import Base
+
+
+class UserRole(str, enum.Enum):
+    STUDENT = "student"
+    COORDINATOR = "coordinator"
+    DEAN = "dean"
+    CAREER_CENTER = "career_center"
+    HTE_SUPERVISOR = "hte_supervisor"
+    ADMIN = "admin"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        index=True
+    )
+
+    email = Column(
+        String(255),
+        unique=True,
+        index=True,
+        nullable=False
+    )
+
+    student_id = Column(
+        String(50),
+        unique=True,
+        nullable=True
+    )
+
+    first_name = Column(
+        String(100),
+        nullable=False
+    )
+
+    last_name = Column(
+        String(100),
+        nullable=False
+    )
+
+    phone = Column(
+        String(20),
+        nullable=True
+    )
+
+    gender = Column(
+        String(24),
+        nullable=True
+    )
+
+    hashed_password = Column(
+        String(255),
+        nullable=False
+    )
+
+    role = Column(
+        Enum(UserRole),
+        nullable=False,
+        default=UserRole.STUDENT
+    )
+
+    is_active = Column(
+        Boolean,
+        default=True
+    )
+
+    is_verified = Column(
+        Boolean,
+        default=False
+    )
+
+    # ✅ ADDED: Avatar URL field
+    avatar_url = Column(
+        String(500),
+        nullable=True
+    )
+
+    created_at = Column(
+        DateTime,
+        server_default=func.now()
+    )
+
+    updated_at = Column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now()
+    )

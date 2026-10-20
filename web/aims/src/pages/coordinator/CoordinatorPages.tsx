@@ -2,27 +2,15 @@
 import type { DashboardData } from '../../types/dashboard'
 import type { UserSession } from '../../types/auth'
 
-// ========================================
-// SHARED UTILITY PAGES
-// ========================================
-
 import {
   AccountSettingsPage,
   HelpCenterPage,
 } from '../shared/UtilityPages'
 
-// ========================================
-// COORDINATOR PAGES
-// ========================================
-
 import { CoordinatorDashboardPage } from './CoordinatorDashboardPage'
 import { StudentsPage } from './StudentsPage'
 import { ApplicationsPage } from './ApplicationsPage'
 import { NotificationsPage } from './NotificationsPage'
-
-// ========================================
-// COMPONENT PROPS
-// ========================================
 
 interface CoordinatorPagesProps {
   section: string
@@ -32,10 +20,6 @@ interface CoordinatorPagesProps {
   onNavigate: (section: string) => void
 }
 
-// ========================================
-// COORDINATOR PAGE ROUTER
-// ========================================
-
 export function CoordinatorPages({
   section,
   session,
@@ -43,10 +27,6 @@ export function CoordinatorPages({
   onLogout,
   onNavigate,
 }: CoordinatorPagesProps) {
-  // ========================================
-  // DASHBOARD
-  // ========================================
-
   switch (section) {
     case 'dashboard':
       return (
@@ -57,34 +37,14 @@ export function CoordinatorPages({
         />
       )
 
-    // ========================================
-    // STUDENT MANAGEMENT
-    // ========================================
-
     case 'students':
       return <StudentsPage />
 
-    // ========================================
-    // INTERNSHIP APPLICATIONS
-    // ========================================
-
     case 'applications':
-      return (
-        <ApplicationsPage
-          data={data}
-        />
-      )
-
-    // ========================================
-    // NOTIFICATIONS
-    // ========================================
+      return <ApplicationsPage />
 
     case 'notifications':
       return <NotificationsPage />
-
-    // ========================================
-    // ACCOUNT SETTINGS
-    // ========================================
 
     case 'settings':
       return (
@@ -94,20 +54,12 @@ export function CoordinatorPages({
         />
       )
 
-    // ========================================
-    // HELP CENTER
-    // ========================================
-
     case 'help-center':
       return (
         <HelpCenterPage
           session={session}
         />
       )
-
-    // ========================================
-    // DEFAULT DASHBOARD
-    // ========================================
 
     default:
       return (

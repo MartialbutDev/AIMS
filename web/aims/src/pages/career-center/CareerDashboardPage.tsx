@@ -1,11 +1,12 @@
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../components/Icons'
-
-import type {
-  DashboardData,
-  DashboardMetric,
-} from '../../types/dashboard'
+import {
+  getCareerCompanies,
+  type CareerCompany,
+} from '../../services/careerCenterService'
+import type { DashboardData } from '../../types/dashboard'
+import './career-center-ui.css'
 
 interface CareerDashboardPageProps {
   data: DashboardData
@@ -13,33 +14,20 @@ interface CareerDashboardPageProps {
   onNavigate: (section: string) => void
 }
 
-function MetricCard({
-  metric,
-}: {
-  metric: DashboardMetric
-}) {
-  return (
-    <article className="metric-card">
-      <div className="metric-topline">
-        <span>{metric.label}</span>
+function todayString() {
+  const date = new Date()
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
+}
 
-        <span
-          className={`metric-icon metric-icon--${metric.tone}`}
-        >
-          <Icon name={metric.icon} size={18} />
-        </span>
-      </div>
-
-      <strong className="metric-value">
-        {metric.value}
-      </strong>
-
-      <span
-        className={`metric-change metric-change--${metric.tone}`}
-      >
-        {metric.change}
-      </span>
-    </article>
+function daysRemaining(date: string) {
+  return Math.round(
+    (Date.parse(`${date}T00:00:00Z`) -
+      Date.parse(`${todayString()}T00:00:00Z`)) /
+      86400000
   )
 }
 
@@ -48,95 +36,158 @@ export function CareerDashboardPage({
   name,
   onNavigate,
 }: CareerDashboardPageProps) {
-  const [checkedTasks, setCheckedTasks] = useState<string[]>([])
+  const [companies, setCompanies] = useState<CareerCompany[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const chartMaximum = Math.max(...data.chartValues, 0)
+  useEffect(() => {
+    let active = true
 
-  const pendingCount = data.tasks.filter(
-    (task) => !checkedTasks.includes(task)
-  ).length
+    getCareerCompanies()
+      .then((result) => {
+        if (active) setCompanies(result)
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Unable to load partnership statistics.'
+          )
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
 
-  function toggleTask(task: string) {
-    setCheckedTasks((current) =>
-      current.includes(task)
-        ? current.filter((item) => item !== task)
-        : [...current, task]
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const stats = useMemo(() => {
+    const active = companies.filter((company) => company.is_active)
+
+    const expiring = active.filter((company) => {
+      if (!company.is_moa_signed || !company.moa_expires_at) {
+        return false
+      }
+
+      const days = daysRemaining(company.moa_expires_at)
+      return days >= 0 && days <= 30
+    })
+
+    const expired = active.filter(
+      (company) =>
+        company.is_moa_signed &&
+        company.moa_expires_at !== null &&
+        daysRemaining(company.moa_expires_at) < 0
     )
-  }
+
+    return {
+      total: active.length,
+      signed: active.filter(
+        (company) =>
+          company.is_moa_signed &&
+          (!company.moa_expires_at ||
+            daysRemaining(company.moa_expires_at) > 30)
+      ).length,
+      pending: active.filter(
+        (company) => !company.is_moa_signed
+      ).length,
+      expiring,
+      expired: expired.length,
+    }
+  }, [companies])
 
   return (
-    <>
-      {/* WELCOME HEADER */}
-
-      <section className="welcome-row">
+    <main className="cc-page">
+      <header className="cc-page-header">
         <div>
-          <div className="welcome-eyebrow">
-            <span className="eyebrow-dot" />
-            YOUR DASHBOARD
+          <div className="cc-eyebrow">
+            <span className="cc-eyebrow-dot" />
+            CAREER CENTER OVERVIEW
           </div>
 
           <h1>
-            {data.greeting}, <span>{name}.</span>
+            {data.greeting}, {name}.
           </h1>
 
-          <p>{data.subtitle}</p>
+          <p>
+            Monitor internship partnerships, agreement status,
+            and the latest Career Center activities.
+          </p>
         </div>
 
-        <button
-          type="button"
-          className="outline-button"
-          onClick={() => onNavigate('notifications')}
-        >
-          <Icon name="bell" size={17} />
-          {' '}Notifications
-        </button>
-      </section>
+        <div className="cc-header-actions">
+          <button
+            type="button"
+            className="cc-button cc-button-secondary"
+            onClick={() => onNavigate('notifications')}
+          >
+            <Icon name="bell" size={16} />
+            Notifications
+          </button>
 
-      {/* DASHBOARD METRICS */}
+          <button
+            type="button"
+            className="cc-button cc-button-primary"
+            onClick={() => onNavigate('companies')}
+          >
+            Manage Companies
+            <Icon name="arrow" size={16} />
+          </button>
+        </div>
+      </header>
 
-      <section
-        className="metrics-grid"
-        aria-label="Key metrics"
-      >
-        {data.metrics.map((metric) => (
-          <MetricCard
-            key={metric.label}
-            metric={metric}
-          />
+      {error && (
+        <div className="cc-alert cc-alert-error" role="alert">
+          {error}
+        </div>
+      )}
+
+      <section className="cc-stats">
+        {[
+          ['Active Partners', stats.total, 'Registered active HTEs'],
+          ['Signed MOAs', stats.signed, 'Signed agreements'],
+          ['Unsigned MOAs', stats.pending, 'Awaiting agreements'],
+          ['Expiring Soon', stats.expiring.length, 'Within 30 days'],
+          ['Expired MOAs', stats.expired, 'Need attention'],
+        ].map(([label, value, detail]) => (
+          <article className="cc-stat-card" key={String(label)}>
+            <span className="cc-stat-label">{label}</span>
+            <strong className="cc-stat-value">
+              {loading ? '—' : value}
+            </strong>
+            <span className="cc-stat-detail">{detail}</span>
+          </article>
         ))}
       </section>
 
-      {/* ACTIVITY AND TASKS */}
-
-      <section className="dashboard-columns">
-        <article className="panel activity-panel">
-          <div className="panel-heading">
+      <section className="cc-bottom-grid">
+        <article className="cc-card cc-info-card">
+          <div className="cc-section-header">
             <div>
-              <h2>Recent activity</h2>
-
-              <p>
-                The latest updates from your workspace
-              </p>
+              <span className="cc-section-kicker">RECENT UPDATES</span>
+              <h2>Application Activity</h2>
+              <p>Latest internship-related records.</p>
             </div>
-
             <button
               type="button"
-              className="panel-link"
+              className="cc-button cc-button-secondary"
               onClick={() => onNavigate('applications')}
             >
-              View all
-              {' '}
-              <Icon name="arrow" size={15} />
+              View All
             </button>
           </div>
 
-          <div className="activity-list">
-            {data.activities.length === 0 ? (
-              <p className="empty-state">
-                No application activity yet.
-              </p>
-            ) : (
-              data.activities.map((activity, index) => (
+          {data.activities.length === 0 ? (
+            <div className="cc-mini-empty">
+              No recent application activity available.
+            </div>
+          ) : (
+            <div className="activity-list">
+              {data.activities.slice(0, 5).map((activity, index) => (
                 <div
                   className="activity-row"
                   key={`${activity.title}-${index}`}
@@ -149,159 +200,93 @@ export function CareerDashboardPage({
 
                   <span className="activity-copy">
                     <strong>{activity.title}</strong>
-
                     <small>{activity.detail}</small>
                   </span>
 
                   <time>{activity.time}</time>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </article>
 
-        {/* TASK CHECKLIST */}
-
-        <article className="panel tasks-panel">
-          <div className="panel-heading">
+        <article className="cc-card cc-info-card">
+          <div className="cc-section-header">
             <div>
-              <h2>{data.tasksTitle}</h2>
-
-              <p>Keep things moving forward</p>
+              <span className="cc-section-kicker">PARTNERSHIP ALERTS</span>
+              <h2>MOA Monitoring</h2>
+              <p>Agreements expiring within 30 days.</p>
             </div>
-
-            <span className="task-count">
-              {pendingCount}
-            </span>
           </div>
 
-          <ul className="task-list">
-            {data.tasks.map((task, index) => {
-              const isChecked = checkedTasks.includes(task)
-
-              return (
-                <li key={`${task}-${index}`}>
-                  <button
-                    type="button"
-                    className={`task-check${
-                      isChecked
-                        ? ' task-check--checked'
-                        : ''
-                    }`}
-                    onClick={() => toggleTask(task)}
-                    aria-label={`${
-                      isChecked
-                        ? 'Mark incomplete'
-                        : 'Complete'
-                    }: ${task}`}
-                  >
-                    {isChecked && (
-                      <Icon name="check" size={13} />
-                    )}
-                  </button>
-
-                  <span
-                    className={
-                      isChecked ? 'task-done' : ''
-                    }
-                  >
-                    {task}
+          {loading ? (
+            <div className="cc-mini-empty">
+              Loading agreements...
+            </div>
+          ) : stats.expiring.length === 0 ? (
+            <div className="cc-mini-empty">
+              No signed MOAs are currently expiring within 30 days.
+            </div>
+          ) : (
+            <div className="cc-watch-list">
+              {stats.expiring.slice(0, 5).map((company) => (
+                <button
+                  type="button"
+                  key={company.id}
+                  className="cc-watch-item"
+                  onClick={() => onNavigate('companies')}
+                >
+                  <span>
+                    <strong>{company.name}</strong>
+                    <small>
+                      MOA expiration: {company.moa_expires_at}
+                    </small>
                   </span>
-                </li>
-              )
-            })}
-          </ul>
-
-          <button
-            type="button"
-            className="add-task"
-            onClick={() => onNavigate('applications')}
-          >
-            <span>+</span>
-            {' '}View applications
-          </button>
+                  <span className="cc-watch-days">
+                    {daysRemaining(company.moa_expires_at!)}d
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </article>
       </section>
 
-      {/* ACTIVITY CHART */}
-
-      <section className="panel chart-panel">
-        <div className="panel-heading">
+      <section className="cc-card cc-info-card" style={{ marginTop: 20 }}>
+        <div className="cc-section-header">
           <div>
+            <span className="cc-section-kicker">INTERNSHIP ANALYTICS</span>
             <h2>{data.chartTitle}</h2>
-
             <p>{data.chartCaption}</p>
           </div>
-
-          <span className="period-label">
-            Last 6 months
-          </span>
         </div>
 
-        <div className="chart-area">
-          <div className="chart-y-labels">
-            {[1, 0.75, 0.5, 0.25].map((fraction) => (
-              <span key={fraction}>
-                {Math.round(
-                  chartMaximum * fraction
-                ).toLocaleString()}
-              </span>
-            ))}
+        {data.chartValues.length === 0 ? (
+          <div className="cc-mini-empty">
+            No chart data available.
           </div>
+        ) : (
+          <div className="cc-dashboard-chart">
+            {data.chartValues.map((value, index) => {
+              const max = Math.max(...data.chartValues, 1)
 
-          <div className="chart-plot">
-            <div className="chart-grid-lines">
-              <i />
-              <i />
-              <i />
-              <i />
-            </div>
-
-            <div className="chart-bars">
-              {data.chartValues.map((value, index) => (
-                <div
-                  className="chart-column"
-                  key={index}
-                >
-                  <div
-                    className={`chart-bar${
-                      index === data.chartValues.length - 1
-                        ? ' chart-bar--highlight'
-                        : ''
-                    }`}
-                    style={{
-                      height: chartMaximum
-                        ? `${(value / chartMaximum) * 100}%`
-                        : '0%',
-                    }}
-                    title={`${value} applications`}
-                  />
+              return (
+                <div className="cc-dashboard-chart-column" key={index}>
+                  <strong>{value.toLocaleString()}</strong>
+                  <div className="cc-dashboard-chart-track">
+                    <span
+                      style={{
+                        height: `${Math.max(0, value / max) * 100}%`,
+                      }}
+                    />
+                  </div>
+                  <small>{data.chartLabels[index] ?? ''}</small>
                 </div>
-              ))}
-            </div>
-
-            <div className="chart-x-labels">
-              {data.chartLabels.map((label, index) => (
-                <span key={index}>
-                  {label}
-                </span>
-              ))}
-            </div>
+              )
+            })}
           </div>
-        </div>
+        )}
       </section>
-
-      {/* FOOTER */}
-
-      <footer className="dashboard-footer">
-        <span>
-          © 2026 USTP AIMS · Internship Management System
-        </span>
-
-        <span>
-          Made for the next generation.
-        </span>
-      </footer>
-    </>
+    </main>
   )
 }

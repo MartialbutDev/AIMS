@@ -12,6 +12,10 @@ import {
   ScrollProvider,
 } from "../src/context/ScrollContext";
 
+// ============================================================
+// ROOT NAVIGATION
+// ============================================================
+
 function RootLayoutNav() {
   const { isDark } = useTheme();
 
@@ -25,19 +29,47 @@ function RootLayoutNav() {
           animation: "slide_from_right",
         }}
       >
-        <Stack.Screen name="index" />
-
         {/* Authentication screens */}
-        <Stack.Screen name="(auth)/login" />
-        <Stack.Screen name="(auth)/signup" />
-        <Stack.Screen name="(auth)/forgot-password" />
+        <Stack.Screen
+          name="(auth)/login"
+          options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="(auth)/signup"
+          options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="(auth)/forgot-password"
+          options={{ headerShown: false }}
+        />
+
+        {/* Mandatory student onboarding */}
+        <Stack.Screen
+          name="onboarding/index"
+          options={{
+            headerShown: false,
+            gestureEnabled: false,
+          }}
+        />
 
         {/* Protected student screens */}
-        <Stack.Screen name="(student)" />
+        <Stack.Screen
+          name="(student)"
+          options={{
+            headerShown: false,
+            gestureEnabled: false,
+          }}
+        />
       </Stack>
     </>
   );
 }
+
+// ============================================================
+// ROOT LAYOUT
+// ============================================================
 
 export default function RootLayout() {
   return (

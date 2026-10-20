@@ -1,16 +1,8 @@
 
 import { useState } from 'react'
-
 import { Icon } from '../../components/Icons'
-
-import type {
-  DashboardData,
-  DashboardMetric,
-} from '../../types/dashboard'
-
-// ========================================
-// TYPES
-// ========================================
+import type { DashboardData, DashboardMetric } from '../../types/dashboard'
+import './coordinator-ui.css'
 
 interface CoordinatorDashboardPageProps {
   data: DashboardData
@@ -18,95 +10,55 @@ interface CoordinatorDashboardPageProps {
   onNavigate: (section: string) => void
 }
 
-interface MetricCardProps {
-  metric: DashboardMetric
-  onClick?: () => void
-}
-
-// ========================================
-// METRIC CARD
-// ========================================
-
 function MetricCard({
   metric,
   onClick,
-}: MetricCardProps) {
+}: {
+  metric: DashboardMetric
+  onClick?: () => void
+}) {
   const content = (
     <>
-      <div className="metric-topline">
-        <span>{metric.label}</span>
-
-        <span
-          className={`metric-icon metric-icon--${metric.tone}`}
-        >
-          <Icon name={metric.icon} size={18} />
+      <div className="co-metric-header">
+        <span className="co-metric-label">{metric.label}</span>
+        <span className={`co-metric-icon co-tone-${metric.tone}`}>
+          <Icon name={metric.icon} size={20} />
         </span>
       </div>
 
-      <strong className="metric-value">
-        {metric.value}
-      </strong>
+      <strong className="co-metric-value">{metric.value}</strong>
 
-      <span
-        className={`metric-change metric-change--${metric.tone}`}
-      >
-        {metric.change}
-      </span>
+      <div className="co-metric-footer">
+        <span className={`co-metric-change co-tone-${metric.tone}`}>
+          {metric.change}
+        </span>
+        {onClick && <span className="co-metric-action">View details →</span>}
+      </div>
     </>
   )
 
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        className="metric-card metric-card--interactive"
-        onClick={onClick}
-      >
-        {content}
-      </button>
-    )
-  }
-
-  return (
-    <article className="metric-card">
+  return onClick ? (
+    <button type="button" className="co-metric-card co-metric-clickable" onClick={onClick}>
       {content}
-    </article>
+    </button>
+  ) : (
+    <article className="co-metric-card">{content}</article>
   )
 }
-
-// ========================================
-// COORDINATOR DASHBOARD
-// ========================================
 
 export function CoordinatorDashboardPage({
   data,
   name,
   onNavigate,
 }: CoordinatorDashboardPageProps) {
-  // ========================================
-  // STATE
-  // ========================================
+  const [checkedTasks, setCheckedTasks] = useState<string[]>([])
 
-  const [checkedTasks, setCheckedTasks] = useState<
-    string[]
-  >([])
-
-  // ========================================
-  // COMPUTED VALUES
-  // ========================================
-
-  const chartMaximum = Math.max(
-    ...data.chartValues,
-    0
-  )
-
+  const chartMaximum = Math.max(...data.chartValues, 1)
   const pendingCount = data.tasks.filter(
     (task) => !checkedTasks.includes(task)
   ).length
 
-  // ========================================
-  // TASK CHECKLIST
-  // ========================================
+  const completedCount = data.tasks.length - pendingCount
 
   function toggleTask(task: string) {
     setCheckedTasks((current) =>
@@ -116,64 +68,72 @@ export function CoordinatorDashboardPage({
     )
   }
 
-  // ========================================
-  // METRIC NAVIGATION
-  // ========================================
+  function metricDestination(metric: DashboardMetric) {
+    const label = metric.label.toLowerCase()
 
-  function getMetricDestination(
-    metric: DashboardMetric
-  ): string | undefined {
-    if (
-      metric.label === 'Students' ||
-      metric.label === 'Applications'
-    ) {
-      return metric.label.toLowerCase()
-    }
+    if (label.includes('student')) return 'students'
+    if (label.includes('application')) return 'applications'
 
     return undefined
   }
 
-  // ========================================
-  // RENDER
-  // ========================================
-
   return (
-    <>
-      {/* DASHBOARD HEADER */}
-
-      <section className="welcome-row">
-        <div>
-          <div className="welcome-eyebrow">
-            <span className="eyebrow-dot" />
-            YOUR DASHBOARD
-          </div>
+    <main className="co-page co-dashboard">
+      <section className="co-hero">
+        <div className="co-hero-content">
+          <span className="co-hero-eyebrow">
+            <span className="co-live-dot" />
+            COORDINATOR WORKSPACE
+          </span>
 
           <h1>
-            {data.greeting}, <span>{name}.</span>
+            {data.greeting}, <span>{name}!</span>
           </h1>
 
           <p>{data.subtitle}</p>
+
+          <div className="co-hero-actions">
+            <button
+              type="button"
+              className="co-button co-button-primary"
+              onClick={() => onNavigate('students')}
+            >
+              <Icon name="search" size={17} />
+              Manage students
+            </button>
+
+            <button
+              type="button"
+              className="co-button co-button-hero-outline"
+              onClick={() => onNavigate('notifications')}
+            >
+              <Icon name="bell" size={17} />
+              Notifications
+            </button>
+          </div>
         </div>
 
-        <button
-          type="button"
-          className="outline-button"
-          onClick={() => onNavigate('notifications')}
-        >
-          <Icon name="bell" size={17} />
-          {' '}Notifications
-        </button>
+        <div className="co-hero-decoration" aria-hidden="true">
+          <div className="co-hero-orbit co-hero-orbit-one" />
+          <div className="co-hero-orbit co-hero-orbit-two" />
+          <div className="co-hero-symbol">
+            <Icon name="check" size={36} />
+          </div>
+        </div>
       </section>
 
-      {/* DASHBOARD METRICS */}
+      <div className="co-section-title">
+        <div>
+          <span className="co-overline">OVERVIEW</span>
+          <h2>Workspace overview</h2>
+          <p>Monitor internship activity and important updates.</p>
+        </div>
+        <span className="co-section-tag">Live workspace data</span>
+      </div>
 
-      <section
-        className="metrics-grid"
-        aria-label="Key metrics"
-      >
+      <section className="co-metrics-grid" aria-label="Coordinator metrics">
         {data.metrics.map((metric) => {
-          const destination =
-            getMetricDestination(metric)
+          const destination = metricDestination(metric)
 
           return (
             <MetricCard
@@ -189,240 +149,177 @@ export function CoordinatorDashboardPage({
         })}
       </section>
 
-      {/* RECENT ACTIVITY AND TASKS */}
-
-      <section className="dashboard-columns">
-
-        {/* RECENT ACTIVITY */}
-
-        <article className="panel activity-panel">
-          <div className="panel-heading">
+      <section className="co-content-grid">
+        <article className="co-card co-activity-card">
+          <header className="co-card-header">
             <div>
+              <span className="co-overline">LATEST UPDATES</span>
               <h2>Recent activity</h2>
-
-              <p>
-                The latest updates from your workspace
-              </p>
+              <p>What's happening in your internship workspace</p>
             </div>
 
             <button
               type="button"
-              className="panel-link"
+              className="co-text-button"
               onClick={() => onNavigate('applications')}
             >
               View all
-              {' '}
               <Icon name="arrow" size={15} />
             </button>
-          </div>
+          </header>
 
-          <div className="activity-list">
-            {data.activities.length === 0 ? (
-              <p className="empty-state">
-                No application activity yet.
-              </p>
-            ) : (
-              data.activities.map((activity, index) => (
+          {data.activities.length === 0 ? (
+            <div className="co-empty">
+              <div className="co-empty-icon">
+                <Icon name="bell" size={24} />
+              </div>
+              <strong>No recent activity</strong>
+              <p>New internship activity will appear here.</p>
+            </div>
+          ) : (
+            <div className="co-activity-list">
+              {data.activities.slice(0, 6).map((activity, index) => (
                 <div
-                  className="activity-row"
+                  className="co-activity-item"
                   key={`${activity.title}-${index}`}
                 >
-                  <span
-                    className={`activity-avatar activity-avatar--${activity.tone}`}
-                  >
+                  <div className={`co-avatar co-tone-${activity.tone}`}>
                     {activity.initials}
-                  </span>
+                  </div>
 
-                  <span className="activity-copy">
-                    <strong>
-                      {activity.title}
-                    </strong>
+                  <div className="co-activity-content">
+                    <strong>{activity.title}</strong>
+                    <p>{activity.detail}</p>
+                  </div>
 
-                    <small>
-                      {activity.detail}
-                    </small>
-                  </span>
-
-                  <time>
-                    {activity.time}
-                  </time>
+                  <time className="co-activity-time">{activity.time}</time>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </article>
 
-        {/* TASK CHECKLIST */}
-
-        <article className="panel tasks-panel">
-          <div className="panel-heading">
+        <article className="co-card co-task-card">
+          <header className="co-card-header">
             <div>
+              <span className="co-overline">YOUR CHECKLIST</span>
               <h2>{data.tasksTitle}</h2>
-
-              <p>
-                Keep things moving forward
-              </p>
+              <p>Stay organized throughout the day</p>
             </div>
 
-            <span className="task-count">
-              {pendingCount}
-            </span>
+            <span className="co-count-badge">{pendingCount}</span>
+          </header>
+
+          {data.tasks.length > 0 && (
+            <div className="co-task-progress">
+              <div className="co-task-progress-label">
+                <span>Checklist progress</span>
+                <strong>{completedCount}/{data.tasks.length}</strong>
+              </div>
+              <div className="co-progress-track">
+                <span
+                  style={{
+                    width: `${(completedCount / data.tasks.length) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="co-task-list">
+            {data.tasks.length === 0 ? (
+              <div className="co-empty co-empty-compact">
+                <strong>No tasks available</strong>
+                <p>Your checklist is currently empty.</p>
+              </div>
+            ) : (
+              data.tasks.map((task, index) => {
+                const checked = checkedTasks.includes(task)
+
+                return (
+                  <label className="co-task-item" key={`${task}-${index}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleTask(task)}
+                    />
+                    <span className={`co-task-checkbox ${checked ? 'is-checked' : ''}`}>
+                      {checked && <Icon name="check" size={13} />}
+                    </span>
+                    <span className={checked ? 'co-task-done' : ''}>
+                      {task}
+                    </span>
+                  </label>
+                )
+              })
+            )}
           </div>
-
-          <ul className="task-list">
-            {data.tasks.map((task, index) => {
-              const isChecked =
-                checkedTasks.includes(task)
-
-              return (
-                <li key={`${task}-${index}`}>
-                  <button
-                    type="button"
-                    className={`task-check${
-                      isChecked
-                        ? ' task-check--checked'
-                        : ''
-                    }`}
-                    onClick={() => toggleTask(task)}
-                    aria-label={`${
-                      isChecked
-                        ? 'Mark incomplete'
-                        : 'Complete'
-                    }: ${task}`}
-                  >
-                    {isChecked && (
-                      <Icon
-                        name="check"
-                        size={13}
-                      />
-                    )}
-                  </button>
-
-                  <span
-                    className={
-                      isChecked
-                        ? 'task-done'
-                        : ''
-                    }
-                  >
-                    {task}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
 
           <button
             type="button"
-            className="add-task"
+            className="co-button co-button-soft co-full-width"
             onClick={() => onNavigate('applications')}
           >
-            <span>+</span>
-            {' '}View applications
+            View applications
+            <Icon name="arrow" size={16} />
           </button>
         </article>
       </section>
 
-      {/* APPLICATION ACTIVITY CHART */}
-
-      <section className="panel chart-panel">
-        <div className="panel-heading">
+      <section className="co-card co-chart-card">
+        <header className="co-card-header">
           <div>
-            <h2>
-              {data.chartTitle}
-            </h2>
+            <span className="co-overline">ANALYTICS</span>
+            <h2>{data.chartTitle}</h2>
+            <p>{data.chartCaption}</p>
+          </div>
+          <span className="co-section-tag">Last 6 months</span>
+        </header>
 
-            <p>
-              {data.chartCaption}
-            </p>
+        <div className="co-chart-container">
+          <div className="co-chart-y-axis">
+            {[1, 0.75, 0.5, 0.25, 0].map((fraction) => (
+              <span key={fraction}>
+                {Math.round(chartMaximum * fraction)}
+              </span>
+            ))}
           </div>
 
-          <span className="period-label">
-            Last 6 months
-          </span>
-        </div>
-
-        <div className="chart-area">
-
-          {/* Y-AXIS */}
-
-          <div className="chart-y-labels">
-            {[1, 0.75, 0.5, 0.25].map(
-              (fraction) => (
-                <span key={fraction}>
-                  {Math.round(
-                    chartMaximum * fraction
-                  ).toLocaleString()}
-                </span>
-              )
-            )}
-          </div>
-
-          {/* CHART PLOT */}
-
-          <div className="chart-plot">
-            <div className="chart-grid-lines">
-              <i />
-              <i />
-              <i />
-              <i />
+          <div className="co-chart-main">
+            <div className="co-chart-grid" aria-hidden="true">
+              {[0, 1, 2, 3, 4].map((line) => (
+                <span key={line} />
+              ))}
             </div>
 
-            <div className="chart-bars">
-              {data.chartValues.map(
-                (value, index) => (
-                  <div
-                    className="chart-column"
-                    key={index}
-                  >
+            <div className="co-chart-bars">
+              {data.chartValues.map((value, index) => (
+                <div className="co-chart-column" key={index}>
+                  <div className="co-chart-bar-area">
                     <div
-                      className={`chart-bar${
-                        index ===
-                        data.chartValues.length - 1
-                          ? ' chart-bar--highlight'
+                      className={`co-chart-bar ${
+                        index === data.chartValues.length - 1
+                          ? 'co-chart-bar-active'
                           : ''
                       }`}
                       style={{
-                        height: chartMaximum
-                          ? `${
-                              (value / chartMaximum) *
-                              100
-                            }%`
-                          : '0%',
+                        height: `${Math.max(0, (value / chartMaximum) * 100)}%`,
                       }}
                       title={`${value} applications`}
                     />
                   </div>
-                )
-              )}
-            </div>
-
-            {/* X-AXIS */}
-
-            <div className="chart-x-labels">
-              {data.chartLabels.map(
-                (label, index) => (
-                  <span key={index}>
-                    {label}
-                  </span>
-                )
-              )}
+                  <span>{data.chartLabels[index] ?? ''}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </section>
 
-      {/* DASHBOARD FOOTER */}
-
-      <footer className="dashboard-footer">
-        <span>
-          © 2026 USTP AIMS · Internship Management System
-        </span>
-
-        <span>
-          Made for the next generation.
-        </span>
+      <footer className="co-footer">
+        <span>© 2026 USTP AIMS · Academic Internship Management System</span>
+        <span>Coordinator Portal</span>
       </footer>
-    </>
+    </main>
   )
 }

@@ -4,26 +4,28 @@
 import math
 import mimetypes
 import os
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import require_role
-from app.models.application import Application
+from app.models.application import Application, ApplicationStatus
 from app.models.company import Company
 from app.models.coordinator_assignment import CoordinatorStudentAssignment
 from app.models.coordinator_evaluation import CoordinatorEvaluation
 from app.models.document import Document, DocumentType
 from app.models.dtr import DTR, DTRStatus
-from app.models.journal import Journal
+from app.models.journal import Journal, JournalStatus
 from app.models.user import User, UserRole
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 
@@ -619,4 +621,372 @@ async def get_student_dtr_photo(
     return _file_response(
         relative_path,
         os.path.basename(relative_path or ""),
+    )
+
+
+# ============================================================
+# ASSIGNMENT-SCOPED REVIEW WORKSPACE
+# ============================================================
+
+class ApplicationReviewInput(BaseModel):
+    status: Literal["reviewing", "interview", "accepted", "rejected"]
+
+
+class RecordReviewInput(BaseModel):
+    status: Literal["approved", "rejected"]
+
+
+def _visible_student_ids(db: Session, actor: User) -> list[str]:
+    if actor.role == UserRole.ADMIN:
+        rows = db.query(User.id).filter(
+            User.role == UserRole.STUDENT
+        ).all()
+    else:
+        rows = db.query(
+            CoordinatorStudentAssignment.student_id
+        ).filter(
+            CoordinatorStudentAssignment.coordinator_id == actor.id
+        ).all()
+
+    return [row[0] for row in rows]
+
+
+def _notify_safely(callback) -> None:
+    # A notification failure must not undo a saved review.
+    try:
+        callback()
+    except Exception as exc:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "Review notification failed: %s",
+            exc,
+        )
+
+
+@router.get("/review-queue")
+async def get_review_queue(
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    """Return review records for assigned students only."""
+
+    ids = _visible_student_ids(db, current_user)
+
+    if not ids:
+        return {
+            "applications": [],
+            "dtrs": [],
+            "journals": [],
+        }
+
+    students = db.query(User).filter(
+        User.id.in_(ids)
+    ).all()
+
+    names = {
+        student.id: (
+            f"{student.first_name} {student.last_name}".strip()
+        )
+        for student in students
+    }
+
+    app_rows = (
+        db.query(Application, Company.name)
+        .outerjoin(
+            Company,
+            Company.id == Application.company_id,
+        )
+        .filter(Application.student_id.in_(ids))
+        .order_by(Application.applied_date.desc())
+        .limit(limit)
+        .all()
+    )
+
+    dtrs = (
+        db.query(DTR)
+        .filter(
+            DTR.student_id.in_(ids),
+            DTR.status != DTRStatus.PENDING,
+        )
+        .order_by(DTR.date.desc())
+        .limit(limit)
+        .all()
+    )
+
+    journals = (
+        db.query(Journal)
+        .filter(
+            Journal.student_id.in_(ids),
+            Journal.status != JournalStatus.DRAFT,
+        )
+        .order_by(Journal.week.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "applications": [
+            {
+                "id": app.id,
+                "student_id": app.student_id,
+                "student_name": names.get(
+                    app.student_id, "Student"
+                ),
+                "company_name": company_name,
+                "position": app.position,
+                "status": app.status.value,
+                "applied_date": app.applied_date,
+            }
+            for app, company_name in app_rows
+        ],
+        "dtrs": [
+            {
+                "id": entry.id,
+                "student_id": entry.student_id,
+                "student_name": names.get(
+                    entry.student_id, "Student"
+                ),
+                "date": entry.date,
+                "time_in": entry.time_in,
+                "time_out": entry.time_out,
+                "total_hours": entry.total_hours,
+                "status": entry.status.value,
+                "tasks_completed": entry.tasks_completed,
+                "image_in_available": bool(
+                    entry.image_in_path
+                ),
+                "image_out_available": bool(
+                    entry.image_out_path
+                ),
+            }
+            for entry in dtrs
+        ],
+        "journals": [
+            {
+                "id": entry.id,
+                "student_id": entry.student_id,
+                "student_name": names.get(
+                    entry.student_id, "Student"
+                ),
+                "week": entry.week,
+                "title": entry.title,
+                "summary": entry.summary,
+                "status": entry.status.value,
+            }
+            for entry in journals
+        ],
+    }
+
+
+@router.put("/review-queue/applications/{application_id}")
+async def review_application(
+    application_id: str,
+    review: ApplicationReviewInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    app = db.query(Application).filter(
+        Application.id == application_id
+    ).first()
+
+    if app is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Application not found",
+        )
+
+    require_assigned_student(
+        db,
+        current_user,
+        app.student_id,
+    )
+
+    if app.status not in (
+        ApplicationStatus.PENDING,
+        ApplicationStatus.REVIEWING,
+        ApplicationStatus.INTERVIEW,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="This application can no longer be reviewed",
+        )
+
+    old_status = app.status
+    app.status = ApplicationStatus(review.status)
+    app.updated_date = func.now()
+
+    db.commit()
+    db.refresh(app)
+
+    if app.status != old_status:
+        company = db.query(Company).filter(
+            Company.id == app.company_id
+        ).first()
+
+        _notify_safely(
+            lambda: NotificationService.create_application_notification(
+                db=db,
+                user_id=app.student_id,
+                application_id=app.id,
+                status=app.status.value,
+                company_name=(
+                    company.name
+                    if company
+                    else "the company"
+                ),
+            )
+        )
+
+    return {
+        "id": app.id,
+        "status": app.status.value,
+    }
+
+
+@router.put("/review-queue/dtrs/{dtr_id}")
+async def review_dtr(
+    dtr_id: str,
+    review: RecordReviewInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    entry = db.query(DTR).filter(
+        DTR.id == dtr_id
+    ).first()
+
+    if entry is None:
+        raise HTTPException(
+            status_code=404,
+            detail="DTR not found",
+        )
+
+    require_assigned_student(
+        db,
+        current_user,
+        entry.student_id,
+    )
+
+    if entry.status != DTRStatus.SUBMITTED:
+        raise HTTPException(
+            status_code=409,
+            detail="Only submitted DTRs may be reviewed",
+        )
+
+    if entry.time_out is None:
+        raise HTTPException(
+            status_code=409,
+            detail="A DTR requires time-out before review",
+        )
+
+    entry.status = DTRStatus(review.status)
+    entry.approved_date = datetime.utcnow()
+    entry.updated_at = func.now()
+
+    db.commit()
+    db.refresh(entry)
+
+    _notify_safely(
+        lambda: NotificationService.create_dtr_notification(
+            db=db,
+            user_id=entry.student_id,
+            dtr_id=entry.id,
+            status=entry.status.value,
+            date=(
+                entry.date.strftime("%b %d, %Y")
+                if entry.date
+                else "Unknown date"
+            ),
+        )
+    )
+
+    return {
+        "id": entry.id,
+        "status": entry.status.value,
+    }
+
+
+@router.put("/review-queue/journals/{journal_id}")
+async def review_journal(
+    journal_id: str,
+    review: RecordReviewInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    entry = db.query(Journal).filter(
+        Journal.id == journal_id
+    ).first()
+
+    if entry is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Journal not found",
+        )
+
+    require_assigned_student(
+        db,
+        current_user,
+        entry.student_id,
+    )
+
+    if entry.status not in (
+        JournalStatus.SUBMITTED,
+        JournalStatus.REVIEWING,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Only submitted journals may be reviewed",
+        )
+
+    entry.status = JournalStatus(review.status)
+    entry.approved_date = datetime.utcnow()
+    entry.updated_at = func.now()
+
+    db.commit()
+    db.refresh(entry)
+
+    _notify_safely(
+        lambda: NotificationService.create_journal_notification(
+            db=db,
+            user_id=entry.student_id,
+            journal_id=entry.id,
+            status=entry.status.value,
+            week=entry.week,
+        )
+    )
+
+    return {
+        "id": entry.id,
+        "status": entry.status.value,
+    }
+
+
+@router.get("/students/{student_id}/journals/{journal_id}/file")
+async def get_assigned_student_journal_file(
+    student_id: str,
+    journal_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    require_assigned_student(
+        db,
+        current_user,
+        student_id,
+    )
+
+    journal = db.query(Journal).filter(
+        Journal.id == journal_id,
+        Journal.student_id == student_id,
+    ).first()
+
+    if journal is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Journal not found",
+        )
+
+    return _file_response(
+        journal.file_path,
+        f"journal_week_{journal.week}.pdf",
     )

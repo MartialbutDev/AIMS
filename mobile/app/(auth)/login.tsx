@@ -1,8 +1,10 @@
-// app/(auth)/login.tsx
+
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+
 import { useRef, useState } from "react";
+
 import {
   ActivityIndicator,
   Alert,
@@ -19,32 +21,63 @@ import {
 } from "react-native";
 
 import AppLogo from "../../src/components/common/AppLogo";
-import { APP_NAME, APP_VERSION } from "../../src/constants/app";
+
+import {
+  APP_NAME,
+  APP_VERSION,
+} from "../../src/constants/app";
+
 import { useTheme } from "../../src/context/ThemeContext";
+
 import { authService } from "../../src/services/auth.service";
 
 const { height } = Dimensions.get("window");
 
 export default function LoginScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
+
+  // ============================================================
+  // FORM STATES
+  // ============================================================
+
   const [studentId, setStudentId] = useState("");
   const [password, setPassword] = useState("");
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // ============================================================
+  // VALIDATION STATES
+  // ============================================================
+
   const [studentIdError, setStudentIdError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [isStudentIdFocused, setIsStudentIdFocused] = useState(false);
-  const [isPasswordFocused, setIsPasswordFocused] = useState(false);
+
+  // ============================================================
+  // INPUT FOCUS STATES
+  // ============================================================
+
+  const [isStudentIdFocused, setIsStudentIdFocused] =
+    useState(false);
+
+  const [isPasswordFocused, setIsPasswordFocused] =
+    useState(false);
 
   const passwordInputRef = useRef<TextInput>(null);
+
+  // ============================================================
+  // FORM VALIDATION
+  // ============================================================
 
   const validateForm = (): boolean => {
     let isValid = true;
 
-    if (!studentId.trim()) {
+    const trimmedStudentId = studentId.trim();
+
+    if (!trimmedStudentId) {
       setStudentIdError("Student ID is required");
       isValid = false;
-    } else if (studentId.trim().length < 8) {
+    } else if (trimmedStudentId.length < 8) {
       setStudentIdError("Please enter a valid student ID");
       isValid = false;
     } else {
@@ -55,7 +88,9 @@ export default function LoginScreen() {
       setPasswordError("Password is required");
       isValid = false;
     } else if (password.trim().length < 6) {
-      setPasswordError("Password must be at least 6 characters");
+      setPasswordError(
+        "Password must be at least 6 characters"
+      );
       isValid = false;
     } else {
       setPasswordError("");
@@ -64,7 +99,15 @@ export default function LoginScreen() {
     return isValid;
   };
 
+  // ============================================================
+  // STUDENT LOGIN
+  // ============================================================
+
   const handleLogin = async () => {
+    if (loading) {
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
@@ -72,19 +115,70 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const response = await authService.login(studentId.trim(), password);
-      console.log("Login successful:", response);
-      router.replace("/(student)/dashboard");
+      // Authenticate student using existing AIMS backend.
+      // authService.login must save the access token
+      // to SecureStore before this promise resolves.
+
+      await authService.login(
+        studentId.trim(),
+        password
+      );
+
+      // ========================================================
+      // MANDATORY STUDENT ONBOARDING
+      // ========================================================
+      //
+      // Do not redirect directly to the dashboard.
+      //
+      // The onboarding screen calls:
+      //
+      // GET /api/v1/onboarding/me
+      //
+      // If eligible = false:
+      //   Student remains in onboarding.
+      //
+      // If eligible = true:
+      //   Student is redirected to the dashboard.
+      //
+      // This also works for returning students whose
+      // documents have already been approved.
+      // ========================================================
+
+      router.replace("/onboarding");
     } catch (error: any) {
-      console.log("Login error:", error);
-      const errorMessage =
-        error.response?.data?.detail || "Invalid credentials. Please try again.";
-      Alert.alert("Login Failed", errorMessage);
+      console.error(
+        "Student login failed:",
+        error?.message || "Unknown error"
+      );
+
+      let errorMessage =
+        "Invalid credentials. Please try again.";
+
+      const detail = error?.response?.data?.detail;
+
+      if (typeof detail === "string") {
+        errorMessage = detail;
+      } else if (
+        typeof error?.message === "string" &&
+        !error?.response
+      ) {
+        errorMessage = error.message;
+      }
+
+      Alert.alert(
+        "Login Failed",
+        errorMessage
+      );
+
       setPassword("");
     } finally {
       setLoading(false);
     }
   };
+
+  // ============================================================
+  // AUTHENTICATION NAVIGATION
+  // ============================================================
 
   const handleForgotPassword = () => {
     router.push("/(auth)/forgot-password");
@@ -94,40 +188,94 @@ export default function LoginScreen() {
     router.push("/(auth)/signup");
   };
 
+  // ============================================================
+  // KEYBOARD ACTIONS
+  // ============================================================
+
   const handleStudentIdSubmit = () => {
     passwordInputRef.current?.focus();
   };
 
   const handlePasswordSubmit = () => {
-    handleLogin();
+    void handleLogin();
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
+  // ============================================================
+  // RENDER
+  // ============================================================
 
-      {/* ✅ Dynamic navy background */}
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.background,
+        },
+      ]}
+    >
+      <StatusBar
+        style={isDark ? "light" : "dark"}
+      />
+
+      {/* ===================================================== */}
+      {/* NAVY HEADER BACKGROUND                                */}
+      {/* ===================================================== */}
+
       <View
         style={[
           styles.navySection,
-          { backgroundColor: isDark ? "#000066" : "#000080" },
+          {
+            backgroundColor: isDark
+              ? "#000066"
+              : "#000080",
+          },
         ]}
       >
-        <View style={styles.circleTopLeft} pointerEvents="none" />
-        <View style={styles.circleBottomRight} pointerEvents="none" />
-        <View style={styles.dotGridTopRight} pointerEvents="none">
-          {Array.from({ length: 16 }).map((_, i) => (
-            <View key={`dot-tr-${i}`} style={styles.dot} />
-          ))}
+        <View
+          style={styles.circleTopLeft}
+          pointerEvents="none"
+        />
+
+        <View
+          style={styles.circleBottomRight}
+          pointerEvents="none"
+        />
+
+        <View
+          style={styles.dotGridTopRight}
+          pointerEvents="none"
+        >
+          {Array.from(
+            { length: 16 },
+            (_, i) => (
+              <View
+                key={`dot-tr-${i}`}
+                style={styles.dot}
+              />
+            )
+          )}
         </View>
-        <View style={styles.dotGridBottomLeft} pointerEvents="none">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <View key={`dot-bl-${i}`} style={styles.dot} />
-          ))}
+
+        <View
+          style={styles.dotGridBottomLeft}
+          pointerEvents="none"
+        >
+          {Array.from(
+            { length: 12 },
+            (_, i) => (
+              <View
+                key={`dot-bl-${i}`}
+                style={styles.dot}
+              />
+            )
+          )}
         </View>
       </View>
 
-      {/* ✅ Dark Mode Toggle Button - OUTSIDE the navy section */}
+      {/* ===================================================== */}
+      {/* DARK MODE TOGGLE                                      */}
+      {/* ===================================================== */}
+
       <TouchableOpacity
         style={[
           styles.themeToggle,
@@ -137,84 +285,189 @@ export default function LoginScreen() {
               : "rgba(255,255,255,0.2)",
           },
         ]}
-        onPress={() => {
-          console.log("🔄 Toggling theme from:", isDark ? "dark" : "light");
-          toggleTheme();
-        }}
+        onPress={toggleTheme}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isDark
+            ? "Switch to light mode"
+            : "Switch to dark mode"
+        }
       >
         <Ionicons
-          name={isDark ? "sunny-outline" : "moon-outline"}
+          name={
+            isDark
+              ? "sunny-outline"
+              : "moon-outline"
+          }
           size={24}
           color="#FFFFFF"
         />
       </TouchableOpacity>
 
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: "transparent" }]}>
+      {/* ===================================================== */}
+      {/* SAFE AREA                                             */}
+      {/* ===================================================== */}
+
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          {
+            backgroundColor: "transparent",
+          },
+        ]}
+      >
         <KeyboardAvoidingView
           style={styles.keyboardView}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={
+            Platform.OS === "ios"
+              ? "padding"
+              : undefined
+          }
         >
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={
+              styles.scrollContent
+            }
             bounces={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* ================================================= */}
+            {/* APP BRANDING                                      */}
+            {/* ================================================= */}
+
             <View style={styles.headerContent}>
               <View style={styles.logoWrapper}>
-                <AppLogo size={100} decorative={true} variant="login" />
+                <AppLogo
+                  size={100}
+                  decorative={true}
+                  variant="login"
+                />
               </View>
-              <Text style={[styles.brandTitle, { color: "#FFFFFF" }]}>
-                A<Text style={[styles.brandTitleAccent, { color: "#F5A623" }]}>
+
+              <Text
+                style={[
+                  styles.brandTitle,
+                  {
+                    color: "#FFFFFF",
+                  },
+                ]}
+              >
+                A
+                <Text
+                  style={[
+                    styles.brandTitleAccent,
+                    {
+                      color: "#F5A623",
+                    },
+                  ]}
+                >
                   I
                 </Text>
                 MS
               </Text>
+
               <Text
-                style={[styles.systemTitle, { color: "#FFFFFF", opacity: 0.9 }]}
+                style={[
+                  styles.systemTitle,
+                  {
+                    color: "#FFFFFF",
+                    opacity: 0.9,
+                  },
+                ]}
               >
                 Academic Internship Management System
               </Text>
             </View>
 
+            {/* ================================================= */}
+            {/* LOGIN CARD                                        */}
+            {/* ================================================= */}
+
             <View style={styles.cardWrapper}>
-              <View style={[styles.card, { backgroundColor: colors.card }]}>
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: colors.card,
+                  },
+                ]}
+              >
+                {/* ============================================= */}
+                {/* CARD HEADER                                   */}
+                {/* ============================================= */}
+
                 <View style={styles.cardHeader}>
                   <Text
-                    style={[styles.welcomeText, { color: colors.textPrimary }]}
+                    style={[
+                      styles.welcomeText,
+                      {
+                        color: colors.textPrimary,
+                      },
+                    ]}
                   >
                     Welcome Back!
                   </Text>
+
                   <Text
-                    style={[styles.subtitleText, { color: colors.textSecondary }]}
+                    style={[
+                      styles.subtitleText,
+                      {
+                        color: colors.textSecondary,
+                      },
+                    ]}
                   >
                     Sign in to continue to your account
                   </Text>
                 </View>
 
+                {/* ============================================= */}
+                {/* LOGIN FORM                                    */}
+                {/* ============================================= */}
+
                 <View style={styles.formContainer}>
+                  {/* =========================================== */}
+                  {/* STUDENT ID                                  */}
+                  {/* =========================================== */}
+
                   <View style={styles.fieldWrapper}>
                     <Text
-                      style={[styles.fieldLabel, { color: colors.textPrimary }]}
+                      style={[
+                        styles.fieldLabel,
+                        {
+                          color: colors.textPrimary,
+                        },
+                      ]}
                     >
                       Student ID
                     </Text>
+
                     <View
                       style={[
                         styles.inputWrapper,
                         {
-                          backgroundColor: colors.background,
-                          borderColor: colors.border,
+                          backgroundColor:
+                            colors.background,
+                          borderColor:
+                            colors.border,
                         },
+
                         isStudentIdFocused && [
                           styles.inputWrapperFocused,
-                          { borderColor: colors.primary },
+                          {
+                            borderColor:
+                              colors.primary,
+                          },
                         ],
+
                         studentIdError
                           ? [
                               styles.inputWrapperError,
-                              { borderColor: colors.error },
+                              {
+                                borderColor:
+                                  colors.error,
+                              },
                             ]
                           : null,
                       ]}
@@ -223,59 +476,105 @@ export default function LoginScreen() {
                         name="person-outline"
                         size={20}
                         color={
-                          isStudentIdFocused ? colors.primary : colors.textSecondary
+                          isStudentIdFocused
+                            ? colors.primary
+                            : colors.textSecondary
                         }
                         style={styles.inputIcon}
                       />
+
                       <TextInput
-                        style={[styles.input, { color: colors.textPrimary }]}
+                        style={[
+                          styles.input,
+                          {
+                            color:
+                              colors.textPrimary,
+                          },
+                        ]}
                         placeholder="Enter your student ID"
-                        placeholderTextColor={colors.textTertiary}
+                        placeholderTextColor={
+                          colors.textTertiary
+                        }
                         value={studentId}
                         onChangeText={(text) => {
                           setStudentId(text);
-                          if (studentIdError) setStudentIdError("");
+
+                          if (studentIdError) {
+                            setStudentIdError("");
+                          }
                         }}
-                        onFocus={() => setIsStudentIdFocused(true)}
-                        onBlur={() => setIsStudentIdFocused(false)}
+                        onFocus={() =>
+                          setIsStudentIdFocused(true)
+                        }
+                        onBlur={() =>
+                          setIsStudentIdFocused(false)
+                        }
                         returnKeyType="next"
-                        onSubmitEditing={handleStudentIdSubmit}
+                        onSubmitEditing={
+                          handleStudentIdSubmit
+                        }
                         autoCapitalize="characters"
                         autoCorrect={false}
                         editable={!loading}
                         accessibilityLabel="Student ID"
                       />
                     </View>
+
                     {studentIdError ? (
                       <Text
-                        style={[styles.errorText, { color: colors.error }]}
+                        style={[
+                          styles.errorText,
+                          {
+                            color: colors.error,
+                          },
+                        ]}
                       >
                         {studentIdError}
                       </Text>
                     ) : null}
                   </View>
 
+                  {/* =========================================== */}
+                  {/* PASSWORD                                    */}
+                  {/* =========================================== */}
+
                   <View style={styles.fieldWrapper}>
                     <Text
-                      style={[styles.fieldLabel, { color: colors.textPrimary }]}
+                      style={[
+                        styles.fieldLabel,
+                        {
+                          color: colors.textPrimary,
+                        },
+                      ]}
                     >
                       Password
                     </Text>
+
                     <View
                       style={[
                         styles.inputWrapper,
                         {
-                          backgroundColor: colors.background,
-                          borderColor: colors.border,
+                          backgroundColor:
+                            colors.background,
+                          borderColor:
+                            colors.border,
                         },
+
                         isPasswordFocused && [
                           styles.inputWrapperFocused,
-                          { borderColor: colors.primary },
+                          {
+                            borderColor:
+                              colors.primary,
+                          },
                         ],
+
                         passwordError
                           ? [
                               styles.inputWrapperError,
-                              { borderColor: colors.error },
+                              {
+                                borderColor:
+                                  colors.error,
+                              },
                             ]
                           : null,
                       ]}
@@ -284,32 +583,63 @@ export default function LoginScreen() {
                         name="lock-closed-outline"
                         size={20}
                         color={
-                          isPasswordFocused ? colors.primary : colors.textSecondary
+                          isPasswordFocused
+                            ? colors.primary
+                            : colors.textSecondary
                         }
                         style={styles.inputIcon}
                       />
+
                       <TextInput
                         ref={passwordInputRef}
-                        style={[styles.input, { color: colors.textPrimary }]}
+                        style={[
+                          styles.input,
+                          {
+                            color:
+                              colors.textPrimary,
+                          },
+                        ]}
                         placeholder="Enter your password"
-                        placeholderTextColor={colors.textTertiary}
-                        secureTextEntry={!showPassword}
+                        placeholderTextColor={
+                          colors.textTertiary
+                        }
+                        secureTextEntry={
+                          !showPassword
+                        }
                         value={password}
                         onChangeText={(text) => {
                           setPassword(text);
-                          if (passwordError) setPasswordError("");
+
+                          if (passwordError) {
+                            setPasswordError("");
+                          }
                         }}
-                        onFocus={() => setIsPasswordFocused(true)}
-                        onBlur={() => setIsPasswordFocused(false)}
+                        onFocus={() =>
+                          setIsPasswordFocused(true)
+                        }
+                        onBlur={() =>
+                          setIsPasswordFocused(false)
+                        }
                         returnKeyType="done"
-                        onSubmitEditing={handlePasswordSubmit}
+                        onSubmitEditing={
+                          handlePasswordSubmit
+                        }
                         textContentType="password"
                         autoComplete="password"
                         editable={!loading}
                         accessibilityLabel="Password"
                       />
+
+                      {/* ======================================= */}
+                      {/* SHOW / HIDE PASSWORD                    */}
+                      {/* ======================================= */}
+
                       <TouchableOpacity
-                        onPress={() => setShowPassword((prev) => !prev)}
+                        onPress={() =>
+                          setShowPassword(
+                            (prev) => !prev
+                          )
+                        }
                         hitSlop={{
                           top: 10,
                           bottom: 10,
@@ -319,65 +649,118 @@ export default function LoginScreen() {
                         activeOpacity={0.7}
                         accessibilityRole="button"
                         accessibilityLabel={
-                          showPassword ? "Hide password" : "Show password"
+                          showPassword
+                            ? "Hide password"
+                            : "Show password"
                         }
                       >
                         <Ionicons
                           name={
-                            showPassword ? "eye-off-outline" : "eye-outline"
+                            showPassword
+                              ? "eye-off-outline"
+                              : "eye-outline"
                           }
                           size={20}
-                          color={colors.textSecondary}
+                          color={
+                            colors.textSecondary
+                          }
                         />
                       </TouchableOpacity>
                     </View>
+
                     {passwordError ? (
                       <Text
-                        style={[styles.errorText, { color: colors.error }]}
+                        style={[
+                          styles.errorText,
+                          {
+                            color: colors.error,
+                          },
+                        ]}
                       >
                         {passwordError}
                       </Text>
                     ) : null}
                   </View>
 
+                  {/* =========================================== */}
+                  {/* FORGOT PASSWORD                             */}
+                  {/* =========================================== */}
+
                   <TouchableOpacity
-                    style={styles.forgotContainer}
-                    onPress={handleForgotPassword}
+                    style={
+                      styles.forgotContainer
+                    }
+                    onPress={
+                      handleForgotPassword
+                    }
                     activeOpacity={0.7}
                   >
                     <Text
-                      style={[styles.forgotText, { color: colors.primary }]}
+                      style={[
+                        styles.forgotText,
+                        {
+                          color:
+                            colors.primary,
+                        },
+                      ]}
                     >
                       Forgot Password?
                     </Text>
                   </TouchableOpacity>
 
+                  {/* =========================================== */}
+                  {/* LOGIN BUTTON                                */}
+                  {/* =========================================== */}
+
                   <TouchableOpacity
                     style={[
                       styles.loginButton,
-                      loading && styles.loginButtonDisabled,
-                      { backgroundColor: colors.primary },
+
+                      loading &&
+                        styles.loginButtonDisabled,
+
+                      {
+                        backgroundColor:
+                          colors.primary,
+                      },
                     ]}
-                    onPress={handleLogin}
+                    onPress={() =>
+                      void handleLogin()
+                    }
                     disabled={loading}
                     activeOpacity={0.8}
                     accessibilityRole="button"
-                    accessibilityState={{ disabled: loading, busy: loading }}
+                    accessibilityState={{
+                      disabled: loading,
+                      busy: loading,
+                    }}
                   >
                     {loading ? (
-                      <ActivityIndicator color="#FFFFFF" />
+                      <ActivityIndicator
+                        color="#FFFFFF"
+                      />
                     ) : (
-                      <View style={styles.loginButtonContent}>
+                      <View
+                        style={
+                          styles.loginButtonContent
+                        }
+                      >
                         <Ionicons
                           name="log-in-outline"
                           size={20}
                           color="#FFFFFF"
-                          style={styles.loginButtonIcon}
+                          style={
+                            styles.loginButtonIcon
+                          }
                         />
+
                         <Text
                           style={[
                             styles.loginButtonText,
-                            { color: "#FFFFFF" },
+                            {
+                              color:
+                                "#FFFFFF",
+                            },
                           ]}
                         >
                           Login
@@ -386,73 +769,157 @@ export default function LoginScreen() {
                     )}
                   </TouchableOpacity>
 
-                  <View style={styles.dividerContainer}>
+                  {/* =========================================== */}
+                  {/* SECURE LOGIN DIVIDER                        */}
+                  {/* =========================================== */}
+
+                  <View
+                    style={
+                      styles.dividerContainer
+                    }
+                  >
                     <View
-                      style={[styles.divider, { backgroundColor: colors.border }]}
+                      style={[
+                        styles.divider,
+                        {
+                          backgroundColor:
+                            colors.border,
+                        },
+                      ]}
                     />
+
                     <Text
-                      style={[styles.dividerText, { color: colors.textSecondary }]}
+                      style={[
+                        styles.dividerText,
+                        {
+                          color:
+                            colors.textSecondary,
+                        },
+                      ]}
                     >
                       Secure Login
                     </Text>
+
                     <View
-                      style={[styles.divider, { backgroundColor: colors.border }]}
+                      style={[
+                        styles.divider,
+                        {
+                          backgroundColor:
+                            colors.border,
+                        },
+                      ]}
                     />
                   </View>
+
+                  {/* =========================================== */}
+                  {/* SECURITY INFORMATION                        */}
+                  {/* =========================================== */}
 
                   <View
                     style={[
                       styles.securityContainer,
                       {
-                        backgroundColor: colors.background,
-                        borderColor: colors.border,
+                        backgroundColor:
+                          colors.background,
+                        borderColor:
+                          colors.border,
                       },
                     ]}
                   >
                     <Ionicons
                       name="shield-checkmark-outline"
                       size={20}
-                      color={colors.primary}
-                      style={styles.securityIcon}
+                      color={
+                        colors.primary
+                      }
+                      style={
+                        styles.securityIcon
+                      }
                     />
-                    <View style={styles.securityTextContainer}>
+
+                    <View
+                      style={
+                        styles.securityTextContainer
+                      }
+                    >
                       <Text
-                        style={[styles.securityText, { color: colors.textPrimary }]}
+                        style={[
+                          styles.securityText,
+                          {
+                            color:
+                              colors.textPrimary,
+                          },
+                        ]}
                       >
                         Secure & Trusted
                       </Text>
+
                       <Text
                         style={[
                           styles.securitySubtext,
-                          { color: colors.textSecondary },
+                          {
+                            color:
+                              colors.textSecondary,
+                          },
                         ]}
                       >
-                        Your data is encrypted and protected with
-                        industry-standard security
+                        Your data is encrypted and
+                        protected with industry-standard
+                        security
                       </Text>
                     </View>
                   </View>
 
-                  <View style={styles.signUpContainer}>
+                  {/* =========================================== */}
+                  {/* SIGN UP                                     */}
+                  {/* =========================================== */}
+
+                  <View
+                    style={
+                      styles.signUpContainer
+                    }
+                  >
                     <Text
-                      style={[styles.signUpText, { color: colors.textSecondary }]}
+                      style={[
+                        styles.signUpText,
+                        {
+                          color:
+                            colors.textSecondary,
+                        },
+                      ]}
                     >
                       Don't have an account?
                     </Text>
+
                     <TouchableOpacity
-                      onPress={handleSignUp}
+                      onPress={
+                        handleSignUp
+                      }
                       activeOpacity={0.7}
                     >
                       <Text
-                        style={[styles.signUpLink, { color: colors.primary }]}
+                        style={[
+                          styles.signUpLink,
+                          {
+                            color:
+                              colors.primary,
+                          },
+                        ]}
                       >
                         {" "}
                         Sign Up
                       </Text>
                     </TouchableOpacity>
                   </View>
+
                   <Text
-                    style={[styles.signUpSubtext, { color: colors.textSecondary }]}
+                    style={[
+                      styles.signUpSubtext,
+                      {
+                        color:
+                          colors.textSecondary,
+                      },
+                    ]}
                   >
                     Create an account to get started.
                   </Text>
@@ -460,14 +927,39 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            <View style={[styles.footer, { backgroundColor: colors.background }]}>
+            {/* ================================================= */}
+            {/* FOOTER                                            */}
+            {/* ================================================= */}
+
+            <View
+              style={[
+                styles.footer,
+                {
+                  backgroundColor:
+                    colors.background,
+                },
+              ]}
+            >
               <Text
-                style={[styles.footerText, { color: colors.textSecondary }]}
+                style={[
+                  styles.footerText,
+                  {
+                    color:
+                      colors.textSecondary,
+                  },
+                ]}
               >
                 © {new Date().getFullYear()} {APP_NAME}
               </Text>
+
               <Text
-                style={[styles.versionText, { color: colors.textSecondary }]}
+                style={[
+                  styles.versionText,
+                  {
+                    color:
+                      colors.textSecondary,
+                  },
+                ]}
               >
                 {APP_VERSION}
               </Text>
@@ -478,6 +970,10 @@ export default function LoginScreen() {
     </View>
   );
 }
+
+// ============================================================
+// STYLES
+// ============================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -493,7 +989,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  // ✅ Toggle is now at the top level, not inside navySection
   themeToggle: {
     position: "absolute",
     top: 55,
@@ -505,11 +1000,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
-    zIndex: 999,  // ✅ HIGH z-index to stay on top
+    zIndex: 999,
     shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     elevation: 8,
   },
 
@@ -520,7 +1018,8 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor:
+      "rgba(255, 255, 255, 0.05)",
   },
 
   circleBottomRight: {
@@ -530,7 +1029,8 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor:
+      "rgba(255, 255, 255, 0.05)",
   },
 
   dotGridTopRight: {
@@ -557,7 +1057,8 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
+    backgroundColor:
+      "rgba(255, 255, 255, 0.18)",
     margin: 4,
   },
 
