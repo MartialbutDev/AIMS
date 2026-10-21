@@ -29,6 +29,10 @@ import SkeletonLoader from "../../../src/components/dashboard/SkeletonLoader";
 
 const REQUIRED_HOURS = 486;
 
+// ============================================================
+// TYPES AND INTERFACES
+// ============================================================
+
 interface DashboardStats {
   applications: number;
   documents: number;
@@ -42,6 +46,19 @@ interface InternshipProgress {
   remainingHours: number;
   currentCompany: string;
 }
+
+interface StudentUser {
+  id?: string;
+  email?: string;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+}
+
+// ============================================================
+// DEFAULT VALUES
+// ============================================================
 
 const DEFAULT_STATS: DashboardStats = {
   applications: 0,
@@ -57,11 +74,20 @@ const DEFAULT_PROGRESS: InternshipProgress = {
   currentCompany: "Not yet assigned",
 };
 
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
 function getGreeting(): string {
   const hour = new Date().getHours();
 
-  if (hour < 12) return "Good Morning";
-  if (hour < 17) return "Good Afternoon";
+  if (hour < 12) {
+    return "Good Morning";
+  }
+
+  if (hour < 17) {
+    return "Good Afternoon";
+  }
 
   return "Good Evening";
 }
@@ -74,115 +100,299 @@ function formatDate(date: Date): string {
   });
 }
 
-function safeNumber(value: unknown, fallback = 0): number {
+function safeNumber(
+  value: unknown,
+  fallback = 0
+): number {
+  if (value === null || value === undefined || value === "") {
+    return fallback;
+  }
+
   const number = Number(value);
 
   return Number.isFinite(number) ? number : fallback;
 }
 
+/**
+ * Build the student's complete display name.
+ *
+ * Examples:
+ *
+ * Juan + M. + Cruz
+ * => Juan M. Cruz
+ *
+ * Juan + null + Cruz
+ * => Juan Cruz
+ *
+ * Maria Angela + D. + Santos
+ * => Maria Angela D. Santos
+ *
+ * Legacy accounts:
+ * Juan M. + null + Cruz
+ * => Juan M. Cruz
+ */
+function formatFullName(
+  user: StudentUser | null | undefined
+): string {
+  if (!user) {
+    return "Student";
+  }
+
+  const nameParts = [
+    user.first_name,
+    user.middle_name,
+    user.last_name,
+  ];
+
+  const fullName = nameParts
+    .filter(
+      (part): part is string =>
+        typeof part === "string" &&
+        part.trim().length > 0
+    )
+    .map((part) => part.trim())
+    .join(" ");
+
+  return fullName || "Student";
+}
+
+// ============================================================
+// DASHBOARD SCREEN
+// ============================================================
+
 export default function DashboardScreen() {
   const { colors, isDark } = useTheme();
   const { setScrollValue } = useScrollContext();
 
+  // ==========================================================
+  // STATES
+  // ==========================================================
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [stats, setStats] = useState<DashboardStats>(DEFAULT_STATS);
-  const [activities, setActivities] = useState<any[]>([]);
+  const [stats, setStats] =
+    useState<DashboardStats>(DEFAULT_STATS);
 
-  const [notificationCount, setNotificationCount] = useState(0);
+  const [activities, setActivities] =
+    useState<any[]>([]);
 
-  const [greeting, setGreeting] = useState(getGreeting());
+  const [notificationCount, setNotificationCount] =
+    useState(0);
+
+  const [greeting, setGreeting] =
+    useState(getGreeting());
+
   const [currentDate, setCurrentDate] = useState(
     formatDate(new Date())
   );
 
-  const [userName, setUserName] = useState("Student");
-  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+  const [userName, setUserName] =
+    useState("Student");
+
+  const [userAvatar, setUserAvatar] =
+    useState<string | null>(null);
 
   const [progress, setProgress] =
     useState<InternshipProgress>(DEFAULT_PROGRESS);
 
+  // ==========================================================
+  // REFERENCES
+  // ==========================================================
+
   const lastScrollY = useRef(0);
   const requestIdRef = useRef(0);
-  const mountedRef = useRef(true);
+  const mountedRef = useRef(false);
 
-  const loadUserData = useCallback(async (requestId: number) => {
-    try {
-      const userData = await SecureStore.getItemAsync("user");
+  /**
+   * Prevent outdated requests from modifying dashboard state.
+   */
+  const isCurrentRequest = useCallback(
+    (requestId: number): boolean => {
+      return (
+        mountedRef.current &&
+        requestId === requestIdRef.current
+      );
+    },
+    []
+  );
 
-      let nextUserName = "Student";
+  // ==========================================================
+  // LOAD STUDENT INFORMATION
+  // ==========================================================
 
-      if (userData) {
-        const user = JSON.parse(userData);
-        nextUserName = user.first_name || "Student";
+  const loadUserData = useCallback(
+    async (requestId: number) => {
+      let cachedUser: StudentUser | null = null;
+
+      // ------------------------------------------------------
+      // STEP 1: LOAD CACHED USER
+      // ------------------------------------------------------
+
+      try {
+        const storedUser =
+          await SecureStore.getItemAsync("user");
+
+        if (storedUser) {
+          cachedUser = JSON.parse(
+            storedUser
+          ) as StudentUser;
+
+          if (isCurrentRequest(requestId)) {
+            setUserName(
+              formatFullName(cachedUser)
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Error reading cached student information:",
+          error
+        );
       }
 
-      const avatar = await authService.getAvatar();
+      // ------------------------------------------------------
+      // STEP 2: REFRESH USER FROM BACKEND
+      // ------------------------------------------------------
 
-      if (
-        !mountedRef.current ||
-        requestId !== requestIdRef.current
-      ) {
-        return;
+      try {
+        const currentUser =
+          await authService.getCurrentUser();
+
+        if (!isCurrentRequest(requestId)) {
+          return;
+        }
+
+        if (currentUser) {
+          const updatedUser =
+            currentUser as StudentUser;
+
+          setUserName(
+            formatFullName(updatedUser)
+          );
+
+          // Update locally cached profile information.
+          // Preserve any existing cached fields not returned
+          // by the backend.
+          try {
+            const mergedUser = {
+              ...(cachedUser || {}),
+              ...updatedUser,
+            };
+
+            await SecureStore.setItemAsync(
+              "user",
+              JSON.stringify(mergedUser)
+            );
+          } catch (storageError) {
+            console.error(
+              "Error caching updated student information:",
+              storageError
+            );
+          }
+        }
+      } catch (error) {
+        // Keep the cached name if the backend is unavailable.
+        console.error(
+          "Error refreshing student information:",
+          error
+        );
       }
 
-      setUserName(nextUserName);
-      setUserAvatar(avatar || null);
-    } catch (error) {
-      console.error("Error loading user data:", error);
-    }
-  }, []);
+      // ------------------------------------------------------
+      // STEP 3: LOAD STUDENT AVATAR
+      // ------------------------------------------------------
+
+      try {
+        const avatar =
+          await authService.getAvatar();
+
+        if (!isCurrentRequest(requestId)) {
+          return;
+        }
+
+        setUserAvatar(avatar || null);
+      } catch (error) {
+        console.error(
+          "Error loading student avatar:",
+          error
+        );
+      }
+    },
+    [isCurrentRequest]
+  );
+
+  // ==========================================================
+  // FETCH DASHBOARD STATISTICS
+  // ==========================================================
 
   const fetchDashboardData = useCallback(
     async (requestId: number) => {
       try {
-        const [statsData, activitiesData] = await Promise.all([
+        const [
+          statsData,
+          activitiesData,
+        ] = await Promise.all([
           dashboardService.getStats(),
           dashboardService.getRecentActivities(4),
         ]);
 
-        if (
-          !mountedRef.current ||
-          requestId !== requestIdRef.current
-        ) {
+        if (!isCurrentRequest(requestId)) {
           return;
         }
 
         setStats({
-          applications: safeNumber(statsData?.applications),
-          documents: safeNumber(statsData?.documents),
-          dtr: safeNumber(statsData?.dtr),
-          journals: safeNumber(statsData?.journals),
+          applications: safeNumber(
+            statsData?.applications
+          ),
+          documents: safeNumber(
+            statsData?.documents
+          ),
+          dtr: safeNumber(
+            statsData?.dtr
+          ),
+          journals: safeNumber(
+            statsData?.journals
+          ),
         });
 
         setActivities(
-          Array.isArray(activitiesData) ? activitiesData : []
+          Array.isArray(activitiesData)
+            ? activitiesData
+            : []
         );
       } catch (error) {
-        console.error("Error fetching dashboard data:", error);
+        console.error(
+          "Error fetching dashboard data:",
+          error
+        );
 
-        // Preserve previously loaded data during temporary errors.
+        // Preserve previously loaded statistics.
       }
     },
-    []
+    [isCurrentRequest]
   );
+
+  // ==========================================================
+  // FETCH NOTIFICATION COUNT
+  // ==========================================================
 
   const fetchNotificationCount = useCallback(
     async (requestId: number) => {
       try {
         const count =
-          await notificationService.getNotificationCount();
+          await notificationService
+            .getNotificationCount();
 
-        if (
-          !mountedRef.current ||
-          requestId !== requestIdRef.current
-        ) {
+        if (!isCurrentRequest(requestId)) {
           return;
         }
 
         setNotificationCount(
-          Math.max(0, safeNumber(count?.unread))
+          Math.max(
+            0,
+            safeNumber(count?.unread)
+          )
         );
       } catch (error) {
         console.error(
@@ -191,24 +401,28 @@ export default function DashboardScreen() {
         );
       }
     },
-    []
+    [isCurrentRequest]
   );
+
+  // ==========================================================
+  // FETCH INTERNSHIP PROGRESS
+  // ==========================================================
 
   const fetchProgress = useCallback(
     async (requestId: number) => {
       try {
-        const summary = await dtrService.getDTRSummary();
+        const summary =
+          await dtrService.getDTRSummary();
 
-        if (
-          !mountedRef.current ||
-          requestId !== requestIdRef.current
-        ) {
+        if (!isCurrentRequest(requestId)) {
           return;
         }
 
         const hoursRendered = Math.max(
           0,
-          safeNumber(summary?.total_hours)
+          safeNumber(
+            summary?.total_hours
+          )
         );
 
         const remainingHours = Math.max(
@@ -235,18 +449,27 @@ export default function DashboardScreen() {
           hoursRendered,
           remainingHours,
           currentCompany:
-            summary?.current_company || "Not yet assigned",
+            summary?.current_company ||
+            "Not yet assigned",
         });
       } catch (error) {
-        console.error("Error fetching progress:", error);
+        console.error(
+          "Error fetching internship progress:",
+          error
+        );
       }
     },
-    []
+    [isCurrentRequest]
   );
+
+  // ==========================================================
+  // LOAD DASHBOARD
+  // ==========================================================
 
   const loadDashboard = useCallback(
     async (isRefresh = false) => {
-      const requestId = ++requestIdRef.current;
+      const requestId =
+        ++requestIdRef.current;
 
       if (isRefresh) {
         setRefreshing(true);
@@ -255,6 +478,7 @@ export default function DashboardScreen() {
       }
 
       const now = new Date();
+
       setGreeting(getGreeting());
       setCurrentDate(formatDate(now));
 
@@ -266,10 +490,7 @@ export default function DashboardScreen() {
           fetchProgress(requestId),
         ]);
       } finally {
-        if (
-          mountedRef.current &&
-          requestId === requestIdRef.current
-        ) {
+        if (isCurrentRequest(requestId)) {
           setLoading(false);
           setRefreshing(false);
         }
@@ -280,8 +501,13 @@ export default function DashboardScreen() {
       fetchDashboardData,
       fetchNotificationCount,
       fetchProgress,
+      isCurrentRequest,
     ]
   );
+
+  // ==========================================================
+  // INITIAL DASHBOARD LOAD
+  // ==========================================================
 
   useEffect(() => {
     mountedRef.current = true;
@@ -294,13 +520,25 @@ export default function DashboardScreen() {
     };
   }, [loadDashboard]);
 
+  // ==========================================================
+  // PULL TO REFRESH
+  // ==========================================================
+
   const onRefresh = useCallback(() => {
     void loadDashboard(true);
   }, [loadDashboard]);
 
+  // ==========================================================
+  // NAVIGATION
+  // ==========================================================
+
   const navigateTo = (route: string) => {
     router.push(route as any);
   };
+
+  // ==========================================================
+  // SCROLL HANDLER
+  // ==========================================================
 
   const handleScroll = (
     event: NativeSyntheticEvent<NativeScrollEvent>
@@ -308,7 +546,8 @@ export default function DashboardScreen() {
     const currentOffsetY =
       event.nativeEvent.contentOffset.y;
 
-    const diff = currentOffsetY - lastScrollY.current;
+    const diff =
+      currentOffsetY - lastScrollY.current;
 
     if (currentOffsetY <= 0) {
       setScrollValue(0);
@@ -321,12 +560,19 @@ export default function DashboardScreen() {
     lastScrollY.current = currentOffsetY;
   };
 
+  // ==========================================================
+  // LOADING SCREEN
+  // ==========================================================
+
   if (loading) {
     return (
       <View
         style={[
           styles.container,
-          { backgroundColor: colors.background },
+          {
+            backgroundColor:
+              colors.background,
+          },
         ]}
       >
         <StatusBar
@@ -339,11 +585,18 @@ export default function DashboardScreen() {
     );
   }
 
+  // ==========================================================
+  // MAIN DASHBOARD
+  // ==========================================================
+
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor: colors.background },
+        {
+          backgroundColor:
+            colors.background,
+        },
       ]}
     >
       <StatusBar
@@ -353,7 +606,9 @@ export default function DashboardScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
         scrollEventThrottle={16}
         onScroll={handleScroll}
         refreshControl={
@@ -365,28 +620,54 @@ export default function DashboardScreen() {
           />
         }
       >
+        {/* ============================================= */}
+        {/* STUDENT HERO CARD */}
+        {/* ============================================= */}
+
         <HeroCard
           greeting={greeting}
           userName={userName}
           userAvatar={userAvatar}
           currentDate={currentDate}
-          notificationCount={notificationCount}
+          notificationCount={
+            notificationCount
+          }
           onNotificationPress={() =>
-            navigateTo("/(student)/notifications")
+            navigateTo(
+              "/(student)/notifications"
+            )
           }
           onProfilePress={() =>
-            navigateTo("/(student)/profile")
+            navigateTo(
+              "/(student)/profile"
+            )
           }
         />
+
+        {/* ============================================= */}
+        {/* INTERNSHIP PROGRESS */}
+        {/* ============================================= */}
 
         <InternshipProgressCard
           progress={progress.progress}
-          hoursRendered={progress.hoursRendered}
-          remainingHours={progress.remainingHours}
-          currentCompany={progress.currentCompany}
+          hoursRendered={
+            progress.hoursRendered
+          }
+          remainingHours={
+            progress.remainingHours
+          }
+          currentCompany={
+            progress.currentCompany
+          }
         />
 
-        <View style={styles.statsContainer}>
+        {/* ============================================= */}
+        {/* DASHBOARD STATISTICS */}
+        {/* ============================================= */}
+
+        <View
+          style={styles.statsContainer}
+        >
           <View style={styles.statsRow}>
             <StatisticCard
               icon="briefcase-outline"
@@ -394,7 +675,9 @@ export default function DashboardScreen() {
               label="Applications"
               color={colors.primary}
               onPress={() =>
-                navigateTo("/(student)/applications")
+                navigateTo(
+                  "/(student)/applications"
+                )
               }
             />
 
@@ -404,7 +687,9 @@ export default function DashboardScreen() {
               label="Documents"
               color="#0EA5E9"
               onPress={() =>
-                navigateTo("/(student)/documents")
+                navigateTo(
+                  "/(student)/documents"
+                )
               }
             />
           </View>
@@ -416,7 +701,9 @@ export default function DashboardScreen() {
               label="DTR Records"
               color="#10B981"
               onPress={() =>
-                navigateTo("/(student)/dtr")
+                navigateTo(
+                  "/(student)/dtr"
+                )
               }
             />
 
@@ -426,23 +713,35 @@ export default function DashboardScreen() {
               label="Journals"
               color="#F59E0B"
               onPress={() =>
-                navigateTo("/(student)/journals")
+                navigateTo(
+                  "/(student)/journals"
+                )
               }
             />
           </View>
         </View>
 
-        <View style={styles.section}>
-          <SectionHeader title="Quick Actions" />
+        {/* ============================================= */}
+        {/* QUICK ACTIONS */}
+        {/* ============================================= */}
 
-          <View style={styles.quickActionsGrid}>
+        <View style={styles.section}>
+          <SectionHeader
+            title="Quick Actions"
+          />
+
+          <View
+            style={styles.quickActionsGrid}
+          >
             <QuickActionCard
               icon="briefcase-outline"
               label="Apply Internship"
               subtitle="Start your application"
               color={colors.primary}
               onPress={() =>
-                navigateTo("/(student)/applications/new")
+                navigateTo(
+                  "/(student)/applications/new"
+                )
               }
             />
 
@@ -452,7 +751,9 @@ export default function DashboardScreen() {
               subtitle="Submit requirements"
               color="#0EA5E9"
               onPress={() =>
-                navigateTo("/(student)/documents/upload")
+                navigateTo(
+                  "/(student)/documents/upload"
+                )
               }
             />
 
@@ -462,7 +763,9 @@ export default function DashboardScreen() {
               subtitle="Log your daily time"
               color="#10B981"
               onPress={() =>
-                navigateTo("/(student)/dtr/new")
+                navigateTo(
+                  "/(student)/dtr/new"
+                )
               }
             />
 
@@ -472,21 +775,35 @@ export default function DashboardScreen() {
               subtitle="Submit your journal"
               color="#F59E0B"
               onPress={() =>
-                navigateTo("/(student)/journals/new")
+                navigateTo(
+                  "/(student)/journals/new"
+                )
               }
             />
           </View>
         </View>
 
-        <View style={styles.section}>
-          <SectionHeader title="Recent Activities" />
+        {/* ============================================= */}
+        {/* RECENT ACTIVITIES */}
+        {/* ============================================= */}
 
-          <ActivityTimeline activities={activities} />
+        <View style={styles.section}>
+          <SectionHeader
+            title="Recent Activities"
+          />
+
+          <ActivityTimeline
+            activities={activities}
+          />
         </View>
       </ScrollView>
     </View>
   );
 }
+
+// ============================================================
+// STYLES
+// ============================================================
 
 const styles = StyleSheet.create({
   container: {

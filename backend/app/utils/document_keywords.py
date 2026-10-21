@@ -1,28 +1,22 @@
-# backend/app/utils/document_keywords.py
+
 """
-Document keyword validation utilities for AIMS.
+AIMS internship document validation.
 
-Each validator returns:
-    {
-        "is_valid": bool,          # must be True to reach verified/pending
-        "confidence": int,         # 0-100
-        "message": str,
-        "found_sections": [...],
-        "score": int,
-        "total_sections": int,
-        "thresholds": {"reject": 55, "verify": 80},
-    }
+Uses OCR-extracted text and document-specific rules.
 
-Validators use TWO gates:
-    1. Keyword density — must score >= REJECT_THRESHOLD
-    2. Required structure — must contain the sections that DEFINE the type
+The returned confidence is a heuristic content-coverage
+score, NOT a probability of authenticity.
 
-A class PPT can hit 4/6 letter sections but will fail the required gate
-because it lacks a greeting and a closing.
+The service layer decides whether the document qualifies
+for automatic verification or requires coordinator review.
 """
 
 import re
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional, Set
+
+
+REJECT_THRESHOLD = 55
+VERIFY_THRESHOLD = 80
 
 
 # ============================================================
@@ -30,41 +24,66 @@ from typing import List, Dict, Any
 # ============================================================
 
 def _normalize(text: str) -> str:
-    """Uppercase + collapse whitespace for consistent matching."""
-    return re.sub(r"\s+", " ", (text or "")).upper()
+    return re.sub(
+        r"\s+",
+        " ",
+        (text or "").upper()
+    ).strip()
 
 
 def _matches(text_upper: str, keyword: str) -> bool:
     """
-    Case-insensitive substring match with basic singular/plural tolerance.
+    Match complete words and phrases.
+
+    Prevents:
+      WORK matching NETWORK
+      ART matching START
     """
-    kw = keyword.upper()
+    keyword = _normalize(keyword)
 
-    if kw in text_upper:
-        return True
+    if not keyword:
+        return False
 
-    # plural → singular
-    if kw.endswith("S") and len(kw) > 4 and kw[:-1] in text_upper:
-        return True
+    escaped = re.escape(keyword)
+    escaped = escaped.replace(r"\ ", r"\s+")
 
-    # singular → plural
-    if not kw.endswith("S") and (kw + "S") in text_upper:
-        return True
+    pattern = (
+        r"(?<![A-Z0-9])"
+        + escaped
+        + r"(?![A-Z0-9])"
+    )
 
-    return False
+    return bool(re.search(pattern, text_upper))
 
 
-def _score_sections(text_upper: str, sections: Dict[str, List[str]]):
-    """Return (found_sections, score, total)."""
+def _has_any(
+    text_upper: str,
+    keywords: List[str],
+) -> bool:
+    return any(
+        _matches(text_upper, keyword)
+        for keyword in keywords
+    )
+
+
+def _score_sections(
+    text_upper: str,
+    sections: Dict[str, List[str]],
+):
     found = []
+
     for section, keywords in sections.items():
-        if any(_matches(text_upper, kw) for kw in keywords):
+        if _has_any(text_upper, keywords):
             found.append(section)
+
     return found, len(found), len(sections)
 
 
 def _confidence(score: int, total: int) -> int:
-    return int((score / total) * 100) if total > 0 else 0
+    if total <= 0:
+        return 0
+
+    return round(score / total * 100)
 
 
 def _result(
@@ -73,429 +92,807 @@ def _result(
     message: str,
     score: int,
     total: int,
-    reject_threshold: int,
-    verify_threshold: int,
-    **extra,
+    reject_threshold: int = REJECT_THRESHOLD,
+    verify_threshold: int = VERIFY_THRESHOLD,
+    **extra: Any,
 ) -> Dict[str, Any]:
-    payload = {
-        "is_valid": is_valid,
-        "confidence": confidence,
+
+    return {
+        "is_valid": bool(is_valid),
+        "confidence": max(
+            0,
+            min(100, int(confidence))
+        ),
         "message": message,
         "score": score,
         "total_sections": total,
-        "thresholds": {"reject": reject_threshold, "verify": verify_threshold},
+        "thresholds": {
+            "reject": reject_threshold,
+            "verify": verify_threshold,
+        },
+        "found_sections": extra.pop(
+            "found_sections",
+            []
+        ),
+        "requires_manual_review": not is_valid,
+        **extra,
     }
-    payload.update(extra)
-    return payload
+
+
+def _validate_sections(
+    text: str,
+    label: str,
+    sections: Dict[str, List[str]],
+    required: Set[str],
+    min_length: int = 120,
+) -> Dict[str, Any]:
+    """
+    Mandatory sections account for 80% of the score.
+    Optional sections account for the remaining 20%.
+
+    A document cannot pass without ALL mandatory sections.
+    """
+
+    upper = _normalize(text)
+
+    found, score, total = _score_sections(
+        upper,
+        sections,
+    )
+
+    found_set = set(found)
+
+    missing = sorted(
+        required - found_set
+    )
+
+    optional = set(sections) - required
+
+    required_found = len(
+        required & found_set
+    )
+
+    optional_found = len(
+        optional & found_set
+    )
+
+    required_score = (
+        required_found / len(required) * 80
+        if required
+        else 80
+    )
+
+    optional_score = (
+        optional_found / len(optional) * 20
+        if optional
+        else 20
+    )
+
+    confidence = round(
+        required_score + optional_score
+    )
+
+    readable = (
+        len((text or "").strip()) >= min_length
+    )
+
+    structure_ok = not missing
+
+    is_valid = (
+        readable
+        and structure_ok
+        and confidence >= VERIFY_THRESHOLD
+    )
+
+    if not readable:
+        message = (
+            f"{label}: insufficient readable text "
+            f"({len((text or '').strip())} characters). "
+            "Manual review required."
+        )
+
+    elif missing:
+        message = (
+            f"{label}: missing expected content: "
+            f"{', '.join(missing)}. "
+            "Manual review required."
+        )
+
+    else:
+        message = (
+            f"{label}: required content detected "
+            f"({score}/{total} sections)."
+        )
+
+    return _result(
+        is_valid=is_valid,
+        confidence=confidence,
+        message=message,
+        score=score,
+        total=total,
+        found_sections=found,
+        found_section_names=[
+            name.replace("_", " ").title()
+            for name in found
+        ],
+        missing_sections=missing,
+        structure_ok=structure_ok,
+        readable=readable,
+        required_sections=sorted(required),
+    )
 
 
 # ============================================================
-# THRESHOLD CONSTANTS
-# ============================================================
-
-# Two-tier gate. `reject` = below → auto-reject.
-# Anything between reject and verify → manual review (pending).
-# At or above verify → auto-verify.
-REJECT_THRESHOLD = 55
-VERIFY_THRESHOLD = 80
-
-
-# ============================================================
-# KEYWORD DICTIONARIES
+# RESUME / CV
 # ============================================================
 
 RESUME_KEYWORDS = {
     "personal": [
-        "PERSONAL INFORMATION", "PERSONAL DATA", "PERSONAL DETAILS",
-        "PROFILE", "PERSONAL PROFILE", "ABOUT ME", "BIOGRAPHY",
-        "CAREER OBJECTIVE", "OBJECTIVE", "PROFESSIONAL SUMMARY",
-        "SUMMARY", "INSTRUCTOR", "FACULTY", "PROFESSIONAL",
+        "PERSONAL INFORMATION",
+        "PERSONAL DETAILS",
+        "PERSONAL PROFILE",
+        "PROFILE",
+        "ABOUT ME",
+        "CAREER OBJECTIVE",
+        "OBJECTIVE",
+        "PROFESSIONAL SUMMARY",
     ],
     "education": [
-        "EDUCATION", "EDUCATIONAL BACKGROUND", "ACADEMIC BACKGROUND",
-        "EDUCATIONAL ATTAINMENT", "TERTIARY", "COLLEGE", "UNIVERSITY",
-        "SECONDARY", "HIGH SCHOOL", "ELEMENTARY", "PRIMARY EDUCATION",
-        "ACADEMIC RECORD", "SCHOOL", "INSTITUTE", "DEGREE", "BACHELOR",
-        "MASTER", "DOCTORATE", "GRADUATE", "UNDERGRADUATE",
-        "BS IN", "BA IN", "BACHELOR OF SCIENCE", "BACHELOR OF ARTS",
-        "SHS", "SENIOR HIGH", "JUNIOR HIGH", "STRAND",
-        "GWA", "GPA", "CGPA",
-        "CUM LAUDE", "MAGNA CUM LAUDE", "SUMMA CUM LAUDE",
-        "DEAN'S LISTER", "DEANS LISTER", "DEAN LISTER",
-        "SCHOLAR", "WITH HONORS", "HONORS", "COMPLETER",
-    ],
-    "experience": [
-        "WORK EXPERIENCE", "WORK HISTORY", "EMPLOYMENT HISTORY",
-        "PROFESSIONAL EXPERIENCE", "CAREER HISTORY", "JOB EXPERIENCE",
-        "EMPLOYMENT", "WORK", "PROFESSIONAL BACKGROUND",
-        "RELEVANT EXPERIENCE", "WORK BACKGROUND",
-        "FORMER", "CURRENTLY", "ON-GOING", "PART-TIME", "PART TIME",
-        "FULL-TIME", "FULL TIME", "FREELANCE", "CONTRACT", "CONTRACTUAL",
-    ],
-    "internship": [
-        "INTERNSHIP", "ON-THE-JOB TRAINING", "OJT", "PRACTICUM",
-        "TRAINING EXPERIENCE", "INTERNSHIP EXPERIENCE", "APPRENTICESHIP",
-        "FIELD PRACTICE", "WORK INTEGRATION", "INTERN",
-        "IT INTERN", "INTERN AT", "STUDENT INTERN", "TRAINEE",
+        "EDUCATION",
+        "EDUCATIONAL BACKGROUND",
+        "ACADEMIC BACKGROUND",
+        "EDUCATIONAL ATTAINMENT",
+        "BACHELOR OF SCIENCE",
+        "BACHELOR OF ARTS",
+        "UNIVERSITY",
+        "COLLEGE",
+        "DEGREE",
     ],
     "skills": [
-        "SKILLS", "TECHNICAL SKILLS", "COMPUTER SKILLS",
-        "PROFESSIONAL SKILLS", "CORE SKILLS", "KEY SKILLS",
-        "SOFT SKILLS", "HARD SKILLS", "COMPETENCIES",
-        "EXPERTISE", "PROFICIENCIES", "SPECIALIZATION",
-        "SKILLS & INTEREST", "SKILLS AND INTEREST",
-        "CORE COMPETENCIES", "TECH STACK",
-        "PROGRAMMING", "LANGUAGES",
-    ],
-    "certifications": [
-        "CERTIFICATIONS", "CERTIFICATES", "TRAINING",
-        "SEMINARS", "WORKSHOPS", "CERTIFICATE PROGRAMS",
-        "PROFESSIONAL CERTIFICATIONS", "LICENSES",
-        "CERTIFICATES & AWARDS", "CERTIFICATES AND AWARDS",
-        "CERTIFICATES & AWARDS RECEIVED",
-        "ICDL", "CISCO", "AWS", "AZURE", "COURSERA", "UDEMY",
-    ],
-    "achievements": [
-        "ACHIEVEMENTS", "AWARDS", "HONORS", "ACCOMPLISHMENTS",
-        "RECOGNITIONS", "DISTINCTIONS", "COMMENDATIONS",
-        "NOTABLE ACHIEVEMENTS",
-        "DEAN'S LISTER", "DEANS LISTER", "CUM LAUDE",
-        "WITH HONORS", "SCHOLAR",
-    ],
-    "projects": [
-        "PROJECTS", "ACADEMIC PROJECTS", "PERSONAL PROJECTS",
-        "RESEARCH", "CAPSTONE PROJECT", "THESIS", "DISSERTATION",
-        "RESEARCH PROJECTS", "PROJECT EXPERIENCE",
-        "PROJECT MANAGER", "PORTFOLIO", "HACKATHON",
-        "SIDE PROJECT", "GITHUB", "SOURCE CODE",
-    ],
-    "organizations": [
-        "ORGANIZATIONS", "AFFILIATIONS", "MEMBERSHIPS",
-        "LEADERSHIP EXPERIENCE", "LEADERSHIP ROLES",
-        "EXTRA-CURRICULAR", "VOLUNTEER EXPERIENCE",
-        "MEMBER", "OFFICER", "VOLUNTEER", "COMMUNITY SERVICE",
-    ],
-    "references": [
-        "REFERENCES", "CHARACTER REFERENCES", "PROFESSIONAL REFERENCES",
-        "REFEREES", "PERSONAL REFERENCES", "WORK REFERENCES",
-        "AVAILABLE UPON REQUEST",
-    ],
-    "languages": [
-        "LANGUAGES", "LANGUAGE", "LANGUAGE PROFICIENCY", "LANGUAGE SKILLS",
-        "FOREIGN LANGUAGES", "LINGUISTIC SKILLS",
-    ],
-    "contact": [
-        "CONTACT INFORMATION", "CONTACT DETAILS", "EMAIL",
-        "PHONE", "MOBILE", "TELEPHONE", "ADDRESS",
-        "CONTACT NUMBER", "PHONE NUMBER", "MOBILE NUMBER",
-        "EMAIL ADDRESS", "WEBSITE", "PORTFOLIO",
-        "LINKEDIN", "GITHUB",
-    ],
-    "interests": [
-        "INTERESTS", "HOBBIES", "EXTRACURRICULAR ACTIVITIES",
-        "PERSONAL INTERESTS", "LEISURE ACTIVITIES",
-    ],
-    "declaration": [
-        "DECLARATION", "SIGNATURE", "AUTHORIZATION",
-        "VERIFICATION", "CERTIFICATION", "AFFIDAVIT",
-    ],
-    "publications": [
-        "PUBLICATIONS", "PUBLISHED", "JOURNAL",
-        "CONFERENCE", "PROCEEDINGS", "AUTHORS", "RESEARCH PAPER",
-    ],
-}
-
-
-APPLICATION_LETTER_KEYWORDS = {
-    "greeting": [
-        "DEAR", "DR.", "MR.", "MS.", "MRS.", "TO WHOM IT MAY CONCERN",
-        "HIRING MANAGER", "RESPECTED SIR", "RESPECTED MA'AM",
-        "DEAR SIR", "DEAR MADAM", "DEAR SIR/MADAM",
-    ],
-    "purpose": [
-        "APPLY", "APPLICATION", "POSITION", "JOB", "CAREER",
-        "INTERNSHIP", "OPPORTUNITY", "INTERESTED", "SEEKING",
-        "PROSPECTIVE", "CANDIDATE", "APPLICANT", "APPLYING FOR",
-        "EXPRESS INTEREST", "CURRENT OPENING",
-    ],
-    "qualifications": [
-        "QUALIFICATIONS", "SKILLS", "EXPERIENCE", "EDUCATION",
-        "QUALIFIED", "CAPABLE", "PROFICIENT", "COMPETENT",
-        "BACKGROUND", "TRAINING", "CERTIFICATIONS", "STRENGTHS",
+        "SKILLS",
+        "TECHNICAL SKILLS",
+        "COMPUTER SKILLS",
+        "SOFT SKILLS",
+        "HARD SKILLS",
+        "COMPETENCIES",
+        "PROGRAMMING",
+        "TECH STACK",
+        "PROFICIENCIES",
     ],
     "experience": [
-        "EXPERIENCE", "WORK", "EMPLOYMENT", "INTERNSHIP",
-        "PREVIOUS", "CURRENT", "POSITION", "ROLE", "RESPONSIBILITIES",
-        "DUTIES", "SKILLS ACQUIRED", "ACHIEVEMENTS",
+        "WORK EXPERIENCE",
+        "PROFESSIONAL EXPERIENCE",
+        "WORK HISTORY",
+        "EMPLOYMENT HISTORY",
+        "EXPERIENCE",
     ],
-    "interest": [
-        "INTERESTED", "INTEREST", "PASSIONATE", "MOTIVATED",
-        "ENTHUSIASTIC", "EAGER", "EXCITED", "COMMITTED",
-        "DEDICATED", "KEEN", "GENUINE INTEREST",
+    "internship": [
+        "INTERNSHIP",
+        "ON-THE-JOB TRAINING",
+        "OJT",
+        "PRACTICUM",
+        "TRAINING EXPERIENCE",
+        "STUDENT INTERN",
     ],
-    "closing": [
-        "SINCERELY", "FAITHFULLY", "THANK YOU", "RESPECTFULLY",
-        "BEST REGARDS", "YOURS TRULY", "AWAITING", "RESPONSE",
-        "INTERVIEW", "CONTACT", "AVAILABLE", "LOOK FORWARD",
-        "APPRECIATE", "CONSIDERATION", "GRATEFUL",
+    "projects": [
+        "PROJECTS",
+        "ACADEMIC PROJECTS",
+        "PERSONAL PROJECTS",
+        "CAPSTONE",
+        "THESIS",
+        "PORTFOLIO",
+        "GITHUB",
+    ],
+    "contact": [
+        "CONTACT INFORMATION",
+        "CONTACT DETAILS",
+        "EMAIL",
+        "PHONE",
+        "MOBILE",
+        "CONTACT NUMBER",
+        "EMAIL ADDRESS",
     ],
 }
 
-
-ENDORSEMENT_KEYWORDS = [
-    "ENDORSE", "RECOMMEND", "CERTIFY", "QUALIFIED", "CAPABLE",
-    "ENDORSEMENT", "RECOMMENDATION", "APPROVAL", "CONFIRMATION",
-    "SUPPORT", "CERTIFICATION", "AUTHENTICATE",
-]
-
-
-CERTIFICATE_KEYWORDS = [
-    "CERTIFICATE", "COMPLETION", "SUCCESSFULLY", "COMPLETED",
-    "AWARDED", "CERTIFY", "ACCOMPLISH", "GRADUATE",
-    "FULFILLED", "REQUIREMENTS", "SATISFACTORY",
-]
-
-
-WAIVER_KEYWORDS = [
-    "WAIVER", "CONSENT", "RELEASE", "LIABILITY", "HOLD HARMLESS",
-    "GUARDIAN", "PARENT", "SIGNATURE", "NOTARIZED", "ACKNOWLEDGE",
-    "VOLUNTARY", "ASSUME RISK", "INDEMNIFY", "REPUBLIC OF THE PHILIPPINES",
-    "AFFIDAVIT", "UNDERSIGNED", "WITNESS", "DOCTOR OF", "PARENT'S CONSENT",
-]
-
-
-MEDICAL_KEYWORDS = [
-    "MEDICAL CERTIFICATE", "MEDICAL CLEARANCE", "PHYSICALLY FIT",
-    "MEDICAL EXAMINATION", "PHYSICIAN", "DOCTOR", "LICENSED",
-    "CLINIC", "HOSPITAL", "DEPARTMENT OF HEALTH",
-    "BLOOD PRESSURE", "HEIGHT", "WEIGHT", "SIGNATURE",
-    "PHYSICAL EXAMINATION", "MEDICAL FITNESS", "GOOD HEALTH",
-]
-
-
-INTERNSHIP_PLAN_KEYWORDS = [
-    "INTERNSHIP PLAN", "TRAINING PLAN", "OBJECTIVES", "OUTCOMES",
-    "COMPETENCIES", "DURATION", "HOURS", "SCHEDULE", "TASKS",
-    "SUPERVISOR", "HOST TRAINING ESTABLISHMENT", "HTE",
-    "LEARNING OBJECTIVES", "ACTIVITIES", "PROGRAM",
-    "TRAINING OBJECTIVES", "SKILLS DEVELOPMENT", "WORK PLAN",
-]
-
-
-INSURANCE_KEYWORDS = [
-    "INSURANCE", "POLICY", "COVERAGE", "INSURED", "BENEFICIARY",
-    "GROUP ACCIDENT", "PERSONAL ACCIDENT", "HOSPITALIZATION",
-    "POLICY NUMBER", "EFFECTIVE DATE", "EXPIRY", "PREMIUM",
-    "INSURANCE COMPANY", "CLAIM", "COVERAGE PERIOD",
-]
-
-
-# ============================================================
-# REQUIRED SECTIONS PER DOCUMENT TYPE
-# ============================================================
-# A document must contain these sections (in addition to passing the
-# keyword threshold) to be considered valid. This prevents a class PPT
-# from being accepted just because it mentions "skills" and "experience".
-
-REQUIRED_SECTIONS = {
-    # Resume: must contain at least 3 of these core sections
-    "resume": {
-        "mode": "at_least",
-        "min_count": 3,
-        "sections": {"education", "skills", "experience", "internship", "projects"},
-    },
-    # Application letter: must contain greeting, purpose, closing
-    "application_letter": {
-        "mode": "all_of",
-        "sections": {"greeting", "purpose", "closing"},
-    },
-}
-
-
-# ============================================================
-# VALIDATORS
-# ============================================================
 
 def validate_resume(text: str) -> Dict[str, Any]:
     upper = _normalize(text)
-    found, score, total = _score_sections(upper, RESUME_KEYWORDS)
-    confidence = _confidence(score, total)
 
-    # ✅ Required structure gate
-    core = {"education", "skills", "experience", "internship", "projects"}
-    core_hit = core & set(found)
-    structure_ok = len(core_hit) >= 3
+    has_email = bool(
+        re.search(
+            r"\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b",
+            upper,
+        )
+    )
 
-    # ✅ Both gates must pass
-    is_valid = (confidence >= REJECT_THRESHOLD) and structure_ok
+    has_phone = bool(
+        re.search(
+            r"(?<!\d)(?:\+?63|0)9\d{9}(?!\d)",
+            upper,
+        )
+    )
 
-    section_names = {
-        "personal": "Personal Info", "education": "Education",
-        "experience": "Experience", "internship": "Internship/OJT",
-        "skills": "Skills", "certifications": "Certifications",
-        "achievements": "Achievements", "projects": "Projects",
-        "organizations": "Organizations", "references": "References",
-        "languages": "Languages", "contact": "Contact Info",
-        "interests": "Interests", "declaration": "Declaration",
-        "publications": "Publications",
+    # Contact requires actual contact information,
+    # not simply the word "CONTACT".
+    sections = {
+        key: value
+        for key, value in RESUME_KEYWORDS.items()
+        if key != "contact"
     }
-    found_names = [section_names.get(s, s) for s in found]
-    core_names = [section_names.get(s, s) for s in core_hit]
-    missing_core = core - core_hit
 
-    if is_valid:
-        message = (
-            f"✅ Resume — {confidence}% ({score}/{total} sections) · "
-            f"core: {len(core_hit)}/5"
-        )
-    elif not structure_ok:
-        message = (
-            f"❌ Not a valid resume — only {len(core_hit)}/5 core sections found "
-            f"({', '.join(core_names) or 'none'}). "
-            f"Resume must have at least 3 of: Education, Skills, Experience, Internship, Projects."
-        )
-    else:
-        message = (
-            f"❌ Not a valid resume — only {confidence}% ({score}/{total} sections). "
-            f"Need {REJECT_THRESHOLD}%+."
-        )
+    sections["contact"] = []
 
-    return _result(
-        is_valid=is_valid,
-        confidence=confidence,
-        message=message,
-        score=score,
-        total=total,
-        reject_threshold=REJECT_THRESHOLD,
-        verify_threshold=VERIFY_THRESHOLD,
-        found_sections=found,
-        found_section_names=found_names,
-        core_hits=list(core_hit),
-        missing_core=list(missing_core),
+    result = _validate_sections(
+        text=text,
+        label="Resume/CV",
+        sections=sections,
+        required={
+            "education",
+            "skills",
+            "contact",
+        },
     )
 
+    found = set(
+        result["found_sections"]
+    )
 
-def validate_application_letter(text: str) -> Dict[str, Any]:
-    upper = _normalize(text)
-    found, score, total = _score_sections(upper, APPLICATION_LETTER_KEYWORDS)
-    confidence = _confidence(score, total)
+    if has_email or has_phone:
+        found.add("contact")
 
-    # ✅ Required structure gate
-    required = {"greeting", "purpose", "closing"}
-    missing = required - set(found)
-    structure_ok = len(missing) == 0
-
-    # ✅ Both gates must pass
-    is_valid = (confidence >= REJECT_THRESHOLD) and structure_ok
-
-    section_names = {
-        "greeting": "Greeting", "purpose": "Purpose",
-        "qualifications": "Qualifications", "experience": "Experience",
-        "interest": "Interest", "closing": "Closing",
+    required = {
+        "education",
+        "skills",
+        "contact",
     }
-    found_names = [section_names.get(s, s) for s in found]
-    missing_names = [section_names[m] for m in missing]
 
-    if is_valid:
-        message = f"✅ Application Letter — {confidence}% ({score}/{total} sections)"
-    elif not structure_ok:
-        message = (
-            f"❌ Not a valid application letter — missing required sections: "
-            f"{', '.join(missing_names)}. "
-            f"An application letter must have a greeting (e.g. 'Dear Sir'), "
-            f"a purpose statement, and a closing (e.g. 'Sincerely yours')."
-        )
-    else:
-        message = (
-            f"❌ Not a valid application letter — only {confidence}%. "
-            f"Need {REJECT_THRESHOLD}%+."
-        )
+    optional = set(sections) - required
 
-    return _result(
+    required_hits = len(
+        required & found
+    )
+
+    optional_hits = len(
+        optional & found
+    )
+
+    confidence = round(
+        (required_hits / len(required) * 80)
+        + (
+            optional_hits / len(optional) * 20
+            if optional
+            else 20
+        )
+    )
+
+    missing = sorted(
+        required - found
+    )
+
+    readable = (
+        len((text or "").strip()) >= 120
+    )
+
+    is_valid = (
+        readable
+        and not missing
+        and confidence >= VERIFY_THRESHOLD
+    )
+
+    result.update(
         is_valid=is_valid,
         confidence=confidence,
-        message=message,
-        score=score,
-        total=total,
-        reject_threshold=REJECT_THRESHOLD,
-        verify_threshold=VERIFY_THRESHOLD,
-        found_sections=found,
-        found_section_names=found_names,
-        missing_sections=list(missing),
+        found_sections=sorted(found),
+        found_section_names=[
+            name.replace("_", " ").title()
+            for name in sorted(found)
+        ],
+        score=len(found),
+        missing_sections=missing,
+        structure_ok=not missing,
+        contact_detected=(
+            has_email or has_phone
+        ),
+        core_hits=sorted(
+            found & {
+                "education",
+                "skills",
+                "experience",
+                "internship",
+                "projects",
+            }
+        ),
+        missing_core=sorted(
+            {
+                "education",
+                "skills",
+                "experience",
+                "internship",
+                "projects",
+            } - found
+        ),
+        requires_manual_review=not is_valid,
+    )
+
+    if is_valid:
+        result["message"] = (
+            "Resume/CV: required education, skills, "
+            "and contact information detected."
+        )
+
+    elif missing:
+        result["message"] = (
+            "Resume/CV: missing required information: "
+            + ", ".join(missing)
+            + ". Manual review required."
+        )
+
+    else:
+        result["message"] = (
+            "Resume/CV: OCR text is insufficient. "
+            "Manual review required."
+        )
+
+    return result
+
+
+# ============================================================
+# APPLICATION LETTER
+# ============================================================
+
+APPLICATION_LETTER_KEYWORDS = {
+    "greeting": [
+        "DEAR",
+        "TO WHOM IT MAY CONCERN",
+        "DEAR SIR",
+        "DEAR MADAM",
+        "RESPECTED SIR",
+        "RESPECTED MA'AM",
+    ],
+    "purpose": [
+        "APPLY",
+        "APPLYING",
+        "APPLICATION",
+        "APPLYING FOR",
+        "EXPRESS MY INTEREST",
+        "SEEKING",
+    ],
+    "internship": [
+        "INTERNSHIP",
+        "ON-THE-JOB TRAINING",
+        "OJT",
+        "PRACTICUM",
+        "STUDENT INTERN",
+        "INTERN POSITION",
+    ],
+    "closing": [
+        "SINCERELY",
+        "RESPECTFULLY",
+        "YOURS TRULY",
+        "BEST REGARDS",
+        "FAITHFULLY",
+        "THANK YOU",
+    ],
+    "qualifications": [
+        "QUALIFICATIONS",
+        "SKILLS",
+        "EXPERIENCE",
+        "EDUCATION",
+        "KNOWLEDGE",
+        "BACKGROUND",
+    ],
+    "interest": [
+        "INTERESTED",
+        "INTEREST",
+        "MOTIVATED",
+        "EAGER",
+        "OPPORTUNITY",
+        "PASSIONATE",
+    ],
+}
+
+
+def validate_application_letter(
+    text: str,
+) -> Dict[str, Any]:
+
+    return _validate_sections(
+        text=text,
+        label="Application Letter",
+        sections=APPLICATION_LETTER_KEYWORDS,
+        required={
+            "greeting",
+            "purpose",
+            "internship",
+            "closing",
+        },
     )
 
 
-def _flat_keyword_validator(text: str, keywords: List[str], label: str) -> Dict[str, Any]:
-    upper = _normalize(text)
-    found = [kw for kw in keywords if _matches(upper, kw)]
-    score = len(found)
-    total = len(keywords)
-    confidence = _confidence(score, total)
-    is_valid = confidence >= REJECT_THRESHOLD
+# ============================================================
+# ENDORSEMENT LETTER
+# ============================================================
 
-    if is_valid:
-        message = f"✅ {label} — {confidence}%"
-    else:
-        message = f"❌ Not a valid {label.lower()} — only {confidence}% ({score}/{total} keywords). Need {REJECT_THRESHOLD}%."
+ENDORSEMENT_KEYWORDS = [
+    "ENDORSE",
+    "ENDORSEMENT",
+    "RECOMMEND",
+    "RECOMMENDATION",
+    "CERTIFY",
+    "REFERRED",
+]
 
-    return _result(
-        is_valid=is_valid,
-        confidence=confidence,
-        message=message,
-        score=score,
-        total=total,
-        reject_threshold=REJECT_THRESHOLD,
-        verify_threshold=VERIFY_THRESHOLD,
-        found_keywords=found[:5],
+
+def validate_endorsement_letter(
+    text: str,
+) -> Dict[str, Any]:
+
+    return _validate_sections(
+        text=text,
+        label="Endorsement Letter",
+        sections={
+            "endorsement": ENDORSEMENT_KEYWORDS,
+            "student": [
+                "STUDENT",
+                "INTERN",
+                "TRAINEE",
+                "PRACTICUM",
+            ],
+            "institution": [
+                "UNIVERSITY",
+                "COLLEGE",
+                "DEPARTMENT",
+                "INSTITUTE",
+            ],
+            "recipient": [
+                "COMPANY",
+                "MANAGER",
+                "SUPERVISOR",
+                "HUMAN RESOURCES",
+                "HOST TRAINING ESTABLISHMENT",
+            ],
+        },
+        required={
+            "endorsement",
+            "student",
+        },
     )
 
 
-def validate_endorsement_letter(text: str) -> Dict[str, Any]:
-    return _flat_keyword_validator(text, ENDORSEMENT_KEYWORDS, "Endorsement letter")
+# ============================================================
+# ACCEPTANCE LETTER
+# ============================================================
+
+def validate_acceptance_letter(
+    text: str,
+) -> Dict[str, Any]:
+
+    return _validate_sections(
+        text=text,
+        label="Acceptance Letter",
+        sections={
+            "acceptance": [
+                "ACCEPTED",
+                "ACCEPTANCE",
+                "PLEASED TO ACCEPT",
+                "CONFIRM YOUR PLACEMENT",
+                "WELCOME",
+            ],
+            "internship": [
+                "INTERNSHIP",
+                "OJT",
+                "PRACTICUM",
+                "TRAINING",
+                "INTERN",
+                "TRAINEE",
+            ],
+            "company": [
+                "COMPANY",
+                "ORGANIZATION",
+                "HUMAN RESOURCES",
+                "MANAGER",
+                "SUPERVISOR",
+            ],
+            "schedule": [
+                "START DATE",
+                "COMMENCEMENT",
+                "DURATION",
+                "HOURS",
+                "REPORT ON",
+            ],
+        },
+        required={
+            "acceptance",
+            "internship",
+        },
+    )
 
 
-def validate_certificate_of_completion(text: str) -> Dict[str, Any]:
-    return _flat_keyword_validator(text, CERTIFICATE_KEYWORDS, "Certificate of completion")
+# ============================================================
+# CERTIFICATE OF COMPLETION
+# ============================================================
+
+CERTIFICATE_KEYWORDS = [
+    "CERTIFICATE",
+    "CERTIFICATION",
+    "CERTIFY",
+    "COMPLETED",
+    "COMPLETION",
+    "SUCCESSFULLY",
+]
 
 
-def validate_waiver(text: str) -> Dict[str, Any]:
-    return _flat_keyword_validator(text, WAIVER_KEYWORDS, "Waiver / Consent")
+def validate_certificate_of_completion(
+    text: str,
+) -> Dict[str, Any]:
+
+    return _validate_sections(
+        text=text,
+        label="Certificate of Completion",
+        sections={
+            "certificate": CERTIFICATE_KEYWORDS,
+            "training": [
+                "INTERNSHIP",
+                "TRAINING",
+                "OJT",
+                "PRACTICUM",
+                "HOURS",
+            ],
+            "issuer": [
+                "COMPANY",
+                "ORGANIZATION",
+                "MANAGER",
+                "SUPERVISOR",
+                "DIRECTOR",
+            ],
+        },
+        required={
+            "certificate",
+            "training",
+        },
+    )
 
 
-def validate_medical_certificate(text: str) -> Dict[str, Any]:
-    return _flat_keyword_validator(text, MEDICAL_KEYWORDS, "Medical certificate")
+# ============================================================
+# WAIVER / CONSENT
+# ============================================================
+
+WAIVER_KEYWORDS = [
+    "WAIVER",
+    "CONSENT",
+    "RELEASE",
+    "LIABILITY",
+    "GUARDIAN",
+    "PARENT",
+    "UNDERSIGNED",
+    "ACKNOWLEDGE",
+]
 
 
-def validate_internship_plan(text: str) -> Dict[str, Any]:
-    return _flat_keyword_validator(text, INTERNSHIP_PLAN_KEYWORDS, "Internship plan")
+def validate_waiver(
+    text: str,
+) -> Dict[str, Any]:
+
+    return _validate_sections(
+        text=text,
+        label="Waiver / Consent",
+        sections={
+            "consent": WAIVER_KEYWORDS,
+            "student": [
+                "STUDENT",
+                "INTERN",
+                "TRAINEE",
+                "CHILD",
+                "WARD",
+            ],
+            "acknowledgment": [
+                "ACKNOWLEDGE",
+                "AGREE",
+                "UNDERSTAND",
+                "VOLUNTARY",
+                "UNDERSIGNED",
+            ],
+            "signature_field": [
+                "SIGNATURE",
+                "SIGNED",
+                "PARENT",
+                "GUARDIAN",
+                "DATE",
+            ],
+        },
+        required={
+            "consent",
+            "acknowledgment",
+        },
+    )
 
 
-def validate_insurance(text: str) -> Dict[str, Any]:
-    return _flat_keyword_validator(text, INSURANCE_KEYWORDS, "Insurance document")
+# ============================================================
+# MEDICAL CERTIFICATE
+# ============================================================
+
+MEDICAL_KEYWORDS = [
+    "MEDICAL CERTIFICATE",
+    "MEDICAL CLEARANCE",
+    "PHYSICALLY FIT",
+    "FIT TO WORK",
+    "FIT FOR TRAINING",
+    "MEDICAL EXAMINATION",
+]
 
 
-def validate_generic_document(text: str) -> Dict[str, Any]:
-    """
-    Fallback for acceptance_letter / requirements.
-    Length check only. Can reach 'pending' at most.
-    """
-    text_length = len((text or "").strip())
-    is_valid = text_length > 200
+def validate_medical_certificate(
+    text: str,
+) -> Dict[str, Any]:
 
-    confidence = 55 if is_valid else 0
+    return _validate_sections(
+        text=text,
+        label="Medical Certificate",
+        sections={
+            "medical": MEDICAL_KEYWORDS,
+            "provider": [
+                "PHYSICIAN",
+                "DOCTOR",
+                "CLINIC",
+                "HOSPITAL",
+                "MEDICAL OFFICER",
+            ],
+            "assessment": [
+                "FIT",
+                "HEALTH",
+                "EXAMINED",
+                "EXAMINATION",
+                "CLEARANCE",
+            ],
+        },
+        required={
+            "medical",
+            "provider",
+        },
+    )
 
-    if is_valid:
-        message = f"⏳ Generic document — {text_length} chars. Requires manual review."
-    else:
-        message = f"❌ Document too short ({text_length} chars)."
+
+# ============================================================
+# INTERNSHIP PLAN
+# ============================================================
+
+INTERNSHIP_PLAN_KEYWORDS = [
+    "INTERNSHIP PLAN",
+    "TRAINING PLAN",
+    "WORK PLAN",
+    "TRAINING PROGRAM",
+]
+
+
+def validate_internship_plan(
+    text: str,
+) -> Dict[str, Any]:
+
+    return _validate_sections(
+        text=text,
+        label="Internship Plan",
+        sections={
+            "plan": INTERNSHIP_PLAN_KEYWORDS,
+            "objectives": [
+                "OBJECTIVES",
+                "LEARNING OBJECTIVES",
+                "LEARNING OUTCOMES",
+                "COMPETENCIES",
+                "TRAINING OBJECTIVES",
+            ],
+            "activities": [
+                "ACTIVITIES",
+                "TASKS",
+                "RESPONSIBILITIES",
+                "ASSIGNMENTS",
+            ],
+            "schedule": [
+                "SCHEDULE",
+                "DURATION",
+                "HOURS",
+                "WEEKS",
+                "TIMELINE",
+            ],
+            "supervisor": [
+                "SUPERVISOR",
+                "MENTOR",
+                "TRAINER",
+                "HTE",
+            ],
+        },
+        required={
+            "plan",
+            "objectives",
+            "activities",
+            "schedule",
+        },
+    )
+
+
+# ============================================================
+# INSURANCE
+# ============================================================
+
+INSURANCE_KEYWORDS = [
+    "INSURANCE",
+    "POLICY",
+    "COVERAGE",
+    "INSURED",
+    "BENEFICIARY",
+    "ACCIDENT INSURANCE",
+]
+
+
+def validate_insurance(
+    text: str,
+) -> Dict[str, Any]:
+
+    return _validate_sections(
+        text=text,
+        label="Insurance Document",
+        sections={
+            "insurance": INSURANCE_KEYWORDS,
+            "coverage": [
+                "COVERAGE",
+                "BENEFITS",
+                "ACCIDENT",
+                "PROTECTION",
+            ],
+            "policy": [
+                "POLICY NUMBER",
+                "POLICY NO",
+                "POLICY",
+                "CERTIFICATE NUMBER",
+            ],
+            "insured": [
+                "INSURED",
+                "BENEFICIARY",
+                "POLICYHOLDER",
+                "MEMBER",
+            ],
+        },
+        required={
+            "insurance",
+            "coverage",
+            "policy",
+        },
+    )
+
+
+# ============================================================
+# GENERIC DOCUMENT
+# ============================================================
+
+def validate_generic_document(
+    text: str,
+) -> Dict[str, Any]:
+
+    text_length = len(
+        (text or "").strip()
+    )
+
+    readable = text_length >= 200
+
+    confidence = (
+        55 if readable else 0
+    )
+
+    message = (
+        "Generic document: readable OCR text "
+        "detected; manual review required."
+        if readable
+        else
+        "Generic document: insufficient OCR text; "
+        "manual review required."
+    )
 
     return _result(
-        is_valid=is_valid,
+        is_valid=readable,
         confidence=confidence,
         message=message,
         score=text_length,
         total=200,
-        reject_threshold=REJECT_THRESHOLD,
-        verify_threshold=VERIFY_THRESHOLD,
+        found_sections=[],
         text_length=text_length,
+        requires_manual_review=True,
     )

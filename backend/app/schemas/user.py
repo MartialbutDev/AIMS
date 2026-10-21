@@ -1,4 +1,3 @@
-
 """Pydantic user schemas shared by mobile and web clients."""
 
 from datetime import datetime
@@ -20,6 +19,12 @@ class UserBase(BaseModel):
 
     first_name: str = Field(
         min_length=1,
+        max_length=100
+    )
+
+    # Optional: supports a full middle name or a middle initial (e.g. "M.").
+    middle_name: Optional[str] = Field(
+        default=None,
         max_length=100
     )
 
@@ -67,6 +72,11 @@ class AdminUserCreate(BaseModel):
         max_length=100
     )
 
+    middle_name: Optional[str] = Field(
+        default=None,
+        max_length=100
+    )
+
     last_name: str = Field(
         min_length=1,
         max_length=100
@@ -102,6 +112,11 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(
         default=None,
         min_length=1,
+        max_length=100
+    )
+
+    middle_name: Optional[str] = Field(
+        default=None,
         max_length=100
     )
 

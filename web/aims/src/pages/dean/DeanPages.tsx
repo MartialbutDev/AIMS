@@ -7,6 +7,7 @@ import {
 } from '../shared/UtilityPages'
 
 import { DeanDashboardPage } from './DeanDashboardPage'
+import { DeanCoordinatorManagement } from './DeanCoordinatorManagement'
 import { NotificationsPage } from './NotificationsPage'
 
 // ========================================
@@ -36,6 +37,17 @@ export function DeanPages({
     case 'dashboard':
     case 'analytics':
       return <DeanDashboardPage />
+
+    // ========================================
+    // COORDINATOR MANAGEMENT
+    // ========================================
+
+    case 'coordinators':
+      return (
+        <section className="workspace-page dean-analytics">
+          <DeanCoordinatorManagement />
+        </section>
+      )
 
     // ========================================
     // NOTIFICATIONS

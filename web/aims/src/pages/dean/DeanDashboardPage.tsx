@@ -6,6 +6,8 @@ import {
   type DeanAnalytics,
 } from '../../services/deanAnalyticsService'
 
+import { DeanCoordinatorManagement } from './DeanCoordinatorManagement'
+
 // ========================================
 // COMPLETION BAR COMPONENT
 // ========================================
@@ -278,7 +280,9 @@ export function DeanDashboardPage() {
         </button>
       </div>
 
-      {/* REFRESH ERROR */}
+      {/* ========================================
+          REFRESH ERROR
+      ======================================== */}
 
       {error && (
         <p className="form-error" role="alert">
@@ -502,6 +506,12 @@ export function DeanDashboardPage() {
           </div>
         )}
       </section>
+
+      {/* ========================================
+          DEAN COORDINATOR MANAGEMENT
+      ======================================== */}
+
+      <DeanCoordinatorManagement />
 
       {/* ========================================
           DATA PRIVACY NOTICE

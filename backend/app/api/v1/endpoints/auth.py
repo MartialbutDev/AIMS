@@ -1,4 +1,3 @@
-
 """AIMS authentication endpoints (mobile + web).
 
 Password reset and email verification require SMTP and frontend action URLs.
@@ -51,6 +50,13 @@ GENERIC_RESET_MESSAGE = (
 
 class TokenRequest(BaseModel):
     token: str = Field(min_length=10)
+
+
+def _clean_middle_name(value: str | None) -> str | None:
+    """Normalize an optional middle name without guessing missing names."""
+    if value is None:
+        return None
+    return value.strip() or None
 
 
 def _token_response(user: User) -> LoginResponse:
@@ -163,6 +169,7 @@ async def register_student(
         id=str(uuid.uuid4()),
         email=email,
         first_name=user_data.first_name.strip(),
+        middle_name=_clean_middle_name(user_data.middle_name),
         last_name=user_data.last_name.strip(),
         phone=user_data.phone,
         student_id=student_id,
@@ -235,6 +242,7 @@ async def register_web_user(
         id=str(uuid.uuid4()),
         email=email,
         first_name=user_data.first_name.strip(),
+        middle_name=_clean_middle_name(user_data.middle_name),
         last_name=user_data.last_name.strip(),
         phone=user_data.phone,
         hashed_password=get_password_hash(user_data.password),
@@ -314,6 +322,7 @@ async def login_user_form(
             "id": user.id,
             "email": user.email,
             "first_name": user.first_name,
+            "middle_name": user.middle_name,
             "last_name": user.last_name,
             "role": user.role.value,
             "student_id": user.student_id,
@@ -336,6 +345,7 @@ async def update_current_user(
 ):
     for field in (
         "first_name",
+        "middle_name",
         "last_name",
         "phone",
         "gender",
@@ -346,7 +356,10 @@ async def update_current_user(
                 # Avatar changes must use the authenticated upload API.
                 continue
 
-            setattr(current_user, field, getattr(user_data, field))
+            value = getattr(user_data, field)
+            if field == "middle_name":
+                value = _clean_middle_name(value)
+            setattr(current_user, field, value)
 
     if (
         "student_id" in user_data.model_fields_set

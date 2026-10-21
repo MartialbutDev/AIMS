@@ -1,19 +1,28 @@
-"""AIMS student onboarding uploads with automated OCR content checks.
 
-An OCR match automatically completes the content-check workflow, not an
-independent authenticity check. Deployments requiring proof of university
-issuance should integrate an authoritative document verification source.
+"""AIMS onboarding with OCR validation and coordinator matching.
+
+OCR content matches do not independently authenticate university
+documents. Coordinator assignment requires a Dean-approved designation.
 """
 
 import asyncio
 import io
 import uuid
+
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pymupdf as fitz
 import pytesseract
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    UploadFile,
+)
+
 from fastapi.responses import FileResponse
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, Field
@@ -23,18 +32,45 @@ from sqlalchemy.orm import Session, aliased
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.coordinator_assignment import CoordinatorStudentAssignment
-from app.models.student_onboarding import StudentOnboarding, StudentOnboardingSubmission
-from app.models.user import User, UserRole
-from app.services.ocr_service import OCRService
-from app.services.onboarding_validation import validate_cor, validate_orientation
 
-router = APIRouter(prefix="/onboarding", tags=["Student Onboarding"])
+from app.models.coordinator_assignment import (
+    CoordinatorStudentAssignment,
+)
+
+from app.models.student_onboarding import (
+    StudentOnboarding,
+    StudentOnboardingSubmission,
+)
+
+from app.models.user import User, UserRole
+
+from app.services.coordinator_auto_assignment import (
+    try_assign_coordinator,
+)
+
+from app.services.cor_faculty_extraction import (
+    extract_cor_course_layout,
+)
+
+from app.services.ocr_service import OCRService
+
+from app.services.onboarding_validation import (
+    validate_cor,
+    validate_orientation,
+)
+
+
+router = APIRouter(
+    prefix="/onboarding",
+    tags=["Student Onboarding"],
+)
 
 ASSET_ROOT = Path(settings.ASSET_DIR).resolve()
 PRIVATE_DIR = ASSET_ROOT / "onboarding"
+
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_PDF_PAGES = 6
+
 ALLOWED_EXTENSIONS = {
     ".pdf": "application/pdf",
     ".png": "image/png",
@@ -42,8 +78,6 @@ ALLOWED_EXTENSIONS = {
     ".jpeg": "image/jpeg",
 }
 
-# Text clearly identifying an artificial QA fixture is never acceptable as an
-# official internship document. Use isolated unit/integration tests for fixtures.
 TEST_DOCUMENT_MARKERS = (
     "SYNTHETIC DOCUMENT",
     "NOT ISSUED BY USTP",
@@ -54,17 +88,25 @@ TEST_DOCUMENT_MARKERS = (
 
 
 class ReviewRequest(BaseModel):
-    decision: str  # "verified" or "rejected"
-    notes: str | None = Field(default=None, max_length=2000)
+    decision: str
+    notes: str | None = Field(
+        default=None,
+        max_length=2000,
+    )
 
 
 def _utc_now_naive() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(
+        timezone.utc
+    ).replace(tzinfo=None)
 
 
 def _require_student(user: User) -> None:
     if user.role != UserRole.STUDENT:
-        raise HTTPException(403, "Only students can submit onboarding documents")
+        raise HTTPException(
+            403,
+            "Only students can submit onboarding documents",
+        )
 
 
 def _require_reviewer(
@@ -72,32 +114,44 @@ def _require_reviewer(
     user: User,
     student_id: str | None = None,
 ) -> None:
+
     if user.role == UserRole.ADMIN:
         return
 
     if user.role != UserRole.COORDINATOR:
-        raise HTTPException(403, "Coordinator or administrator access required")
+        raise HTTPException(
+            403,
+            "Coordinator or administrator access required",
+        )
 
     if student_id is None:
         return
 
-    assigned = db.query(CoordinatorStudentAssignment.id).filter(
+    assigned = db.query(
+        CoordinatorStudentAssignment.id
+    ).filter(
         CoordinatorStudentAssignment.coordinator_id == user.id,
         CoordinatorStudentAssignment.student_id == student_id,
     ).first()
 
     if not assigned:
-        raise HTTPException(403, "Student is not assigned to this coordinator")
+        raise HTTPException(
+            403,
+            "Student is not assigned to this coordinator",
+        )
 
 
 def _submission(
     db: Session,
     submission_id: str | None,
 ) -> StudentOnboardingSubmission | None:
+
     if not submission_id:
         return None
 
-    return db.query(StudentOnboardingSubmission).filter(
+    return db.query(
+        StudentOnboardingSubmission
+    ).filter(
         StudentOnboardingSubmission.id == submission_id
     ).first()
 
@@ -105,6 +159,7 @@ def _submission(
 def _submission_data(
     submission: StudentOnboardingSubmission | None,
 ) -> dict | None:
+
     if submission is None:
         return None
 
@@ -120,26 +175,91 @@ def _submission_data(
     }
 
 
+def _is_complete(
+    db: Session,
+    record: StudentOnboarding | None,
+) -> bool:
+
+    if not record:
+        return False
+
+    orientation = _submission(
+        db,
+        record.orientation_submission_id,
+    )
+
+    cor = _submission(
+        db,
+        record.cor_submission_id,
+    )
+
+    return bool(
+        orientation
+        and orientation.review_status == "verified"
+        and cor
+        and cor.review_status == "verified"
+    )
+
+
+def _maybe_assign(
+    db: Session,
+    student: User,
+    record: StudentOnboarding | None,
+) -> dict:
+    """Assign only when both documents are verified."""
+
+    if not _is_complete(db, record):
+        return {
+            "status": "awaiting_document_verification",
+        }
+
+    cor = _submission(
+        db,
+        record.cor_submission_id,
+    )
+
+    details = (
+        (cor.validation_result or {}).get("details") or {}
+    )
+
+    return try_assign_coordinator(
+        db,
+        student,
+        details,
+    )
+
+
 def _status(
     db: Session,
     student: User,
     record: StudentOnboarding | None = None,
 ) -> dict:
+
     if record is None:
-        record = db.query(StudentOnboarding).filter(
+        record = db.query(
+            StudentOnboarding
+        ).filter(
             StudentOnboarding.student_id == student.id
         ).first()
 
     orientation = (
-        _submission(db, record.orientation_submission_id)
-        if record else None
-    )
-    cor = (
-        _submission(db, record.cor_submission_id)
-        if record else None
+        _submission(
+            db,
+            record.orientation_submission_id,
+        )
+        if record
+        else None
     )
 
-    # Existing mobile app uses "verified" to determine onboarding eligibility.
+    cor = (
+        _submission(
+            db,
+            record.cor_submission_id,
+        )
+        if record
+        else None
+    )
+
     complete = bool(
         orientation
         and orientation.review_status == "verified"
@@ -149,16 +269,53 @@ def _status(
 
     if complete:
         next_step = "completed"
+
     elif orientation is None:
         next_step = "upload_orientation"
+
     elif orientation.review_status == "rejected":
         next_step = "resubmit_rejected"
+
     elif cor is None:
         next_step = "upload_cor"
+
     elif cor.review_status == "rejected":
         next_step = "resubmit_rejected"
+
     else:
         next_step = "awaiting_review"
+
+    assignment = db.query(
+        CoordinatorStudentAssignment
+    ).filter(
+        CoordinatorStudentAssignment.student_id == student.id
+    ).first()
+
+    coordinator = (
+        db.query(User).filter(
+            User.id == assignment.coordinator_id
+        ).first()
+        if assignment
+        else None
+    )
+
+    if coordinator:
+        coordinator_data = {
+            "status": "assigned",
+            "coordinator_id": coordinator.id,
+            "coordinator_name": (
+                f"{coordinator.first_name} "
+                f"{coordinator.last_name}"
+            ),
+        }
+    else:
+        coordinator_data = {
+            "status": (
+                "pending_assignment"
+                if complete
+                else "not_eligible"
+            ),
+        }
 
     return {
         "student_id": student.id,
@@ -166,24 +323,43 @@ def _status(
         "next_step": next_step,
         "orientation": _submission_data(orientation),
         "cor": _submission_data(cor),
+        "coordinator_assignment": coordinator_data,
     }
 
 
-async def _save_private_upload(file: UploadFile) -> tuple[Path, str]:
-    extension = Path(file.filename or "").suffix.lower()
+async def _save_private_upload(
+    file: UploadFile,
+) -> tuple[Path, str]:
+
+    extension = Path(
+        file.filename or ""
+    ).suffix.lower()
 
     if extension not in ALLOWED_EXTENSIONS:
-        raise HTTPException(400, "Upload a PDF, JPG, or PNG document")
+        raise HTTPException(
+            400,
+            "Upload a PDF, JPG, or PNG document",
+        )
 
-    PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
-    path = PRIVATE_DIR / f"{uuid.uuid4().hex}{extension}"
+    PRIVATE_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    path = PRIVATE_DIR / (
+        f"{uuid.uuid4().hex}{extension}"
+    )
+
     size = 0
     first_bytes = b""
 
     try:
         with path.open("wb") as output:
             while True:
-                chunk = await file.read(1024 * 1024)
+                chunk = await file.read(
+                    1024 * 1024
+                )
+
                 if not chunk:
                     break
 
@@ -191,69 +367,122 @@ async def _save_private_upload(file: UploadFile) -> tuple[Path, str]:
                     first_bytes = chunk[:16]
 
                 size += len(chunk)
+
                 if size > MAX_UPLOAD_BYTES:
-                    raise HTTPException(413, "Document must be 10 MB or smaller")
+                    raise HTTPException(
+                        413,
+                        "Document must be 10 MB or smaller",
+                    )
 
                 output.write(chunk)
 
         if size == 0:
-            raise HTTPException(400, "Uploaded file is empty")
+            raise HTTPException(
+                400,
+                "Uploaded file is empty",
+            )
 
         if extension == ".pdf":
-            valid_signature = first_bytes.startswith(b"%PDF-")
+            valid_signature = (
+                first_bytes.startswith(b"%PDF-")
+            )
+
         elif extension == ".png":
-            valid_signature = first_bytes.startswith(b"\x89PNG\r\n\x1a\n")
+            valid_signature = (
+                first_bytes.startswith(
+                    b"\x89PNG\r\n\x1a\n"
+                )
+            )
+
         else:
-            valid_signature = first_bytes.startswith(b"\xff\xd8\xff")
+            valid_signature = (
+                first_bytes.startswith(b"\xff\xd8\xff")
+            )
 
         if not valid_signature:
-            raise HTTPException(400, "File contents do not match its extension")
+            raise HTTPException(
+                400,
+                "File contents do not match its extension",
+            )
 
         if extension == ".pdf":
             try:
                 with fitz.open(path) as pdf:
-                    if pdf.needs_pass or not (1 <= pdf.page_count <= MAX_PDF_PAGES):
+                    if (
+                        pdf.needs_pass
+                        or not (
+                            1 <= pdf.page_count <= MAX_PDF_PAGES
+                        )
+                    ):
                         raise HTTPException(
                             400,
-                            "PDF must be unlocked and contain 1–6 pages",
+                            "PDF must be unlocked "
+                            "and contain 1–6 pages",
                         )
+
             except HTTPException:
                 raise
+
             except Exception as exc:
-                raise HTTPException(400, "PDF cannot be opened") from exc
+                raise HTTPException(
+                    400,
+                    "PDF cannot be opened",
+                ) from exc
+
         else:
             try:
                 with Image.open(path) as image:
                     image.verify()
-            except (UnidentifiedImageError, OSError, ValueError) as exc:
-                raise HTTPException(400, "Image cannot be opened") from exc
+
+            except (
+                UnidentifiedImageError,
+                OSError,
+                ValueError,
+            ) as exc:
+                raise HTTPException(
+                    400,
+                    "Image cannot be opened",
+                ) from exc
 
         return path, ALLOWED_EXTENSIONS[extension]
 
     except Exception:
         path.unlink(missing_ok=True)
         raise
+
     finally:
         await file.close()
 
 
-def _extract_text(path: Path, media_type: str) -> str:
+def _extract_text(
+    path: Path,
+    media_type: str,
+) -> str:
+
     if media_type != "application/pdf":
-        return OCRService.extract_text_from_image(str(path))
+        return OCRService.extract_text_from_image(
+            str(path)
+        )
 
     chunks: list[str] = []
 
     with fitz.open(path) as pdf:
         for page in pdf:
-            text = page.get_text("text").strip()
+            text = page.get_text(
+                "text"
+            ).strip()
 
-            # Scanned PDFs often contain no selectable text.
             if len(text) < 40:
                 pixmap = page.get_pixmap(
                     matrix=fitz.Matrix(2, 2),
                     alpha=False,
                 )
-                with Image.open(io.BytesIO(pixmap.tobytes("png"))) as image:
+
+                with Image.open(
+                    io.BytesIO(
+                        pixmap.tobytes("png")
+                    )
+                ) as image:
                     text = pytesseract.image_to_string(
                         image.convert("RGB"),
                         timeout=20,
@@ -264,9 +493,18 @@ def _extract_text(path: Path, media_type: str) -> str:
     return "\n".join(chunks).strip()
 
 
-def _is_test_fixture(extracted_text: str) -> bool:
-    normalized = " ".join((extracted_text or "").upper().split())
-    return any(marker in normalized for marker in TEST_DOCUMENT_MARKERS)
+def _is_test_fixture(
+    extracted_text: str,
+) -> bool:
+
+    normalized = " ".join(
+        (extracted_text or "").upper().split()
+    )
+
+    return any(
+        marker in normalized
+        for marker in TEST_DOCUMENT_MARKERS
+    )
 
 
 @router.get("/me")
@@ -275,7 +513,11 @@ def get_my_onboarding(
     current_user: User = Depends(get_current_user),
 ):
     _require_student(current_user)
-    return _status(db, current_user)
+
+    return _status(
+        db,
+        current_user,
+    )
 
 
 async def _upload(
@@ -284,118 +526,224 @@ async def _upload(
     db: Session,
     student: User,
 ) -> dict:
+
     _require_student(student)
 
-    record = db.query(StudentOnboarding).filter(
+    record = db.query(
+        StudentOnboarding
+    ).filter(
         StudentOnboarding.student_id == student.id
     ).first()
 
-    if kind == "cor" and (
-        record is None or record.orientation_submission_id is None
+    if (
+        kind == "cor"
+        and (
+            record is None
+            or record.orientation_submission_id is None
+        )
     ):
-        raise HTTPException(409, "Upload the orientation certificate first")
+        raise HTTPException(
+            409,
+            "Upload the orientation certificate first",
+        )
 
     existing_id = None
-    if record is not None:
+
+    if record:
         existing_id = (
             record.orientation_submission_id
             if kind == "orientation"
             else record.cor_submission_id
         )
 
-    previous = _submission(db, existing_id)
-    if previous and previous.review_status != "rejected":
+    previous = _submission(
+        db,
+        existing_id,
+    )
+
+    if (
+        previous
+        and previous.review_status != "rejected"
+    ):
         raise HTTPException(
             409,
-            "Document already submitted; contact your coordinator if a replacement is needed",
+            "Document already submitted; "
+            "contact your coordinator if a replacement is needed",
         )
 
-    path, media_type = await _save_private_upload(file)
+    path, media_type = await _save_private_upload(
+        file
+    )
 
     try:
         try:
-            extracted = await asyncio.to_thread(_extract_text, path, media_type)
+            extracted = await asyncio.to_thread(
+                _extract_text,
+                path,
+                media_type,
+            )
+
             ocr_error = None
+
         except Exception:
             extracted = ""
             ocr_error = (
-                "Text extraction was unsuccessful; manual review required"
+                "Text extraction was unsuccessful; "
+                "manual review required"
             )
 
-        # Clearly marked synthetic test documents cannot complete real onboarding.
         if _is_test_fixture(extracted):
             raise HTTPException(
-                status_code=422,
-                detail=(
-                    "This document is marked as a test fixture or synthetic sample. "
-                    "It cannot be verified as an official onboarding document."
-                ),
+                422,
+                "This document is marked as a test fixture "
+                "or synthetic sample. It cannot be verified "
+                "as an official onboarding document.",
             )
 
+        layout = {}
+
+        if (
+            kind == "cor"
+            and media_type == "application/pdf"
+            and not ocr_error
+        ):
+            try:
+                codes = [
+                    code.strip()
+                    for code in str(
+                        getattr(
+                            settings,
+                            "PRACTICUM_SUBJECT_CODES",
+                            "IT421",
+                        ) or "IT421"
+                    ).split(",")
+                    if code.strip()
+                ]
+
+                layout = await asyncio.to_thread(
+                    extract_cor_course_layout,
+                    path,
+                    codes,
+                )
+
+            except Exception:
+                # Missing faculty metadata must not
+                # automatically invalidate the COR.
+                layout = {}
+
         validation = (
-            validate_orientation(extracted, student)
+            validate_orientation(
+                extracted,
+                student,
+            )
             if kind == "orientation"
-            else validate_cor(extracted, student)
+            else validate_cor(
+                extracted,
+                student,
+                layout_details=layout,
+            )
         )
 
         if ocr_error:
-            validation["automatic_result"] = "needs_review"
-            validation["ocr_warning"] = ocr_error
-
-        outcome = validation.get("automatic_result")
-
-        # Reject clear content mismatches before creating a submission.
-        if outcome == "mismatch":
-            reasons = validation.get("reasons") or [
-                "Required document details do not match"
-            ]
-            raise HTTPException(
-                status_code=422,
-                detail="Document rejected: " + "; ".join(reasons),
+            validation["automatic_result"] = (
+                "needs_review"
             )
 
-        # Automated content verification: no routine coordinator click needed.
-        # This is NOT an independent proof of document authenticity.
+            validation["ocr_warning"] = ocr_error
+
+        outcome = validation.get(
+            "automatic_result"
+        )
+
+        if outcome == "mismatch":
+            reasons = (
+                validation.get("reasons")
+                or ["Required document details do not match"]
+            )
+
+            raise HTTPException(
+                422,
+                "Document rejected: "
+                + "; ".join(reasons),
+            )
+
         if outcome == "matched":
             review_status = "verified"
             reviewed_at = _utc_now_naive()
-            validation["verification_method"] = "automated_ocr_content_check"
-            validation["requires_manual_review"] = False
-            validation["authenticity_confirmed"] = False
+
+            validation.update({
+                "verification_method": (
+                    "automated_ocr_content_check"
+                ),
+                "requires_manual_review": False,
+                "authenticity_confirmed": False,
+            })
+
         else:
             review_status = "pending_review"
             reviewed_at = None
-            validation["verification_method"] = "manual_review_required"
-            validation["requires_manual_review"] = True
-            validation["authenticity_confirmed"] = False
+
+            validation.update({
+                "verification_method": (
+                    "manual_review_required"
+                ),
+                "requires_manual_review": True,
+                "authenticity_confirmed": False,
+            })
 
         if record is None:
-            record = StudentOnboarding(student_id=student.id)
+            record = StudentOnboarding(
+                student_id=student.id
+            )
+
             db.add(record)
 
         submission = StudentOnboardingSubmission(
             student_id=student.id,
             document_kind=kind,
-            original_filename=Path(file.filename or "upload").name[:255],
-            file_path=str(path.relative_to(ASSET_ROOT)),
+            original_filename=Path(
+                file.filename or "upload"
+            ).name[:255],
+            file_path=str(
+                path.relative_to(ASSET_ROOT)
+            ),
             media_type=media_type,
             extracted_text=extracted[:20000],
             validation_result=validation,
             review_status=review_status,
             reviewed_at=reviewed_at,
-            reviewed_by=None,  # No human reviewer for an automatic check.
+            reviewed_by=None,
         )
 
         db.add(submission)
         db.flush()
 
         if kind == "orientation":
-            record.orientation_submission_id = submission.id
+            record.orientation_submission_id = (
+                submission.id
+            )
         else:
-            record.cor_submission_id = submission.id
+            record.cor_submission_id = (
+                submission.id
+            )
+
+        db.flush()
+
+        # Attempt assignment only after both documents
+        # have been verified.
+        _maybe_assign(
+            db,
+            student,
+            record,
+        )
 
         db.commit()
-        return _status(db, student, record)
+
+        return _status(
+            db,
+            student,
+            record,
+        )
 
     except Exception:
         db.rollback()
@@ -409,7 +757,12 @@ async def upload_orientation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await _upload("orientation", file, db, current_user)
+    return await _upload(
+        "orientation",
+        file,
+        db,
+        current_user,
+    )
 
 
 @router.post("/cor")
@@ -418,7 +771,12 @@ async def upload_cor(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await _upload("cor", file, db, current_user)
+    return await _upload(
+        "cor",
+        file,
+        db,
+        current_user,
+    )
 
 
 @router.get("/verification-queue")
@@ -426,20 +784,38 @@ def verification_queue(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _require_reviewer(db, current_user)
+    _require_reviewer(
+        db,
+        current_user,
+    )
 
-    # Only exceptions requiring human action appear in the review queue.
-    orientation = aliased(StudentOnboardingSubmission)
-    cor = aliased(StudentOnboardingSubmission)
+    orientation = aliased(
+        StudentOnboardingSubmission
+    )
+
+    cor = aliased(
+        StudentOnboardingSubmission
+    )
 
     query = (
-        db.query(StudentOnboarding, User)
-        .join(User, User.id == StudentOnboarding.student_id)
+        db.query(
+            StudentOnboarding,
+            User,
+        )
+        .join(
+            User,
+            User.id == StudentOnboarding.student_id,
+        )
         .outerjoin(
             orientation,
-            orientation.id == StudentOnboarding.orientation_submission_id,
+            orientation.id
+            == StudentOnboarding.orientation_submission_id,
         )
-        .outerjoin(cor, cor.id == StudentOnboarding.cor_submission_id)
+        .outerjoin(
+            cor,
+            cor.id
+            == StudentOnboarding.cor_submission_id,
+        )
         .filter(
             or_(
                 orientation.review_status == "pending_review",
@@ -453,7 +829,8 @@ def verification_queue(
             CoordinatorStudentAssignment,
             CoordinatorStudentAssignment.student_id == User.id,
         ).filter(
-            CoordinatorStudentAssignment.coordinator_id == current_user.id
+            CoordinatorStudentAssignment.coordinator_id
+            == current_user.id
         )
 
     rows = query.order_by(
@@ -465,9 +842,16 @@ def verification_queue(
             "student": {
                 "id": student.id,
                 "student_id": student.student_id,
-                "name": f"{student.first_name} {student.last_name}",
+                "name": (
+                    f"{student.first_name} "
+                    f"{student.last_name}"
+                ),
             },
-            "onboarding": _status(db, student, record),
+            "onboarding": _status(
+                db,
+                student,
+                record,
+            ),
         }
         for record, student in rows
     ]
@@ -479,21 +863,44 @@ def view_submission(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    submission = _submission(db, submission_id)
+    submission = _submission(
+        db,
+        submission_id,
+    )
+
     if submission is None:
-        raise HTTPException(404, "Submission not found")
+        raise HTTPException(
+            404,
+            "Submission not found",
+        )
 
     if current_user.id != submission.student_id:
-        _require_reviewer(db, current_user, submission.student_id)
+        _require_reviewer(
+            db,
+            current_user,
+            submission.student_id,
+        )
 
-    path = (ASSET_ROOT / submission.file_path).resolve()
-    if not path.is_relative_to(PRIVATE_DIR) or not path.is_file():
-        raise HTTPException(404, "Submission file not found")
+    path = (
+        ASSET_ROOT / submission.file_path
+    ).resolve()
+
+    if (
+        not path.is_relative_to(PRIVATE_DIR)
+        or not path.is_file()
+    ):
+        raise HTTPException(
+            404,
+            "Submission file not found",
+        )
 
     return FileResponse(
         str(path),
         media_type=submission.media_type,
-        filename=f"{submission.document_kind}-{submission.id}{path.suffix}",
+        filename=(
+            f"{submission.document_kind}-"
+            f"{submission.id}{path.suffix}"
+        ),
         content_disposition_type="inline",
         headers={
             "Cache-Control": "no-store",
@@ -510,62 +917,135 @@ def review_submission(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    submission = _submission(db, submission_id)
+    submission = _submission(
+        db,
+        submission_id,
+    )
+
     if submission is None:
-        raise HTTPException(404, "Submission not found")
+        raise HTTPException(
+            404,
+            "Submission not found",
+        )
 
-    _require_reviewer(db, current_user, submission.student_id)
+    _require_reviewer(
+        db,
+        current_user,
+        submission.student_id,
+    )
 
-    if payload.decision not in {"verified", "rejected"}:
-        raise HTTPException(400, "Decision must be verified or rejected")
+    if payload.decision not in {
+        "verified",
+        "rejected",
+    }:
+        raise HTTPException(
+            400,
+            "Decision must be verified or rejected",
+        )
 
     if submission.review_status != "pending_review":
-        raise HTTPException(409, "This submission is not awaiting manual review")
+        raise HTTPException(
+            409,
+            "This submission is not awaiting manual review",
+        )
 
-    record = db.query(StudentOnboarding).filter(
-        StudentOnboarding.student_id == submission.student_id
+    record = db.query(
+        StudentOnboarding
+    ).filter(
+        StudentOnboarding.student_id
+        == submission.student_id
     ).first()
 
-    if record is None or submission.id not in {
-        record.orientation_submission_id,
-        record.cor_submission_id,
-    }:
-        raise HTTPException(409, "This submission is no longer the current document")
-
     if (
-        payload.decision == "verified"
-        and (submission.validation_result or {}).get("automatic_result") == "mismatch"
+        record is None
+        or submission.id not in {
+            record.orientation_submission_id,
+            record.cor_submission_id,
+        }
     ):
         raise HTTPException(
             409,
-            "Document failed automatic validation. Reject it and request a corrected upload.",
+            "This submission is no longer the current document",
         )
-
-    notes = (payload.notes or "").strip()
-    if payload.decision == "rejected" and not notes:
-        raise HTTPException(400, "Explain why the document was rejected")
 
     if (
         payload.decision == "verified"
-        and (submission.validation_result or {}).get("automatic_result") != "matched"
+        and (
+            submission.validation_result or {}
+        ).get("automatic_result") == "mismatch"
+    ):
+        raise HTTPException(
+            409,
+            "Document failed automatic validation. "
+            "Reject it and request a corrected upload.",
+        )
+
+    notes = (
+        payload.notes or ""
+    ).strip()
+
+    if (
+        payload.decision == "rejected"
         and not notes
     ):
         raise HTTPException(
             400,
-            "Explain why a document with OCR warnings was approved",
+            "Explain why the document was rejected",
         )
 
-    submission.review_status = payload.decision
-    submission.review_notes = notes or None
-    submission.reviewed_by = current_user.id
-    submission.reviewed_at = _utc_now_naive()
+    if (
+        payload.decision == "verified"
+        and (
+            submission.validation_result or {}
+        ).get("automatic_result") != "matched"
+        and not notes
+    ):
+        raise HTTPException(
+            400,
+            "Explain why a document with OCR warnings "
+            "was approved",
+        )
+
+    submission.review_status = (
+        payload.decision
+    )
+
+    submission.review_notes = (
+        notes or None
+    )
+
+    submission.reviewed_by = (
+        current_user.id
+    )
+
+    submission.reviewed_at = (
+        _utc_now_naive()
+    )
+
+    db.flush()
+
+    student = db.query(
+        User
+    ).filter(
+        User.id == submission.student_id
+    ).first()
+
+    if student is None:
+        raise HTTPException(
+            404,
+            "Student not found",
+        )
+
+    _maybe_assign(
+        db,
+        student,
+        record,
+    )
 
     db.commit()
 
-    student = db.query(User).filter(
-        User.id == submission.student_id
-    ).first()
-    if student is None:
-        raise HTTPException(404, "Student not found")
-
-    return _status(db, student, record)
+    return _status(
+        db,
+        student,
+        record,
+    )

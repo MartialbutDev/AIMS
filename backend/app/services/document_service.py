@@ -1,18 +1,46 @@
-# backend/app/services/document_service.py
-from sqlalchemy.orm import Session
-from fastapi import UploadFile, HTTPException
+
+"""
+AIMS Hybrid Automated Document Validation.
+
+Workflow:
+1. Save uploaded document
+2. Extract OCR text
+3. Apply document-specific rule validation
+4. Check registered student name
+5. Automatically verify eligible documents that pass
+6. Send other documents for coordinator review
+7. Save results and notify student
+
+Does not modify COR / Orientation onboarding.
+"""
+
+import os
 import re
 import uuid
-import os
+import logging
 
-from app.models.document import Document, DocumentType
+from typing import Any
+
+from sqlalchemy.orm import Session
+from fastapi import UploadFile, HTTPException
+
+from app.models.document import (
+    Document,
+    DocumentType,
+)
+
 from app.models.user import User
+
 from app.services.ocr_service import OCRService
+from app.services.notification_service import NotificationService
+
 from app.core.config import settings
+
 from app.utils.document_keywords import (
     validate_resume,
     validate_application_letter,
     validate_endorsement_letter,
+    validate_acceptance_letter,
     validate_certificate_of_completion,
     validate_generic_document,
     validate_waiver,
@@ -22,56 +50,122 @@ from app.utils.document_keywords import (
     REJECT_THRESHOLD,
     VERIFY_THRESHOLD,
 )
-from app.services.notification_service import NotificationService
 
 
-# ----------------------------------------------------------------
-# Fuzzy matching helpers
-# ----------------------------------------------------------------
+logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# NAME MATCHING HELPERS
+# ============================================================
 
 def _edit_distance_one(a: str, b: str) -> bool:
-    """Return True if `a` and `b` differ by at most 1 edit."""
+    """
+    Return True when two strings differ by
+    at most one character edit.
+    """
+
     if a == b:
         return True
+
     if abs(len(a) - len(b)) > 1:
         return False
 
     if len(a) == len(b):
-        return sum(1 for x, y in zip(a, b) if x != y) <= 1
+        return sum(
+            x != y
+            for x, y in zip(a, b)
+        ) <= 1
 
-    longer, shorter = (a, b) if len(a) > len(b) else (b, a)
-    i = j = 0
-    diff = 0
+    longer, shorter = (
+        (a, b)
+        if len(a) > len(b)
+        else (b, a)
+    )
+
+    i = 0
+    j = 0
+    errors = 0
+
     while i < len(longer) and j < len(shorter):
-        if longer[i] != shorter[j]:
-            diff += 1
-            if diff > 1:
-                return False
-            i += 1
-        else:
+
+        if longer[i] == shorter[j]:
             i += 1
             j += 1
-    return diff + (len(longer) - i) <= 1
+            continue
+
+        errors += 1
+
+        if errors > 1:
+            return False
+
+        i += 1
+
+    return (
+        errors + len(longer) - i
+    ) <= 1
 
 
-def _fuzzy_contains(text_upper: str, word: str) -> bool:
-    """True if `word` appears in `text_upper` allowing 1-char OCR errors."""
-    if not word or len(word) < 4:
+def _name_tokens(value: str) -> list[str]:
+    """
+    Split names into tokens.
+
+    Very short tokens are ignored to avoid
+    matching common words and initials.
+    """
+
+    return [
+        token
+        for token in re.findall(
+            r"[A-Z]+",
+            (value or "").upper(),
+        )
+        if len(token) >= 3
+    ]
+
+
+def _fuzzy_contains(
+    text_upper: str,
+    word: str,
+) -> bool:
+    """
+    Find a name token with one OCR error allowed.
+
+    Used for review guidance only.
+    Fuzzy matches do not qualify for auto-verification.
+    """
+
+    if len(word) < 4:
         return False
 
-    if word in text_upper:
-        return True
+    tokens = re.findall(
+        r"[A-Z]+",
+        text_upper[:30000],
+    )
 
-    n = len(word)
-    for i in range(len(text_upper) - n + 1):
-        window = text_upper[i:i + n]
-        if _edit_distance_one(word, window):
-            return True
+    return any(
+        _edit_distance_one(word, token)
+        for token in tokens
+        if abs(len(token) - len(word)) <= 1
+    )
 
-    return False
 
+# ============================================================
+# DOCUMENT SERVICE
+# ============================================================
 
 class DocumentService:
+
+    # Only student-generated documents can qualify
+    # for automatic CONTENT verification.
+    #
+    # External/official documents always require
+    # coordinator review.
+    AUTO_VERIFY_TYPES = {
+        "resume",
+        "application_letter",
+        "internship_plan",
+    }
 
     VALIDATION_FUNCTIONS = {
         "resume": validate_resume,
@@ -81,9 +175,12 @@ class DocumentService:
         "internship_plan": validate_internship_plan,
         "insurance": validate_insurance,
         "endorsement_letter": validate_endorsement_letter,
+        "acceptance_letter": validate_acceptance_letter,
         "certificate_of_completion": validate_certificate_of_completion,
-        "acceptance_letter": validate_generic_document,
         "requirements": validate_generic_document,
+        "document": validate_generic_document,
+        "transcript": validate_generic_document,
+        "user_id": validate_generic_document,
     }
 
     _TYPE_ALIASES = {
@@ -118,38 +215,79 @@ class DocumentService:
         DocumentType.USER_ID: "ID Document",
     }
 
-    # ------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------
+    # ========================================================
+    # RESOLVE DOCUMENT TYPE
+    # ========================================================
 
     @classmethod
-    def _resolve_type(cls, document_type: str) -> DocumentType:
-        key = (document_type or "").strip().lower()
-        member_name = cls._TYPE_ALIASES.get(key) or key.upper()
+    def _resolve_type(
+        cls,
+        document_type: str,
+    ) -> DocumentType:
+
+        key = (
+            document_type or ""
+        ).strip().lower()
+
+        member_name = (
+            cls._TYPE_ALIASES.get(key)
+            or key.upper()
+        )
+
         try:
             return DocumentType[member_name]
+
         except KeyError:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported document_type: {document_type}",
+                detail=(
+                    "Unsupported document_type: "
+                    f"{document_type}"
+                ),
             )
 
-    @classmethod
-    def verify_document(cls, document_type: str, extracted_text: str) -> dict:
-        validation_func = cls.VALIDATION_FUNCTIONS.get(document_type)
+    # ========================================================
+    # DOCUMENT-SPECIFIC VALIDATION
+    # ========================================================
 
-        if validation_func is None:
+    @classmethod
+    def verify_document(
+        cls,
+        document_type: str,
+        extracted_text: str,
+    ) -> dict:
+
+        key = (
+            document_type or ""
+        ).strip().lower()
+
+        validator = (
+            cls.VALIDATION_FUNCTIONS.get(key)
+        )
+
+        if validator is None:
             return {
                 "is_valid": False,
                 "confidence": 0,
-                "message": f"Unknown document type: {document_type}.",
+                "message": (
+                    "Unsupported document validation "
+                    f"type: {document_type}"
+                ),
                 "found_sections": [],
                 "score": 0,
                 "total_sections": 0,
-                "thresholds": {"reject": REJECT_THRESHOLD, "verify": VERIFY_THRESHOLD},
+                "thresholds": {
+                    "reject": REJECT_THRESHOLD,
+                    "verify": VERIFY_THRESHOLD,
+                },
+                "requires_manual_review": True,
             }
 
-        return validation_func(extracted_text)
+        return validator(extracted_text)
+
+    # ========================================================
+    # STUDENT NAME MATCHING
+    # ========================================================
 
     @classmethod
     def _name_match_bonus(
@@ -158,7 +296,14 @@ class DocumentService:
         first_name: str,
         last_name: str,
     ) -> tuple[int, dict]:
-        """Return (bonus, info). +25 if both names match, else +0."""
+        """
+        Compatibility method.
+
+        Returns the legacy bonus indicator and match
+        information, but the bonus is NOT added to
+        the document's validation confidence.
+        """
+
         info = {
             "first_match": False,
             "last_match": False,
@@ -167,36 +312,218 @@ class DocumentService:
             "bonus": 0,
         }
 
-        if not extracted_text or not first_name or not last_name:
+        if (
+            not extracted_text
+            or not first_name
+            or not last_name
+        ):
             return 0, info
 
-        text_upper = extracted_text.upper()
+        upper = extracted_text.upper()
 
-        def clean(s: str) -> str:
-            return re.sub(r"[^A-Z]", "", (s or "").upper())
+        text_tokens = set(
+            re.findall(
+                r"[A-Z]+",
+                upper,
+            )
+        )
 
-        first = clean(first_name)
-        last = clean(last_name)
+        first_tokens = _name_tokens(
+            first_name
+        )
 
-        first_ok = len(first) >= 4
-        last_ok = len(last) >= 4
+        last_tokens = _name_tokens(
+            last_name
+        )
 
-        first_exact = first_ok and first in text_upper
-        last_exact = last_ok and last in text_upper
+        if not first_tokens or not last_tokens:
+            return 0, info
 
-        first_match = first_exact or (first_ok and _fuzzy_contains(text_upper, first))
-        last_match = last_exact or (last_ok and _fuzzy_contains(text_upper, last))
+        # Require every meaningful component
+        # of the registered name.
+        first_exact = all(
+            token in text_tokens
+            for token in first_tokens
+        )
 
-        bonus = 25 if (first_match and last_match) else 0
+        last_exact = all(
+            token in text_tokens
+            for token in last_tokens
+        )
+
+        # Fuzzy matches are for review guidance only.
+        first_match = (
+            first_exact
+            or all(
+                _fuzzy_contains(upper, token)
+                for token in first_tokens
+            )
+        )
+
+        last_match = (
+            last_exact
+            or all(
+                _fuzzy_contains(upper, token)
+                for token in last_tokens
+            )
+        )
+
+        legacy_bonus = (
+            25
+            if first_match and last_match
+            else 0
+        )
 
         info.update(
             first_match=first_match,
             last_match=last_match,
             first_exact=first_exact,
             last_exact=last_exact,
-            bonus=bonus,
+            bonus=legacy_bonus,
         )
-        return bonus, info
+
+        return legacy_bonus, info
+
+    # ========================================================
+    # AUTOMATIC VERIFICATION ELIGIBILITY
+    # ========================================================
+
+    @classmethod
+    def _can_auto_verify(
+        cls,
+        document_type: str,
+        validation_result: dict,
+        extracted_text: str,
+        name_info: dict,
+    ) -> bool:
+        """
+        A document qualifies only if ALL gates pass.
+
+        1. Eligible document type
+        2. Readable OCR text
+        3. Required content detected
+        4. Content score >= 80
+        5. Exact first and last name matches
+
+        These checks do not establish authenticity.
+        """
+
+        if document_type not in cls.AUTO_VERIFY_TYPES:
+            return False
+
+        text_length = len(
+            (extracted_text or "").strip()
+        )
+
+        if text_length < 120:
+            return False
+
+        if not validation_result.get(
+            "is_valid",
+            False,
+        ):
+            return False
+
+        confidence = int(
+            validation_result.get(
+                "confidence",
+                0,
+            )
+        )
+
+        if confidence < VERIFY_THRESHOLD:
+            return False
+
+        if not name_info.get(
+            "first_exact",
+            False,
+        ):
+            return False
+
+        if not name_info.get(
+            "last_exact",
+            False,
+        ):
+            return False
+
+        return True
+
+    # ========================================================
+    # DETERMINE FINAL DOCUMENT STATUS
+    # ========================================================
+
+    @classmethod
+    def _determine_status(
+        cls,
+        document_type: str,
+        validation_result: dict,
+        extracted_text: str,
+        name_info: dict,
+    ) -> tuple[str, str]:
+
+        # Official/external documents always
+        # require coordinator approval.
+        if document_type not in cls.AUTO_VERIFY_TYPES:
+            return (
+                "pending",
+                "Official or non-automated document type; "
+                "coordinator review required.",
+            )
+
+        if cls._can_auto_verify(
+            document_type=document_type,
+            validation_result=validation_result,
+            extracted_text=extracted_text,
+            name_info=name_info,
+        ):
+            return (
+                "verified",
+                "Automatically content-validated using "
+                "OCR, document-specific rules, and "
+                "exact registered student name matching.",
+            )
+
+        text_length = len(
+            (extracted_text or "").strip()
+        )
+
+        if text_length < 120:
+            reason = (
+                "OCR extracted insufficient readable text."
+            )
+
+        elif not validation_result.get(
+            "is_valid",
+            False,
+        ):
+            reason = (
+                "Required document content was not "
+                "fully detected."
+            )
+
+        elif not (
+            name_info.get("first_exact")
+            and name_info.get("last_exact")
+        ):
+            reason = (
+                "Student identity could not be "
+                "exactly matched."
+            )
+
+        else:
+            reason = (
+                "Automatic validation conditions "
+                "were not satisfied."
+            )
+
+        return (
+            "pending",
+            reason + " Coordinator review required.",
+        )
+
+    # ========================================================
+    # NOTIFICATION HELPER
+    # ========================================================
 
     @classmethod
     def _fire_document_notification(
@@ -207,9 +534,13 @@ class DocumentService:
         status: str,
         doc_type_enum: DocumentType,
     ) -> None:
-        """Fire a document notification to the uploader. Never raises."""
+
         try:
-            type_label = cls._TYPE_LABELS.get(doc_type_enum, "Document")
+            type_label = cls._TYPE_LABELS.get(
+                doc_type_enum,
+                "Document",
+            )
+
             NotificationService.create_document_notification(
                 db=db,
                 user_id=user_id,
@@ -217,17 +548,23 @@ class DocumentService:
                 status=status,
                 doc_type=type_label,
             )
-        except Exception as e:
-            print(f"⚠️ Failed to create document notification: {e}")
+
+        except Exception:
+            logger.exception(
+                "Failed to create document notification"
+            )
+            db.rollback()
+
+    # ========================================================
+    # SERIALIZATION
+    # ========================================================
 
     @classmethod
-    def _serialize_document(cls, document: Document) -> dict:
-        """
-        Build a plain dict from the ORM document with primitive values only.
-        This guarantees `document.id` and every other field survives FastAPI's
-        response serialization — no ORM lazy-loading, no missing attributes.
-        """
-        # type: enum → string
+    def _serialize_document(
+        cls,
+        document: Document,
+    ) -> dict:
+
         type_value = (
             document.type.value
             if hasattr(document.type, "value")
@@ -238,12 +575,22 @@ class DocumentService:
             "id": document.id,
             "type": type_value,
             "description": document.description,
-            "original_filename": document.original_filename,
+            "original_filename": (
+                document.original_filename
+            ),
             "file_path": document.file_path,
-            "verification_status": document.verification_status,
-            "extracted_text": document.extracted_text,
-            "validation_confidence": document.validation_confidence,
-            "validation_message": document.validation_message,
+            "verification_status": (
+                document.verification_status
+            ),
+            "extracted_text": (
+                document.extracted_text
+            ),
+            "validation_confidence": (
+                document.validation_confidence
+            ),
+            "validation_message": (
+                document.validation_message
+            ),
             "created_at": (
                 document.created_at.isoformat()
                 if document.created_at
@@ -256,9 +603,9 @@ class DocumentService:
             ),
         }
 
-    # ------------------------------------------------------------
-    # Upload
-    # ------------------------------------------------------------
+    # ========================================================
+    # UPLOAD DOCUMENT
+    # ========================================================
 
     @classmethod
     def upload_document(
@@ -269,22 +616,96 @@ class DocumentService:
         description: str,
         uploaded_by: str,
     ) -> dict:
+
+        saved_path = None
+        committed = False
+
         try:
-            original_filename = (file.filename or "").strip() or None
+            # Validate document type before saving.
+            doc_type_enum = cls._resolve_type(
+                document_type
+            )
 
-            relative_path, file_type = OCRService.save_file(file)
-            full_path = os.path.join(settings.ASSET_DIR, relative_path)
+            type_key = doc_type_enum.value
 
-            extracted_text = OCRService.extract_text(full_path, file_type)
+            original_filename = (
+                (file.filename or "").strip()
+                or None
+            )
 
-            # ----- Keyword validation -----
-            validation_result = cls.verify_document(document_type, extracted_text)
-            base_confidence = validation_result.get("confidence", 0)
-            is_keyword_valid = validation_result.get("is_valid", False)
+            # --------------------------------------------
+            # STEP 1: SAVE FILE
+            # --------------------------------------------
 
-            # ----- Name-match bonus -----
-            uploader = db.query(User).filter(User.id == uploaded_by).first()
+            relative_path, file_type = (
+                OCRService.save_file(file)
+            )
+
+            saved_path = os.path.join(
+                settings.ASSET_DIR,
+                relative_path,
+            )
+
+            # --------------------------------------------
+            # STEP 2: OCR EXTRACTION
+            # --------------------------------------------
+
+            ocr_error = None
+
+            try:
+                extracted_text = (
+                    OCRService.extract_text(
+                        saved_path,
+                        file_type,
+                    )
+                    or ""
+                )
+
+            except Exception as exc:
+                # Preserve the upload for manual review.
+                extracted_text = ""
+
+                ocr_error = (
+                    "OCR extraction failed; "
+                    "manual review required."
+                )
+
+                logger.warning(
+                    "OCR failed for %s: %s",
+                    relative_path,
+                    exc,
+                )
+
+            # --------------------------------------------
+            # STEP 3: RULE-BASED VALIDATION
+            # --------------------------------------------
+
+            validation_result = cls.verify_document(
+                type_key,
+                extracted_text,
+            )
+
+            confidence = int(
+                validation_result.get(
+                    "confidence",
+                    0,
+                )
+            )
+
+            # --------------------------------------------
+            # STEP 4: STUDENT NAME MATCHING
+            # --------------------------------------------
+
+            uploader = (
+                db.query(User)
+                .filter(
+                    User.id == uploaded_by
+                )
+                .first()
+            )
+
             name_bonus = 0
+
             name_info = {
                 "first_match": False,
                 "last_match": False,
@@ -293,64 +714,91 @@ class DocumentService:
                 "bonus": 0,
             }
 
-            if uploader and uploader.first_name and uploader.last_name:
-                name_bonus, name_info = cls._name_match_bonus(
+            if (
+                uploader
+                and uploader.first_name
+                and uploader.last_name
+            ):
+                name_bonus, name_info = (
+                    cls._name_match_bonus(
+                        extracted_text=extracted_text,
+                        first_name=uploader.first_name,
+                        last_name=uploader.last_name,
+                    )
+                )
+
+            # --------------------------------------------
+            # STEP 5: AUTOMATIC OR MANUAL VALIDATION
+            # --------------------------------------------
+
+            status, decision_message = (
+                cls._determine_status(
+                    document_type=type_key,
+                    validation_result=validation_result,
                     extracted_text=extracted_text,
-                    first_name=uploader.first_name,
-                    last_name=uploader.last_name,
+                    name_info=name_info,
+                )
+            )
+
+            # --------------------------------------------
+            # STEP 6: BUILD VALIDATION MESSAGE
+            # --------------------------------------------
+
+            message_parts = [
+                validation_result.get(
+                    "message",
+                    ""
+                ),
+            ]
+
+            if ocr_error:
+                message_parts.append(
+                    ocr_error
                 )
 
-            # ----- Final confidence -----
-            confidence = min(100, base_confidence + name_bonus)
+            if (
+                name_info.get("first_exact")
+                and name_info.get("last_exact")
+            ):
+                message_parts.append(
+                    "Student name matched exactly."
+                )
 
-            # ----- Text length gate -----
-            text_len = len((extracted_text or "").strip())
+            elif (
+                name_info.get("first_match")
+                and name_info.get("last_match")
+            ):
+                message_parts.append(
+                    "Student name approximately matched; "
+                    "manual review required."
+                )
 
-            # ----- Three-tier status -----
-            if text_len < 100 or not is_keyword_valid or confidence < REJECT_THRESHOLD:
-                status = "rejected"
-            elif confidence >= VERIFY_THRESHOLD:
-                status = "verified"
+            elif (
+                name_info.get("first_match")
+                or name_info.get("last_match")
+            ):
+                message_parts.append(
+                    "Partial student name detected."
+                )
+
             else:
-                status = "pending"
-
-            # ----- Build message -----
-            base_message = validation_result.get("message", "")
-            parts = [base_message]
-
-            if name_bonus:
-                match_type = []
-                if name_info.get("first_exact"):
-                    match_type.append("first: exact")
-                elif name_info.get("first_match"):
-                    match_type.append("first: fuzzy")
-                if name_info.get("last_exact"):
-                    match_type.append("last: exact")
-                elif name_info.get("last_match"):
-                    match_type.append("last: fuzzy")
-
-                parts.append(
-                    f"👤 Name match +{name_bonus}% ({', '.join(match_type)})"
-                )
-            elif name_info.get("first_match") or name_info.get("last_match"):
-                which = []
-                if name_info.get("first_match"):
-                    which.append("first name")
-                if name_info.get("last_match"):
-                    which.append("last name")
-                parts.append(
-                    f"⚠️ Partial name match ({', '.join(which)}) — no bonus awarded"
+                message_parts.append(
+                    "Student name not confirmed by OCR."
                 )
 
-            if status == "pending":
-                parts.append(
-                    f"⏳ Confidence {confidence}% is between "
-                    f"{REJECT_THRESHOLD}% and {VERIFY_THRESHOLD}% — queued for manual review."
-                )
+            message_parts.append(
+                decision_message
+            )
 
-            final_message = " ".join(parts)
+            final_message = " ".join(
+                part
+                for part in message_parts
+                if part
+            )
 
-            doc_type_enum = cls._resolve_type(document_type)
+            # --------------------------------------------
+            # STEP 7: SAVE DOCUMENT
+            # --------------------------------------------
 
             document = Document(
                 id=str(uuid.uuid4()),
@@ -367,9 +815,15 @@ class DocumentService:
 
             db.add(document)
             db.commit()
+
+            committed = True
+
             db.refresh(document)
 
-            # ✅ Fire document notification
+            # --------------------------------------------
+            # STEP 8: NOTIFY STUDENT
+            # --------------------------------------------
+
             cls._fire_document_notification(
                 db=db,
                 user_id=uploaded_by,
@@ -378,29 +832,68 @@ class DocumentService:
                 doc_type_enum=doc_type_enum,
             )
 
-            # ✅ Explicitly serialize the document — this guarantees document.id
-            #    is present in the response regardless of FastAPI's model coercion
+            # --------------------------------------------
+            # STEP 9: RETURN EXISTING RESPONSE FORMAT
+            # --------------------------------------------
+
             return {
                 "verified": status == "verified",
                 "status": status,
-                "document": cls._serialize_document(document),
-                "extracted_text": extracted_text[:500],
+                "document": (
+                    cls._serialize_document(document)
+                ),
+                "extracted_text": (
+                    extracted_text[:500]
+                ),
                 "file_type": file_type,
                 "validation": {
                     **validation_result,
                     "confidence": confidence,
-                    "base_confidence": base_confidence,
-                    "name_bonus": name_bonus,
+                    "base_confidence": confidence,
+                    "name_bonus": 0,
+                    "legacy_name_bonus": name_bonus,
                     "name_info": name_info,
                     "message": final_message,
+                    "requires_manual_review": (
+                        status == "pending"
+                    ),
+                    "automatically_verified": (
+                        status == "verified"
+                    ),
+                    "validation_method": (
+                        "ocr_rule_based"
+                    ),
+                    "ocr_error": ocr_error,
                 },
             }
 
         except HTTPException:
-            raise
-        except Exception as e:
             db.rollback()
+
+            if saved_path and not committed:
+                try:
+                    os.remove(saved_path)
+                except OSError:
+                    pass
+
+            raise
+
+        except Exception:
+            db.rollback()
+
+            if saved_path and not committed:
+                try:
+                    os.remove(saved_path)
+                except OSError:
+                    pass
+
+            logger.exception(
+                "Document upload failed"
+            )
+
             raise HTTPException(
                 status_code=500,
-                detail=f"Error uploading document: {str(e)}",
+                detail=(
+                    "Unable to process document upload."
+                ),
             )

@@ -14,6 +14,7 @@ Registers all API endpoints, including:
 - Reports
 - Analytics
 - Coordinator
+- Dean Coordinator Designations
 - Excel Export
 - Student Onboarding Verification
 """
@@ -34,9 +35,10 @@ from app.api.v1.endpoints import (
     analytics,
     coordinator,
     onboarding,
+    dean_coordinators,
 )
 
-# Existing document router
+# Existing document router.
 from app.routers.documents import documents_router
 
 
@@ -77,6 +79,25 @@ router.include_router(
     coordinator.router,
     prefix="/coordinator",
     tags=["Coordinator"],
+)
+
+
+# ============================================================
+# DEAN COORDINATOR DESIGNATIONS
+# ============================================================
+
+# The dean_coordinators router already defines:
+# prefix="/dean/coordinators"
+#
+# Final endpoints:
+# GET   /api/v1/dean/coordinators
+# POST  /api/v1/dean/coordinators
+# PATCH /api/v1/dean/coordinators/{id}/deactivate
+#
+# Do not add another prefix here.
+
+router.include_router(
+    dean_coordinators.router,
 )
 
 
@@ -161,7 +182,9 @@ router.include_router(
 # DOCUMENTS
 # ============================================================
 
-# The existing documents_router already includes "/documents".
+# The existing documents_router already includes
+# the "/documents" prefix.
+#
 # Do not add another prefix.
 
 router.include_router(
@@ -197,7 +220,9 @@ router.include_router(
 # ============================================================
 
 # The onboarding router already includes "/onboarding".
-# Final URL: /api/v1/onboarding/...
+#
+# Final URL:
+# /api/v1/onboarding/...
 
 router.include_router(
     onboarding.router,

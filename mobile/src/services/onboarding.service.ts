@@ -11,9 +11,10 @@ import * as SecureStore from "expo-secure-store";
 
 const RAW_API_URL = (
   process.env.EXPO_PUBLIC_API_URL || ""
-).trim().replace(/\/+$/, "");
+)
+  .trim()
+  .replace(/\/+$/, "");
 
-// Ensure /api/v1 appears exactly once.
 const API_BASE_URL = RAW_API_URL.endsWith("/api/v1")
   ? RAW_API_URL
   : `${RAW_API_URL}/api/v1`;
@@ -36,6 +37,17 @@ export type OnboardingStep =
   | "resubmit_rejected"
   | "completed";
 
+export type CoordinatorAssignmentStatus =
+  | "assigned"
+  | "pending_assignment"
+  | "not_eligible";
+
+export interface CoordinatorAssignment {
+  status: CoordinatorAssignmentStatus;
+  coordinator_id?: string;
+  coordinator_name?: string;
+}
+
 export interface OnboardingSubmission {
   id: string;
   document_kind: "orientation" | "cor";
@@ -45,6 +57,7 @@ export interface OnboardingSubmission {
   validation_result: {
     automatic_result?: string;
     checks?: Record<string, boolean | null>;
+    details?: Record<string, unknown>;
     requires_manual_review?: boolean;
     ocr_warning?: string;
   } | null;
@@ -58,8 +71,12 @@ export interface OnboardingStatus {
   student_id: string;
   eligible: boolean;
   next_step: OnboardingStep;
+
   orientation: OnboardingSubmission | null;
   cor: OnboardingSubmission | null;
+
+  // Returned by GET /api/v1/onboarding/me
+  coordinator_assignment: CoordinatorAssignment;
 }
 
 export interface SelectedDocument {
@@ -94,7 +111,7 @@ async function request<T>(
   if (!RAW_API_URL) {
     throw new Error(
       "EXPO_PUBLIC_API_URL is not configured. " +
-      "Set it to your FastAPI server address."
+        "Set it to your FastAPI server address."
     );
   }
 
@@ -109,7 +126,8 @@ async function request<T>(
     );
   }
 
-  const url = `${API_BASE_URL}${ONBOARDING_ENDPOINT}${path}`;
+  const url =
+    `${API_BASE_URL}${ONBOARDING_ENDPOINT}${path}`;
 
   try {
     const response = await fetch(url, {
@@ -121,7 +139,8 @@ async function request<T>(
     });
 
     if (!response.ok) {
-      let message = `Request failed (${response.status})`;
+      let message =
+        `Request failed (${response.status})`;
 
       try {
         const errorData = await response.json();
@@ -136,7 +155,7 @@ async function request<T>(
             .join(", ");
         }
       } catch {
-        // Keep the original HTTP error message.
+        // Keep original HTTP error message.
       }
 
       throw new OnboardingApiError(
@@ -153,7 +172,8 @@ async function request<T>(
 
     if (error instanceof Error) {
       throw new Error(
-        `Unable to connect to the onboarding server: ${error.message}`
+        "Unable to connect to the onboarding server: " +
+          error.message
       );
     }
 
@@ -213,8 +233,8 @@ async function uploadDocument(
     method: "POST",
     body: formData,
 
-    // Do not set Content-Type manually.
     // React Native generates the multipart boundary.
+    // Do not set Content-Type manually.
   });
 }
 
@@ -247,7 +267,7 @@ export const onboardingService = {
   },
 
   // ----------------------------------------------------------
-  // UPLOAD PRISM CERTIFICATE OF REGISTRATION
+  // UPLOAD CERTIFICATE OF REGISTRATION
   // POST /api/v1/onboarding/cor
   // ----------------------------------------------------------
 

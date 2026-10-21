@@ -44,6 +44,12 @@ class User(Base):
         nullable=False
     )
 
+    # Optional middle name or initial, stored separately from first_name.
+    middle_name = Column(
+        String(100),
+        nullable=True
+    )
+
     last_name = Column(
         String(100),
         nullable=False
@@ -80,7 +86,7 @@ class User(Base):
         default=False
     )
 
-    # ✅ ADDED: Avatar URL field
+    # Avatar URL field
     avatar_url = Column(
         String(500),
         nullable=True

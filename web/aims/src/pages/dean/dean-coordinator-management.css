@@ -1,0 +1,258 @@
+
+/* ========================================
+   AIMS DEAN COORDINATOR MANAGEMENT
+======================================== */
+
+.dean-designations {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* ========================================
+   HEADER
+======================================== */
+
+.dean-designations-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.dean-designations-heading h2 {
+  margin: 10px 0 8px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.dean-designations-heading p {
+  margin: 0;
+  max-width: 680px;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* ========================================
+   SUMMARY CARDS
+======================================== */
+
+.dean-designations-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dean-designations-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.dean-designations-stat span {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.dean-designations-stat strong {
+  color: #0f172a;
+  font-size: 1.9rem;
+  font-weight: 700;
+}
+
+/* ========================================
+   DESIGNATION FORM
+======================================== */
+
+.dean-designations-form {
+  display: grid;
+  grid-template-columns:
+    minmax(200px, 2fr)
+    minmax(150px, 1fr)
+    minmax(150px, 1fr);
+  gap: 16px;
+  align-items: end;
+  margin-top: 20px;
+}
+
+.dean-designations-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dean-designations-field label {
+  color: #334155;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.dean-designations-field input,
+.dean-designations-field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  color: #0f172a;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.dean-designations-field input:focus,
+.dean-designations-field select:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+}
+
+.dean-designations-form > button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+/* ========================================
+   DESIGNATION TABLE
+======================================== */
+
+.dean-designations-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 18px;
+}
+
+.dean-designations-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.dean-designations-table th,
+.dean-designations-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+.dean-designations-table th {
+  color: #64748b;
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.dean-designations-table td {
+  color: #334155;
+}
+
+/* ========================================
+   STATUS BADGES
+======================================== */
+
+.dean-designations-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.dean-designations-status.is-active {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.dean-designations-status.is-inactive {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+/* ========================================
+   DEACTIVATE BUTTON
+======================================== */
+
+.dean-designations-deactivate {
+  padding: 8px 12px;
+  color: #b91c1c;
+  background: #ffffff;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dean-designations-deactivate:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+.dean-designations-deactivate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   SUCCESS MESSAGE
+======================================== */
+
+.dean-designations-success {
+  padding: 14px 16px;
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* ========================================
+   HELPER TEXT
+======================================== */
+
+.dean-designations-hint {
+  color: #64748b;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+======================================== */
+
+@media (max-width: 900px) {
+  .dean-designations-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dean-designations-field:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .dean-designations-heading {
+    flex-direction: column;
+  }
+
+  .dean-designations-summary,
+  .dean-designations-form {
+    grid-template-columns: 1fr;
+  }
+
+  .dean-designations-field:first-child {
+    grid-column: auto;
+  }
+
+  .dean-designations-form > button {
+    width: 100%;
+  }
+}

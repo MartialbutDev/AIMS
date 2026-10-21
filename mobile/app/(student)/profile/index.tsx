@@ -1,8 +1,8 @@
 // app/(student)/profile/index.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Alert,
   ScrollView,
@@ -21,6 +21,10 @@ import { useTheme } from "../../../src/context/ThemeContext";
 import { authService } from "../../../src/services/auth.service";
 import { SkeletonProfile } from "../../../src/components/common/Skeleton";
 import api from "../../../src/services/api";
+import {
+  onboardingService,
+  type OnboardingStatus,
+} from "../../../src/services/onboarding.service";
 
 interface UserProfile {
   id: string;
@@ -56,6 +60,10 @@ export default function ProfileScreen() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
+  const [loadingOnboarding, setLoadingOnboarding] = useState(true);
+  const [onboardingError, setOnboardingError] = useState(false);
+  const onboardingRequestRef = useRef(0);
 
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
@@ -64,6 +72,40 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  // Refresh coordinator details whenever the student opens the Profile tab.
+  // A request ID prevents a previous screen visit from overwriting fresh data.
+  const loadOnboarding = useCallback(async () => {
+    const requestId = ++onboardingRequestRef.current;
+    setLoadingOnboarding(true);
+    setOnboardingError(false);
+
+    try {
+      const status = await onboardingService.getStatus();
+
+      if (requestId !== onboardingRequestRef.current) return;
+      setOnboarding(status);
+    } catch (error) {
+      if (requestId !== onboardingRequestRef.current) return;
+      console.error("Error loading coordinator assignment:", error);
+      setOnboarding(null);
+      setOnboardingError(true);
+    } finally {
+      if (requestId === onboardingRequestRef.current) {
+        setLoadingOnboarding(false);
+      }
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadOnboarding();
+
+      return () => {
+        onboardingRequestRef.current += 1;
+      };
+    }, [loadOnboarding])
+  );
 
   const loadProfile = async () => {
     try {
@@ -386,6 +428,124 @@ export default function ProfileScreen() {
     );
   };
 
+  // Internship Information is read-only and comes from the onboarding API.
+  const renderInternshipInformation = () => {
+    const assignment = onboarding?.coordinator_assignment;
+    const assigned =
+      assignment?.status === "assigned" &&
+      Boolean(assignment.coordinator_name?.trim());
+    const pending = assignment?.status === "pending_assignment";
+
+    const statusLabel = assigned
+      ? "Assigned"
+      : pending
+        ? "Pending Assignment"
+        : "Not Yet Eligible";
+
+    const statusColor = assigned
+      ? colors.success
+      : pending
+        ? colors.warning
+        : colors.textSecondary;
+
+    const coordinatorName = assigned
+      ? assignment?.coordinator_name?.trim() || "Not assigned"
+      : "Not assigned";
+
+    const description = pending
+      ? "Your onboarding documents are verified. Your coordinator assignment is pending."
+      : "Your coordinator will be assigned after your Orientation Certificate and COR are verified and a matching Dean designation is available.";
+
+    return (
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+          Internship Information
+        </Text>
+
+        <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+          {loadingOnboarding ? (
+            <View style={styles.internshipLoading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.docLoadingText, { color: colors.textSecondary }]}>
+                Loading coordinator information...
+              </Text>
+            </View>
+          ) : onboardingError ? (
+            <View style={styles.internshipError}>
+              <Text style={[styles.internshipHint, { color: colors.textSecondary }]}>
+                Coordinator information is temporarily unavailable.
+              </Text>
+              <TouchableOpacity
+                onPress={() => void loadOnboarding()}
+                accessibilityRole="button"
+                style={[styles.internshipRetry, { borderColor: colors.border }]}
+              >
+                <Ionicons name="refresh-outline" size={16} color={colors.primary} />
+                <Text style={[styles.internshipRetryText, { color: colors.primary }]}>
+                  Try Again
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View style={styles.internshipHeader}>
+                <View
+                  style={[
+                    styles.internshipIcon,
+                    { backgroundColor: `${colors.primary}10` },
+                  ]}
+                >
+                  <Ionicons
+                    name="school-outline"
+                    size={22}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={styles.internshipHeaderText}>
+                  <Text style={[styles.internshipName, { color: colors.textPrimary }]}>
+                    {coordinatorName}
+                  </Text>
+                  <Text style={[styles.internshipRole, { color: colors.textSecondary }]}>
+                    Faculty Internship Coordinator
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={[
+                  styles.internshipDivider,
+                  { backgroundColor: colors.border },
+                ]}
+              />
+
+              <View style={styles.internshipStatusRow}>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>
+                  Assignment Status
+                </Text>
+                <View
+                  style={[
+                    styles.internshipStatusBadge,
+                    { backgroundColor: `${statusColor}15` },
+                  ]}
+                >
+                  <Text style={[styles.internshipStatusText, { color: statusColor }]}>
+                    {statusLabel}
+                  </Text>
+                </View>
+              </View>
+
+              {!assigned && (
+                <Text style={[styles.internshipHint, { color: colors.textSecondary }]}>
+                  {description}
+                </Text>
+              )}
+            </>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   // ✅ Skeleton Loader
   if (loading) {
     return (
@@ -574,6 +734,8 @@ export default function ProfileScreen() {
             )}
           </View>
         </View>
+
+        {renderInternshipInformation()}
 
         {/* ✅ Documents Section */}
         {renderDocumentsSection()}
@@ -861,6 +1023,78 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.6,
   },
+  // Read-only internship coordinator details
+  internshipLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+  },
+  internshipError: {
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  internshipRetry: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  internshipRetryText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  internshipHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  internshipIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  internshipHeaderText: {
+    flex: 1,
+  },
+  internshipName: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  internshipRole: {
+    marginTop: 3,
+    fontSize: 12,
+  },
+  internshipDivider: {
+    height: 1,
+    marginVertical: 16,
+  },
+  internshipStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  internshipStatusBadge: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  internshipStatusText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  internshipHint: {
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 12,
+  },
+
   // ✅ Document styles
   docLoadingContainer: {
     paddingVertical: 20,

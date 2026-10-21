@@ -21,7 +21,6 @@ import {
 
   Platform,
 
-
   ScrollView,
 
   StyleSheet,
@@ -36,8 +35,6 @@ import {
 
 } from "react-native";
 
-
-
 import AppLogo from "../../src/components/common/AppLogo";
 
 import { APP_NAME, APP_VERSION } from "../../src/constants/app";
@@ -46,11 +43,7 @@ import { useTheme } from "../../src/context/ThemeContext";
 
 import { authService } from "../../src/services/auth.service";
 
-
-
 const { height } = Dimensions.get("window");
-
-
 
 export default function SignUpScreen() {
 
@@ -78,8 +71,6 @@ export default function SignUpScreen() {
 
   const [success, setSuccess] = useState(false);
 
-
-
   const [firstNameError, setFirstNameError] = useState("");
   const [lastNameError, setLastNameError] = useState("");
 
@@ -90,8 +81,6 @@ export default function SignUpScreen() {
   const [passwordError, setPasswordError] = useState("");
 
   const [confirmPasswordError, setConfirmPasswordError] = useState("");
-
-
 
   const [isFirstNameFocused, setIsFirstNameFocused] = useState(false);
   const [isMiddleNameFocused, setIsMiddleNameFocused] = useState(false);
@@ -105,8 +94,6 @@ export default function SignUpScreen() {
 
   const [isConfirmPasswordFocused, setIsConfirmPasswordFocused] = useState(false);
 
-
-
   const middleNameRef = useRef<TextInput>(null);
   const lastNameRef = useRef<TextInput>(null);
   const studentIdRef = useRef<TextInput>(null);
@@ -116,18 +103,11 @@ export default function SignUpScreen() {
   const passwordRef = useRef<TextInput>(null);
 
   const confirmPasswordRef = useRef<TextInput>(null);
-
-
-
   const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-
 
   const validateForm = (): boolean => {
 
     let isValid = true;
-
-
 
     if (!firstName.trim()) {
       setFirstNameError("First name is required");
@@ -167,8 +147,6 @@ export default function SignUpScreen() {
 
     }
 
-
-
     if (!email.trim()) {
 
       setEmailError("Email is required");
@@ -187,17 +165,15 @@ export default function SignUpScreen() {
 
     }
 
-
-
-    if (!password.trim()) {
+    if (!password) {
 
       setPasswordError("Password is required");
 
       isValid = false;
 
-    } else if (password.trim().length < 6) {
+    } else if (password.length < 8) {
 
-      setPasswordError("Password must be at least 6 characters");
+      setPasswordError("Password must be at least 8 characters");
 
       isValid = false;
 
@@ -207,15 +183,13 @@ export default function SignUpScreen() {
 
     }
 
-
-
     if (!confirmPassword.trim()) {
 
       setConfirmPasswordError("Please confirm your password");
 
       isValid = false;
 
-    } else if (password.trim() !== confirmPassword.trim()) {
+    } else if (password !== confirmPassword) {
 
       setConfirmPasswordError("Passwords do not match");
 
@@ -227,13 +201,9 @@ export default function SignUpScreen() {
 
     }
 
-
-
     return isValid;
 
   };
-
-
 
   const handleSignUp = async () => {
 
@@ -243,21 +213,11 @@ export default function SignUpScreen() {
 
     }
 
-
-
-    // Backend currently stores first_name and last_name only.
-    // Include the optional middle name in first_name until a backend
-    // middle_name field and database migration are implemented.
-    const storedFirstName = [firstName.trim(), middleName.trim()]
-      .filter(Boolean)
-      .join(" ");
-    const storedLastName = lastName.trim();
+    // Keep first, middle, and last names separate for backend storage.
 
     setLoading(true);
 
     setSuccess(false);
-
-
 
     try {
 
@@ -265,11 +225,12 @@ export default function SignUpScreen() {
 
         email: email.trim(),
 
-        password: password.trim(),
+        password,
 
-        first_name: storedFirstName,
+        first_name: firstName.trim(),
+        middle_name: middleName.trim() || null,
 
-        last_name: storedLastName,
+        last_name: lastName.trim(),
 
         student_id: studentId.trim(),
 
@@ -277,13 +238,9 @@ export default function SignUpScreen() {
 
       });
 
-
-
       console.log('✅ Registration successful:', response);
 
       setSuccess(true);
-
-
 
       Alert.alert(
 
@@ -341,15 +298,11 @@ export default function SignUpScreen() {
 
   };
 
-
-
   const handleLogin = () => {
 
     router.push("/(auth)/login");
 
   };
-
-
 
   const handleFirstNameSubmit = () => {
     middleNameRef.current?.focus();
@@ -363,15 +316,11 @@ export default function SignUpScreen() {
     studentIdRef.current?.focus();
   };
 
-
-
   const handleStudentIdSubmit = () => {
 
     emailRef.current?.focus();
 
   };
-
-
 
   const handleEmailSubmit = () => {
 
@@ -379,15 +328,11 @@ export default function SignUpScreen() {
 
   };
 
-
-
   const handlePasswordSubmit = () => {
 
     confirmPasswordRef.current?.focus();
 
   };
-
-
 
   const handleConfirmPasswordSubmit = () => {
 
@@ -395,15 +340,11 @@ export default function SignUpScreen() {
 
   };
 
-
-
   return (
 
     <View style={[styles.container, { backgroundColor: colors.background }]}>
 
       <StatusBar style={isDark ? "light" : "dark"} />
-
-
 
       <View style={[
 
@@ -438,8 +379,6 @@ export default function SignUpScreen() {
         </View>
 
       </View>
-
-
 
       {/* ✅ Dark Mode Toggle Button - OUTSIDE the navy section */}
 
@@ -478,8 +417,6 @@ export default function SignUpScreen() {
         />
 
       </TouchableOpacity>
-
-
 
       <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
 
@@ -525,8 +462,6 @@ export default function SignUpScreen() {
 
             </View>
 
-
-
             <View style={styles.cardWrapper}>
 
               <View style={[styles.card, { backgroundColor: colors.card }]}>
@@ -542,8 +477,6 @@ export default function SignUpScreen() {
                   </Text>
 
                 </View>
-
-
 
                 <View style={styles.formContainer}>
 
@@ -574,8 +507,6 @@ export default function SignUpScreen() {
                     </View>
 
                   )}
-
-
 
                   {/* Separate name fields prevent accidental surname parsing. */}
                   <View style={styles.fieldWrapper}>
@@ -765,8 +696,6 @@ export default function SignUpScreen() {
 
                   </View>
 
-
-
                   <View style={styles.fieldWrapper}>
 
                     <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Gender (optional)</Text>
@@ -834,8 +763,6 @@ export default function SignUpScreen() {
                     </Text>
 
                   </View>
-
-
 
                   <View style={styles.fieldWrapper}>
 
@@ -914,8 +841,6 @@ export default function SignUpScreen() {
                     {emailError ? <Text style={[styles.errorText, { color: colors.error }]}>{emailError}</Text> : null}
 
                   </View>
-
-
 
                   <View style={styles.fieldWrapper}>
 
@@ -1023,8 +948,6 @@ export default function SignUpScreen() {
 
                   </View>
 
-
-
                   <View style={styles.fieldWrapper}>
 
                     <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Confirm Password</Text>
@@ -1129,8 +1052,6 @@ export default function SignUpScreen() {
 
                   </View>
 
-
-
                   <TouchableOpacity
 
                     style={[styles.signUpButton, loading && styles.signUpButtonDisabled, { backgroundColor: colors.primary }]}
@@ -1175,8 +1096,6 @@ export default function SignUpScreen() {
 
                   </TouchableOpacity>
 
-
-
                   <View style={styles.loginContainer}>
 
                     <Text style={[styles.loginText, { color: colors.textSecondary }]}>
@@ -1205,8 +1124,6 @@ export default function SignUpScreen() {
 
             </View>
 
-
-
             <View style={[styles.footer, { backgroundColor: colors.background }]}>
 
               <Text style={[styles.footerText, { color: colors.textSecondary }]}>
@@ -1231,8 +1148,6 @@ export default function SignUpScreen() {
 
 }
 
-
-
 const styles = StyleSheet.create({
 
   container: {
@@ -1240,8 +1155,6 @@ const styles = StyleSheet.create({
     flex: 1,
 
   },
-
-
 
   navySection: {
 
@@ -1258,8 +1171,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
 
   },
-
-
 
   themeToggle: {
 
@@ -1297,8 +1208,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   circleTopLeft: {
 
     position: 'absolute',
@@ -1316,8 +1225,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
 
   },
-
-
 
   circleBottomRight: {
 
@@ -1337,8 +1244,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   dotGridTopRight: {
 
     position: 'absolute',
@@ -1356,8 +1261,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
 
   },
-
-
 
   dotGridBottomLeft: {
 
@@ -1377,8 +1280,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   dot: {
 
     width: 4,
@@ -1393,8 +1294,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   safeArea: {
 
     flex: 1,
@@ -1403,15 +1302,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   keyboardView: {
 
     flex: 1,
 
   },
-
-
 
   scrollContent: {
 
@@ -1420,8 +1315,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
 
   },
-
-
 
   headerContent: {
 
@@ -1437,15 +1330,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   logoWrapper: {
 
     marginBottom: 2,
 
   },
-
-
 
   brandTitle: {
 
@@ -1459,15 +1348,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   brandTitleAccent: {
 
     color: "#F5A623",
 
   },
-
-
 
   systemTitle: {
 
@@ -1483,8 +1368,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   cardWrapper: {
 
     paddingHorizontal: 24,
@@ -1492,8 +1375,6 @@ const styles = StyleSheet.create({
     marginTop: -30,
 
   },
-
-
 
   card: {
 
@@ -1521,15 +1402,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   cardHeader: {
 
     marginBottom: 20,
 
   },
-
-
 
   welcomeText: {
 
@@ -1543,8 +1420,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   subtitleText: {
 
     fontSize: 14,
@@ -1555,15 +1430,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   formContainer: {
 
     width: "100%",
 
   },
-
-
 
   successContainer: {
 
@@ -1581,15 +1452,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   successIcon: {
 
     marginRight: 12,
 
   },
-
-
 
   successText: {
 
@@ -1601,15 +1468,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   fieldWrapper: {
 
     marginBottom: 16,
 
   },
-
-
 
   fieldLabel: {
 
@@ -1621,8 +1484,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   genderOptions: {
 
     flexDirection: "row",
@@ -1632,8 +1493,6 @@ const styles = StyleSheet.create({
     gap: 8,
 
   },
-
-
 
   genderOption: {
 
@@ -1649,8 +1508,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   genderNote: {
 
     marginTop: 7,
@@ -1660,8 +1517,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
 
   },
-
-
 
   inputWrapper: {
 
@@ -1679,15 +1534,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   inputWrapperFocused: {
 
     borderWidth: 1.5,
 
   },
-
-
 
   inputWrapperError: {
 
@@ -1695,15 +1546,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   inputIcon: {
 
     marginRight: 10,
 
   },
-
-
 
   input: {
 
@@ -1712,8 +1559,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
 
   },
-
-
 
   errorText: {
 
@@ -1724,8 +1569,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
 
   },
-
-
 
   signUpButton: {
 
@@ -1755,8 +1598,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   signUpButtonDisabled: {
 
     opacity: 0.6,
@@ -1767,8 +1608,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   signUpButtonContent: {
 
     flexDirection: "row",
@@ -1777,15 +1616,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   signUpButtonIcon: {
 
     marginRight: 8,
 
   },
-
-
 
   signUpButtonText: {
 
@@ -1796,8 +1631,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
 
   },
-
-
 
   loginContainer: {
 
@@ -1811,15 +1644,11 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   loginText: {
 
     fontSize: 14,
 
   },
-
-
 
   loginLink: {
 
@@ -1828,8 +1657,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
 
   },
-
-
 
   footer: {
 
@@ -1845,8 +1672,6 @@ const styles = StyleSheet.create({
 
   },
 
-
-
   footerText: {
 
     fontSize: 11,
@@ -1860,8 +1685,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
 
   },
-
-
 
   versionText: {
 
