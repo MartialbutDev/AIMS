@@ -1,3 +1,5 @@
+from app.core.record_lock import lock_student_term
+from app.core.completion_hours import required_hours_for_student
 
 """Coordinator endpoints with assignment-based access control."""
 
@@ -20,6 +22,7 @@ from app.core.security import require_role
 from app.models.application import Application, ApplicationStatus
 from app.models.company import Company
 from app.models.coordinator_assignment import CoordinatorStudentAssignment
+from app.models.dean_coordinator_designation import DeanCoordinatorDesignation
 from app.models.coordinator_evaluation import CoordinatorEvaluation
 from app.models.document import Document, DocumentType
 from app.models.dtr import DTR, DTRStatus
@@ -55,38 +58,93 @@ class EvaluationInput(BaseModel):
     )
 
 
+def _current_term() -> tuple[str, str]:
+    """Read the configured active term; fail closed on invalid configuration."""
+    import re
+
+    year = str(getattr(settings, "CURRENT_ACADEMIC_YEAR", "") or "").strip()
+    semester = str(
+        getattr(settings, "CURRENT_SEMESTER", None)
+        or getattr(settings, "PRACTICUM_SEMESTER", "")
+    ).strip()
+    match = re.fullmatch(r"(\d{4})-(\d{4})", year)
+    if not match or int(match.group(2)) != int(match.group(1)) + 1:
+        raise HTTPException(503, "CURRENT_ACADEMIC_YEAR is invalid or missing")
+    if semester not in ("1", "2"):
+        raise HTTPException(503, "CURRENT_SEMESTER must be 1 or 2")
+    return year, semester
+
+
+def _has_active_designation(db: Session, actor: User) -> bool:
+    year, semester = _current_term()
+    return db.query(DeanCoordinatorDesignation.id).filter(
+        DeanCoordinatorDesignation.coordinator_id == actor.id,
+        DeanCoordinatorDesignation.academic_year == year,
+        DeanCoordinatorDesignation.semester == semester,
+        DeanCoordinatorDesignation.is_active.is_(True),
+    ).first() is not None
+
+
 def require_assigned_student(
     db: Session,
     actor: User,
     student_id: str,
+    *,
+    mode: Literal["read", "write"] = "read",
 ) -> User:
-    """Return a student only when assigned to this coordinator."""
-
-    query = db.query(User).filter(
+    """Authorize current-term access. Historical data uses its own safe listing."""
+    student = db.query(User).filter(
         User.id == student_id,
         User.role == UserRole.STUDENT,
-    )
-
-    if actor.role != UserRole.ADMIN:
-        query = query.join(
-            CoordinatorStudentAssignment,
-            CoordinatorStudentAssignment.student_id == User.id,
-        ).filter(
-            CoordinatorStudentAssignment.coordinator_id == actor.id
-        )
-
-    student = query.first()
-
+    ).first()
     if student is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Student not found",
-        )
+        raise HTTPException(404, "Student not found")
+    if actor.role == UserRole.ADMIN:
+        if mode == "write": lock_student_term(db, student_id, *_current_term())
+        return student
+    if actor.role != UserRole.COORDINATOR:
+        raise HTTPException(403, "Coordinator role required")
 
+    year, semester = _current_term()
+    assignment = db.query(CoordinatorStudentAssignment.id).filter(
+        CoordinatorStudentAssignment.coordinator_id == actor.id,
+        CoordinatorStudentAssignment.student_id == student_id,
+        CoordinatorStudentAssignment.academic_year == year,
+        CoordinatorStudentAssignment.semester == semester,
+    ).first()
+    if assignment is None:
+        historical = db.query(CoordinatorStudentAssignment.id).filter(
+            CoordinatorStudentAssignment.coordinator_id == actor.id,
+            CoordinatorStudentAssignment.student_id == student_id,
+        ).first()
+        if historical and mode == "write":
+            raise HTTPException(403, "Historical assignments are read-only")
+        raise HTTPException(404, "No current-term assignment for this student")
+    if mode == "write" and not _has_active_designation(db, actor):
+        raise HTTPException(403, "Active Dean designation required for this term")
+    if mode == "write": lock_student_term(db, student_id, year, semester)
     return student
 
 
-def _hours_summary(records: list[DTR]) -> dict:
+def _reject_ambiguous_record_write(db: Session, student_id: str) -> None:
+    """Fail closed if a student's records span multiple assigned terms.
+
+    Application, DTR, Journal and Evaluation models in this endpoint do not
+    provide a verified academic-term relationship. An assignment alone does
+    not prove which term a record belongs to.
+    """
+    assignments = db.query(CoordinatorStudentAssignment.id).filter(
+        CoordinatorStudentAssignment.student_id == student_id
+    ).limit(2).all()
+    if len(assignments) > 1:
+        raise HTTPException(
+            409,
+            "Record's academic term cannot be verified across multiple "
+            "student assignments; term-scoped records are required",
+        )
+
+
+def _hours_summary(records: list[DTR], required: int | None = None) -> dict:
     approved = [
         record
         for record in records
@@ -103,7 +161,7 @@ def _hours_summary(records: list[DTR]) -> dict:
 
     required_hours = max(
         0,
-        settings.REQUIRED_INTERNSHIP_HOURS,
+        required if required is not None else settings.REQUIRED_INTERNSHIP_HOURS,
     )
 
     remaining_hours = round(
@@ -224,12 +282,14 @@ async def list_students(
     )
 
     if current_user.role != UserRole.ADMIN:
+        year, semester = _current_term()
         query = query.join(
             CoordinatorStudentAssignment,
             CoordinatorStudentAssignment.student_id == User.id,
         ).filter(
-            CoordinatorStudentAssignment.coordinator_id
-            == current_user.id
+            CoordinatorStudentAssignment.coordinator_id == current_user.id,
+            CoordinatorStudentAssignment.academic_year == year,
+            CoordinatorStudentAssignment.semester == semester,
         )
 
     if search and search.strip():
@@ -264,22 +324,24 @@ async def list_students(
 
     documents = (
         db.query(Document)
-        .filter(Document.uploaded_by.in_(student_ids))
+        .filter(Document.uploaded_by.in_(student_ids), Document.academic_year == _current_term()[0], Document.semester == _current_term()[1])
         .order_by(Document.created_at.desc())
         .all()
     )
 
     dtrs = db.query(DTR).filter(
-        DTR.student_id.in_(student_ids)
+        DTR.student_id.in_(student_ids), DTR.academic_year == _current_term()[0], DTR.semester == _current_term()[1]
     ).all()
 
     applications = db.query(Application).filter(
-        Application.student_id.in_(student_ids)
+        Application.student_id.in_(student_ids), Application.academic_year == _current_term()[0], Application.semester == _current_term()[1]
     ).all()
 
     evaluations = db.query(CoordinatorEvaluation).filter(
         CoordinatorEvaluation.coordinator_id == current_user.id,
         CoordinatorEvaluation.student_id.in_(student_ids),
+        CoordinatorEvaluation.academic_year == _current_term()[0],
+        CoordinatorEvaluation.semester == _current_term()[1],
     ).all()
 
     docs_by_student: dict[str, list[Document]] = {}
@@ -365,7 +427,7 @@ async def list_students(
                 )
             },
             "journey": _hours_summary(
-                dtrs_by_student.get(student.id, [])
+                dtrs_by_student.get(student.id, []), required_hours_for_student(db, student.id, *_current_term())
             ),
             "grade": (
                 float(evaluations_by_student[student.id].grade)
@@ -383,6 +445,44 @@ async def list_students(
     }
 
 
+@router.get("/historical-students")
+async def list_historical_students(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("coordinator")),
+):
+    """Historical assignment metadata only; never leaks cross-term records."""
+    year, semester = _current_term()
+    rows = (
+        db.query(CoordinatorStudentAssignment, User)
+        .join(User, User.id == CoordinatorStudentAssignment.student_id)
+        .filter(
+            CoordinatorStudentAssignment.coordinator_id == current_user.id,
+            User.role == UserRole.STUDENT,
+        )
+        .order_by(
+            CoordinatorStudentAssignment.academic_year.desc(),
+            CoordinatorStudentAssignment.semester.desc(),
+            User.last_name,
+        )
+        .all()
+    )
+    return {"items": [
+        {
+            "assignment_id": assignment.id,
+            "student_id": student.id,
+            "student_number": student.student_id,
+            "first_name": student.first_name,
+            "last_name": student.last_name,
+            "email": student.email,
+            "academic_year": assignment.academic_year,
+            "semester": assignment.semester,
+            "read_only": True,
+        }
+        for assignment, student in rows
+        if (assignment.academic_year, assignment.semester) != (year, semester)
+    ]}
+
+
 @router.get("/students/{student_id}")
 async def get_student_detail(
     student_id: str,
@@ -393,16 +493,18 @@ async def get_student_detail(
         db, current_user, student_id
     )
 
+    year, semester = _current_term()
+
     documents = (
         db.query(Document)
-        .filter(Document.uploaded_by == student.id)
+        .filter(Document.uploaded_by == student.id, Document.academic_year == year, Document.semester == semester)
         .order_by(Document.created_at.desc())
         .all()
     )
 
     dtrs = (
         db.query(DTR)
-        .filter(DTR.student_id == student.id)
+        .filter(DTR.student_id == student.id, DTR.academic_year == year, DTR.semester == semester)
         .order_by(DTR.date.desc())
         .all()
     )
@@ -413,14 +515,14 @@ async def get_student_detail(
             Company,
             Company.id == Application.company_id,
         )
-        .filter(Application.student_id == student.id)
+        .filter(Application.student_id == student.id, Application.academic_year == year, Application.semester == semester)
         .order_by(Application.applied_date.desc())
         .all()
     )
 
     journals = (
         db.query(Journal)
-        .filter(Journal.student_id == student.id)
+        .filter(Journal.student_id == student.id, Journal.academic_year == year, Journal.semester == semester)
         .order_by(Journal.week.desc())
         .all()
     )
@@ -428,6 +530,8 @@ async def get_student_detail(
     evaluation = db.query(CoordinatorEvaluation).filter(
         CoordinatorEvaluation.coordinator_id == current_user.id,
         CoordinatorEvaluation.student_id == student.id,
+        CoordinatorEvaluation.academic_year == _current_term()[0],
+        CoordinatorEvaluation.semester == _current_term()[1],
     ).first()
 
     latest: dict[str, Document] = {}
@@ -439,6 +543,9 @@ async def get_student_detail(
         )
 
     return {
+        "academic_year": _current_term()[0],
+        "semester": _current_term()[1],
+        "read_only": False,
         "student": {
             "id": student.id,
             "student_id": student.student_id,
@@ -448,7 +555,7 @@ async def get_student_detail(
             "phone": student.phone,
             "is_active": student.is_active,
         },
-        "journey": _hours_summary(dtrs),
+        "journey": _hours_summary(dtrs, required_hours_for_student(db, student.id, year, semester)),
         "document_statuses": [
             {
                 "type": kind.value,
@@ -525,18 +632,22 @@ async def save_student_evaluation(
     current_user: User = Depends(require_role("coordinator")),
 ):
     student = require_assigned_student(
-        db, current_user, student_id
+        db, current_user, student_id, mode="write"
     )
 
     evaluation = db.query(CoordinatorEvaluation).filter(
         CoordinatorEvaluation.coordinator_id == current_user.id,
         CoordinatorEvaluation.student_id == student.id,
+        CoordinatorEvaluation.academic_year == _current_term()[0],
+        CoordinatorEvaluation.semester == _current_term()[1],
     ).first()
 
     if evaluation is None:
         evaluation = CoordinatorEvaluation(
             coordinator_id=current_user.id,
             student_id=student.id,
+            academic_year=_current_term()[0],
+            semester=_current_term()[1],
             grade=evaluation_data.grade,
             notes=evaluation_data.notes,
         )
@@ -638,16 +749,16 @@ class RecordReviewInput(BaseModel):
 
 def _visible_student_ids(db: Session, actor: User) -> list[str]:
     if actor.role == UserRole.ADMIN:
-        rows = db.query(User.id).filter(
-            User.role == UserRole.STUDENT
-        ).all()
+        rows = db.query(User.id).filter(User.role == UserRole.STUDENT).all()
     else:
-        rows = db.query(
-            CoordinatorStudentAssignment.student_id
-        ).filter(
-            CoordinatorStudentAssignment.coordinator_id == actor.id
+        if not _has_active_designation(db, actor):
+            return []
+        year, semester = _current_term()
+        rows = db.query(CoordinatorStudentAssignment.student_id).filter(
+            CoordinatorStudentAssignment.coordinator_id == actor.id,
+            CoordinatorStudentAssignment.academic_year == year,
+            CoordinatorStudentAssignment.semester == semester,
         ).all()
-
     return [row[0] for row in rows]
 
 
@@ -801,7 +912,9 @@ async def review_application(
         db,
         current_user,
         app.student_id,
+        mode="write",
     )
+    _reject_ambiguous_record_write(db, app.student_id)
 
     if app.status not in (
         ApplicationStatus.PENDING,
@@ -866,7 +979,9 @@ async def review_dtr(
         db,
         current_user,
         entry.student_id,
+        mode="write",
     )
+    _reject_ambiguous_record_write(db, entry.student_id)
 
     if entry.status != DTRStatus.SUBMITTED:
         raise HTTPException(
@@ -928,7 +1043,9 @@ async def review_journal(
         db,
         current_user,
         entry.student_id,
+        mode="write",
     )
+    _reject_ambiguous_record_write(db, entry.student_id)
 
     if entry.status not in (
         JournalStatus.SUBMITTED,

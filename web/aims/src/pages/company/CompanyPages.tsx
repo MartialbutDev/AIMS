@@ -7,6 +7,7 @@ import {
   HelpCenterPage,
 } from '../shared/UtilityPages'
 
+import { InternMonitoringPage } from './InternMonitoringPage'
 import { CompanyDashboardPage } from './CompanyDashboardPage'
 import { ApplicationsPage } from './ApplicationsPage'
 import { NotificationsPage } from './NotificationsPage'
@@ -40,6 +41,9 @@ export function CompanyPages({
       )
 
     // APPLICATIONS
+
+    case 'interns':
+      return <InternMonitoringPage />
 
     case 'applications':
       return (

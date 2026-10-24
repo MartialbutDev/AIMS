@@ -7,6 +7,7 @@ Registers all API endpoints, including:
 - User Management
 - Companies
 - Applications
+- Internship Deployments
 - DTR
 - Journals
 - Documents
@@ -26,6 +27,7 @@ from app.api.v1.endpoints import (
     users,
     companies,
     applications,
+    deployments,
     dtr,
     journals,
     notifications,
@@ -36,6 +38,8 @@ from app.api.v1.endpoints import (
     coordinator,
     onboarding,
     dean_coordinators,
+    coordinator_reminders,
+    company_monitoring,
 )
 
 # Existing document router.
@@ -131,6 +135,27 @@ router.include_router(
     applications.router,
     prefix="/applications",
     tags=["Applications"],
+)
+
+
+# ============================================================
+# INTERNSHIP DEPLOYMENTS
+# ============================================================
+
+# The deployments router does not define its own prefix.
+#
+# Final endpoints:
+# GET  /api/v1/deployments/my
+# GET  /api/v1/deployments/{deployment_id}
+# POST /api/v1/deployments/{deployment_id}/confirm
+#
+# An accepted application creates a PRE_DEPLOYMENT record.
+# Official deployment requires Coordinator confirmation.
+
+router.include_router(
+    deployments.router,
+    prefix="/deployments",
+    tags=["Internship Deployments"],
 )
 
 
@@ -251,3 +276,15 @@ for route in router.routes:
 print("=" * 60)
 print("All AIMS API routers registered successfully!")
 print("=" * 60 + "\n")
+
+
+# Read-only host-company intern monitoring.
+router.include_router(company_monitoring.router, prefix="/company", tags=["Company monitoring"])
+
+router.include_router(coordinator_reminders.router, prefix="/coordinator", tags=["Coordinator reminders"])
+
+from app.api.v1.endpoints import push
+router.include_router(push.router, prefix="/push", tags=["Device notifications"])
+
+from app.api.v1.endpoints import completion
+router.include_router(completion.router, prefix="/completion", tags=["Internship completion"])

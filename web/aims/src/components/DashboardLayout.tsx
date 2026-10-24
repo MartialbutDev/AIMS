@@ -1,10 +1,17 @@
-import { useState } from 'react'
+
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+
+import '../pages/coordinator/citc-workspace.css'
+import '../pages/shared/stakeholder-workspaces.css'
 import { Brand } from './Brand'
 import { Icon } from './Icons'
+
 import { roleLabels } from '../types/auth'
+
 import type { UserRole, UserSession } from '../types/auth'
 import type { DashboardData } from '../types/dashboard'
+
 import { AdminPages } from '../pages/admin/AdminPages'
 import { CoordinatorPages } from '../pages/coordinator/CoordinatorPages'
 import { DeanPages } from '../pages/dean/DeanPages'
@@ -21,20 +28,31 @@ const NAV_BY_ROLE = {
   admin: [
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Users', slug: 'users', icon: 'users' },
+    { label: 'Onboarding review', slug: 'document-verification', icon: 'check' },
     { label: 'Assignments', slug: 'assignments', icon: 'file' },
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
     { label: 'Developer info', slug: 'developer-info', icon: 'file' },
   ],
+
   coordinator: [
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Students', slug: 'students', icon: 'users' },
+    { label: 'Document review', slug: 'document-verification', icon: 'check' },
+    {
+      label: 'History',
+      slug: 'historical-students',
+      icon: 'file',
+    },
     { label: 'Applications', slug: 'applications', icon: 'file' },
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
   ],
+
   dean: [
-    { label: 'Overview', slug: 'dashboard', icon: 'grid' },
+    { label: 'Program overview', slug: 'dashboard', icon: 'grid' },
+    { label: 'Coordinators', slug: 'coordinators', icon: 'users' },
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
   ],
+
   career_center: [
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Companies', slug: 'companies', icon: 'briefcase' },
@@ -42,8 +60,10 @@ const NAV_BY_ROLE = {
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
     { label: 'Developer info', slug: 'developer-info', icon: 'file' },
   ],
+
   company: [
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
+    { label: 'Intern monitoring', slug: 'interns', icon: 'briefcase' },
     { label: 'Applications', slug: 'applications', icon: 'users' },
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
     { label: 'Developer info', slug: 'developer-info', icon: 'file' },
@@ -66,8 +86,30 @@ export function DashboardLayout({
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [narrowViewport, setNarrowCoordinator] = useState(() => window.matchMedia('(max-width: 1000px)').matches)
 
-  const section = location.pathname.split('/')[2] || 'dashboard'
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1000px)')
+    const update = () => setNarrowCoordinator(media.matches)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (!mobileNavOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileNavOpen(false)
+        document.querySelector<HTMLButtonElement>('[aria-controls="workspace-navigation"]')?.focus()
+      }
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [mobileNavOpen, session.role])
+
+  const section =
+    location.pathname.split('/')[2] || 'dashboard'
+
   const navItems = NAV_BY_ROLE[session.role]
 
   const sectionLabels: Record<string, string> = {
@@ -75,10 +117,14 @@ export function DashboardLayout({
     users: 'Users',
     assignments: 'Assignments',
     students: 'Students',
+    'historical-students': 'History',
     companies: 'Companies',
     applications: 'Applications',
     notifications: 'Notifications',
     'developer-info': 'Developer info',
+    'document-verification': session.role === 'admin' ? 'Onboarding review' : 'Document review',
+    coordinators: 'Coordinator designations',
+    interns: 'Intern monitoring',
     settings: 'Settings',
     'help-center': 'Help center',
   }
@@ -87,7 +133,10 @@ export function DashboardLayout({
   const firstName = session.name || 'User'
 
   function goTo(nextSection: string) {
-    navigate(`/${WORKSPACE_SLUGS[session.role]}/${nextSection}`)
+    navigate(
+      `/${WORKSPACE_SLUGS[session.role]}/${nextSection}`,
+    )
+
     setMobileNavOpen(false)
   }
 
@@ -154,9 +203,13 @@ export function DashboardLayout({
   }
 
   return (
-    <div className="dashboard-app">
+    <div className={`dashboard-app aims-campus-workspace aims-role-${session.role}${session.role === 'coordinator' ? ' coordinator-workspace' : ''}`}>
       <aside
-        className={`sidebar${mobileNavOpen ? ' sidebar--open' : ''}`}
+        inert={narrowViewport && !mobileNavOpen ? true : undefined}
+        id="workspace-navigation"
+        className={`sidebar${
+          mobileNavOpen ? ' sidebar--open' : ''
+        }`}
       >
         <div className="sidebar-brand">
           <Brand compact />
@@ -171,7 +224,11 @@ export function DashboardLayout({
           </button>
         </div>
 
-        <div className="workspace-label">YOUR WORKSPACE</div>
+        <div className="citc-sidebar-subtitle"><strong>CITC · USTP-CDO</strong><p>Academic Internship<br />Management System</p></div>
+
+        <div className="workspace-label">
+          YOUR WORKSPACE
+        </div>
 
         <div className="workspace-switcher">
           <span
@@ -182,7 +239,7 @@ export function DashboardLayout({
 
           <span>
             <strong>{roleLabels[session.role]}</strong>
-            <small>USTP Internship Office</small>
+            <small>{session.role === 'company' ? 'Host Training Establishment' : 'CITC Internship Office'}</small>
           </span>
 
           <Icon name="chevron" size={16} />
@@ -190,16 +247,23 @@ export function DashboardLayout({
 
         <div className="nav-label">MENU</div>
 
-        <nav className="side-nav" aria-label="Main navigation">
+        <nav
+          className="side-nav"
+          aria-label="Main navigation"
+        >
           {navItems.map((item) => (
             <button
               type="button"
               className={`nav-item${
-                section === item.slug ? ' nav-item--active' : ''
+                section === item.slug
+                  ? ' nav-item--active'
+                  : ''
               }`}
               key={item.slug}
               aria-current={
-                section === item.slug ? 'page' : undefined
+                section === item.slug
+                  ? 'page'
+                  : undefined
               }
               onClick={() => goTo(item.slug)}
             >
@@ -215,10 +279,14 @@ export function DashboardLayout({
           <button
             type="button"
             className={`nav-item${
-              section === 'settings' ? ' nav-item--active' : ''
+              section === 'settings'
+                ? ' nav-item--active'
+                : ''
             }`}
             aria-current={
-              section === 'settings' ? 'page' : undefined
+              section === 'settings'
+                ? 'page'
+                : undefined
             }
             onClick={() => goTo('settings')}
           >
@@ -229,10 +297,14 @@ export function DashboardLayout({
           <button
             type="button"
             className={`nav-item${
-              section === 'help-center' ? ' nav-item--active' : ''
+              section === 'help-center'
+                ? ' nav-item--active'
+                : ''
             }`}
             aria-current={
-              section === 'help-center' ? 'page' : undefined
+              section === 'help-center'
+                ? 'page'
+                : undefined
             }
             onClick={() => goTo('help-center')}
           >
@@ -278,6 +350,8 @@ export function DashboardLayout({
             className="mobile-menu"
             onClick={() => setMobileNavOpen(true)}
             aria-label="Open navigation"
+            aria-expanded={mobileNavOpen}
+            aria-controls="workspace-navigation"
           >
             <Icon name="menu" size={20} />
           </button>
@@ -289,6 +363,7 @@ export function DashboardLayout({
           </div>
 
           <div className="topbar-actions">
+            {<><span className="citc-topbar-campus">CITC / USTP Cagayan de Oro</span><button type="button" className="citc-topbar-button" aria-label="Open notifications" onClick={() => goTo('notifications')}><Icon name="bell" size={17} /></button></>}
             <span className="today-label">
               <Icon name="clock" size={15} />
               Today
@@ -305,7 +380,9 @@ export function DashboardLayout({
           </div>
         </header>
 
-        <div className="dashboard-content">{content}</div>
+        <div className="dashboard-content">
+          {content}
+        </div>
       </main>
     </div>
   )

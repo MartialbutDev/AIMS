@@ -1,3 +1,4 @@
+import { CompletionOverview } from '../../components/CompletionOverview'
 
 import type { UserSession } from '../../types/auth'
 
@@ -36,7 +37,7 @@ export function DeanPages({
 
     case 'dashboard':
     case 'analytics':
-      return <DeanDashboardPage />
+      return <><DeanDashboardPage /><CompletionOverview /></>
 
     // ========================================
     // COORDINATOR MANAGEMENT

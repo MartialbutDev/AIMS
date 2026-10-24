@@ -1,3 +1,4 @@
+import { unregisterPushDevice } from "./push.service";
 import api from './api';
 import * as SecureStore from 'expo-secure-store';
 import { isAxiosError } from 'axios';
@@ -274,6 +275,7 @@ export const authService = {
   // LOGOUT
   // ==========================================================
   async logout(): Promise<void> {
+    await unregisterPushDevice();
     try {
       await SecureStore.deleteItemAsync('access_token');
       await SecureStore.deleteItemAsync('user');

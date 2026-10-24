@@ -1,6 +1,9 @@
 
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import {
+  Alert,
+  Text,
+  TouchableOpacity,
   ScrollView,
   StyleSheet,
   RefreshControl,
@@ -9,7 +12,7 @@ import {
   NativeScrollEvent,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import * as SecureStore from "expo-secure-store";
 
 import { useTheme } from "../../../src/context/ThemeContext";
@@ -17,6 +20,8 @@ import { dashboardService } from "../../../src/services/dashboard.service";
 import { notificationService } from "../../../src/services/notification.service";
 import { authService } from "../../../src/services/auth.service";
 import { dtrService } from "../../../src/services/dtr.service";
+import { deploymentService } from "../../../src/services/deployment.service";
+import type { InternshipDeployment } from "../../../src/services/deployment.service";
 import { useScrollContext } from "../../../src/context/ScrollContext";
 
 import HeroCard from "../../../src/components/dashboard/HeroCard";
@@ -195,6 +200,10 @@ export default function DashboardScreen() {
 
   const [progress, setProgress] =
     useState<InternshipProgress>(DEFAULT_PROGRESS);
+
+  const [deployment, setDeployment] =
+    useState<InternshipDeployment | null>(null);
+  const [deploymentError, setDeploymentError] = useState(false);
 
   // ==========================================================
   // REFERENCES
@@ -404,6 +413,27 @@ export default function DashboardScreen() {
     [isCurrentRequest]
   );
 
+  const fetchDeployment = useCallback(
+    async (requestId: number) => {
+      try {
+        const currentDeployment = await deploymentService.getMyDeployment();
+
+        if (!isCurrentRequest(requestId)) return;
+
+        setDeployment(currentDeployment);
+        setDeploymentError(false);
+      } catch (error) {
+        console.error("Error fetching internship deployment:", error);
+
+        if (!isCurrentRequest(requestId)) return;
+
+        setDeployment(null);
+        setDeploymentError(true);
+      }
+    },
+    [isCurrentRequest]
+  );
+
   // ==========================================================
   // FETCH INTERNSHIP PROGRESS
   // ==========================================================
@@ -488,6 +518,7 @@ export default function DashboardScreen() {
           fetchDashboardData(requestId),
           fetchNotificationCount(requestId),
           fetchProgress(requestId),
+          fetchDeployment(requestId),
         ]);
       } finally {
         if (isCurrentRequest(requestId)) {
@@ -501,6 +532,7 @@ export default function DashboardScreen() {
       fetchDashboardData,
       fetchNotificationCount,
       fetchProgress,
+      fetchDeployment,
       isCurrentRequest,
     ]
   );
@@ -509,7 +541,7 @@ export default function DashboardScreen() {
   // INITIAL DASHBOARD LOAD
   // ==========================================================
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     mountedRef.current = true;
 
     void loadDashboard();
@@ -518,7 +550,7 @@ export default function DashboardScreen() {
       mountedRef.current = false;
       requestIdRef.current += 1;
     };
-  }, [loadDashboard]);
+  }, [loadDashboard]));
 
   // ==========================================================
   // PULL TO REFRESH
@@ -533,6 +565,38 @@ export default function DashboardScreen() {
   // ==========================================================
 
   const navigateTo = (route: string) => {
+    const isInternshipRoute =
+      route === "/(student)/dtr" || route.startsWith("/(student)/dtr/") ||
+      route === "/(student)/journals" || route.startsWith("/(student)/journals/");
+    const isSubmissionRoute =
+      route === "/(student)/dtr/new" || route === "/(student)/journals/new";
+
+    if (isInternshipRoute) {
+      if (refreshing || deploymentError) {
+        Alert.alert(
+          "Deployment Status Unavailable",
+          refreshing
+            ? "Please wait while your deployment status is refreshed."
+            : "Unable to verify your deployment. Pull down to refresh and try again."
+        );
+        return;
+      }
+
+      const canAccessRecords =
+        deployment?.status === "DEPLOYED" || deployment?.status === "COMPLETED";
+      const canSubmit = deployment?.status === "DEPLOYED";
+
+      if (!canAccessRecords || (isSubmissionRoute && !canSubmit)) {
+        Alert.alert(
+          "Deployment Required",
+          deployment?.status === "COMPLETED"
+            ? "Your internship is completed. You can view existing records, but new submissions are closed."
+            : "Your coordinator must confirm your internship deployment before you can access DTR and journals."
+        );
+        return;
+      }
+    }
+
     router.push(route as any);
   };
 
@@ -657,11 +721,32 @@ export default function DashboardScreen() {
             progress.remainingHours
           }
           currentCompany={
-            progress.currentCompany
+            deployment?.company_name || progress.currentCompany
           }
+          deploymentStatus={deployment?.status}
+          academicYear={deployment?.academic_year}
+          semester={deployment?.semester}
+          deploymentDate={deployment?.deployment_date}
         />
 
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => navigateTo("/(student)/pre-deployment")}
+          style={[styles.deploymentLink, { backgroundColor: colors.card }]}
+          activeOpacity={0.8}
+        >
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}>
+            {deployment?.status === "DEPLOYED" || deployment?.status === "COMPLETED"
+              ? "View deployment details"
+              : "View pre-deployment checklist"}
+          </Text>
+          <Text style={{ color: colors.textSecondary, marginTop: 4, lineHeight: 20 }}>
+            Requirements, verification status, and coordinator confirmation
+          </Text>
+        </TouchableOpacity>
+
         {/* ============================================= */}
+        <TouchableOpacity onPress={() => router.push('/(student)/completion' as never)} style={{ marginHorizontal: 20, marginBottom: 18, padding: 18, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }}><Text style={{ color: colors.textPrimary, fontWeight: '700' }}>Final clearance & official completion</Text><Text style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>View approved requirements, submit final files, and track school completion.</Text></TouchableOpacity>
         {/* DASHBOARD STATISTICS */}
         {/* ============================================= */}
 
@@ -806,6 +891,7 @@ export default function DashboardScreen() {
 // ============================================================
 
 const styles = StyleSheet.create({
+  deploymentLink: { marginHorizontal: 20, marginBottom: 4, padding: 18, borderRadius: 16 },
   container: {
     flex: 1,
   },

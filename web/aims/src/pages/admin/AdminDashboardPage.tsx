@@ -44,17 +44,15 @@ export function AdminDashboardPage({
         <div>
           <span className="welcome-eyebrow">
             <span className="eyebrow-dot" />
-            ADMINISTRATOR WORKSPACE
+            CITC / SYSTEM ADMINISTRATION
           </span>
 
           <h1>
-            {data.greeting || 'Welcome back'}
-            {name ? `, ${name}` : ''}
+            Administration desk
           </h1>
 
           <p>
-            {data.subtitle ||
-              'Monitor and manage your academic internship system.'}
+            {name ? `${name}, manage the people and access behind every internship.` : 'Manage the people and access behind every internship.'}
           </p>
         </div>
 
@@ -67,6 +65,15 @@ export function AdminDashboardPage({
           Add User
         </button>
       </div>
+
+      <section className="stake-admin-desk" aria-label="Administration priorities">
+        <div className="stake-admin-desk-title"><span className="stake-kicker">THE ACADEMIC OPERATIONS DESK</span><h2>One system.<br />Every stakeholder connected.</h2><p>Maintain accounts, coordinator rosters, and student onboarding in one workspace.</p></div>
+        <div className="stake-admin-register">
+          <button type="button" onClick={() => onNavigate('users')}><span>01</span><div><strong>Account directory</strong><small>Stakeholder accounts and user imports</small></div><Icon name="arrow" size={18} /></button>
+          <button type="button" onClick={() => onNavigate('assignments')}><span>02</span><div><strong>Assignment register</strong><small>Student-to-coordinator rosters</small></div><Icon name="arrow" size={18} /></button>
+          <button type="button" onClick={() => onNavigate('document-verification')}><span>03</span><div><strong>Onboarding review</strong><small>Orientation certificates and CORs</small></div><Icon name="arrow" size={18} /></button>
+        </div>
+      </section>
 
       {/* DASHBOARD METRICS */}
 
@@ -325,6 +332,27 @@ export function AdminDashboardPage({
               <span>
                 <strong>Student Assignments</strong>
                 <small>Manage coordinator rosters</small>
+              </span>
+
+              <Icon name="arrow" size={16} />
+            </button>
+
+            {/* NEW: ONBOARDING DOCUMENT VERIFICATION */}
+
+            <button
+              type="button"
+              onClick={() => onNavigate('document-verification')}
+              aria-label="Verify pending onboarding documents"
+            >
+              <span className="admin-dashboard-action-icon">
+                <Icon name="file" size={18} />
+              </span>
+
+              <span>
+                <strong>Verify Documents</strong>
+                <small>
+                  Review pending Orientation Certificates and CORs
+                </small>
               </span>
 
               <Icon name="arrow" size={16} />

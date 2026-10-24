@@ -1,3 +1,4 @@
+import { getStudentReminderRoute } from "../../../src/utils/studentReminderRoute";
 // app/(student)/notifications/index.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -162,6 +163,13 @@ export default function NotificationsScreen() {
         onPress={() => {
           if (!item.is_read) {
             handleMarkAsRead(item.id);
+          }
+          const reminderRoute = getStudentReminderRoute(item.data);
+          if (reminderRoute) {
+            Alert.alert(item.title, item.message, [
+              { text: "Close", style: "cancel" },
+              { text: "Open section", onPress: () => router.push(reminderRoute) },
+            ]);
           }
         }}
         activeOpacity={0.7}

@@ -17,7 +17,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { dtrService, DTR } from "../../../src/services/dtr.service";
-import { BASE_URL } from "../../../src/config/env";
+import * as SecureStore from "expo-secure-store";
+import { API_URL } from "../../../src/config/env";
 import DocumentPreview from "../../../src/components/documents/DocumentPreview";
 
 const statusColors: Record<string, string> = {
@@ -46,6 +47,7 @@ export default function DTRDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
 
+  const [photoToken, setPhotoToken] = useState("");
   const [loading, setLoading] = useState(true);
   const [dtr, setDtr] = useState<DTR | null>(null);
   const [previewImage, setPreviewImage] = useState<string>("");
@@ -59,6 +61,7 @@ export default function DTRDetailScreen() {
       if (!id) return;
       try {
         if (showSpinner) setLoading(true);
+        setPhotoToken(await SecureStore.getItemAsync("access_token") || "");
         const data = await dtrService.getDTRById(id);
         setDtr(data);
       } catch (error) {
@@ -117,12 +120,8 @@ export default function DTRDetailScreen() {
     }
   };
 
-  const getImageUri = (imagePath?: string) => {
-    if (!imagePath) return null;
-    if (imagePath.startsWith("http")) return imagePath;
-    const cleanPath = imagePath.replace(/\\/g, "/");
-    return `${BASE_URL}/static/${cleanPath}`;
-  };
+  const getImageUri = (imagePath: string | undefined, kind: "in" | "out") =>
+    imagePath && photoToken ? `${API_URL}/dtr/${encodeURIComponent(id)}/photo/${kind}` : null;
 
   const openImagePreview = (uri: string, title: string) => {
     setPreviewImage(uri);
@@ -170,8 +169,8 @@ export default function DTRDetailScreen() {
 
   const statusColor = statusColors[dtr.status] || colors.primary;
   const statusIcon = statusIcons[dtr.status] || "help-circle-outline";
-  const imageInUri = getImageUri(dtr.image_in_path);
-  const imageOutUri = getImageUri(dtr.image_out_path);
+  const imageInUri = getImageUri(dtr.image_in_path, "in");
+  const imageOutUri = getImageUri(dtr.image_out_path, "out");
   const hasTimeOut = !!dtr.time_out;
   const canTimeOut = dtr.status === "pending" && !dtr.time_out;
 
@@ -334,7 +333,7 @@ export default function DTRDetailScreen() {
                 onPress={() => openImagePreview(imageInUri, "Time-In Photo")}
                 activeOpacity={0.8}
               >
-                <Image source={{ uri: imageInUri }} style={styles.photo} />
+                <Image source={{ uri: imageInUri, headers: { Authorization: `Bearer ${photoToken}` } }} style={styles.photo} />
                 <View
                   style={[styles.photoBadge, { backgroundColor: "rgba(16, 185, 129, 0.85)" }]}
                 >
@@ -359,7 +358,7 @@ export default function DTRDetailScreen() {
                 onPress={() => openImagePreview(imageOutUri, "Time-Out Photo")}
                 activeOpacity={0.8}
               >
-                <Image source={{ uri: imageOutUri }} style={styles.photo} />
+                <Image source={{ uri: imageOutUri, headers: { Authorization: `Bearer ${photoToken}` } }} style={styles.photo} />
                 <View
                   style={[styles.photoBadge, { backgroundColor: "rgba(239, 68, 68, 0.85)" }]}
                 >
@@ -413,6 +412,7 @@ export default function DTRDetailScreen() {
       <DocumentPreview
         visible={previewVisible}
         imageUri={previewImage}
+        headers={{ Authorization: `Bearer ${photoToken}` }}
         documentType="image"
         documentName={previewTitle}
         onClose={() => setPreviewVisible(false)}

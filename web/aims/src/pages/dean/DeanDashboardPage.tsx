@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 
 import { useCallback, useEffect, useState } from 'react'
 
@@ -72,6 +73,7 @@ function Metric({
 // ========================================
 
 export function DeanDashboardPage() {
+  const navigate = useNavigate()
   // ========================================
   // STATE
   // ========================================
@@ -257,10 +259,10 @@ export function DeanDashboardPage() {
         <div>
           <span className="welcome-eyebrow">
             <span className="eyebrow-dot" />
-            DEPARTMENT ANALYTICS
+            CITC / ACADEMIC LEADERSHIP
           </span>
 
-          <h1>Internship program overview</h1>
+          <h1>The internship program, in perspective.</h1>
 
           <p>
             Aggregate progress and coordinator workload.
@@ -289,6 +291,11 @@ export function DeanDashboardPage() {
           {error}
         </p>
       )}
+
+      <section className="stake-dean-brief" aria-label="Program leadership brief">
+        <div><span className="stake-kicker">DEAN'S BRIEF</span><h2>From student coverage<br />to program completion.</h2><p>Use aggregate outcomes to guide coordinator coverage and academic support.</p><button type="button" className="stake-yellow-button" onClick={() => navigate('/dean/coordinators')}>Manage coordinator designations <span aria-hidden="true">→</span></button></div>
+        <div className="stake-dean-coverage"><span>Coordinator coverage</span><strong>{analytics.assigned_student_count}<small> students assigned</small></strong><div className="stake-coverage-note"><span className="stake-yellow-dot" />{analytics.unassigned_student_count} students not yet assigned</div><p>Review designations to support the current internship cohort.</p></div>
+      </section>
 
       {/* ========================================
           SUMMARY METRICS

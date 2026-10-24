@@ -1,3 +1,4 @@
+import { CompletionOverview } from '../../components/CompletionOverview'
 
 import type { DashboardData } from '../../types/dashboard'
 import type { UserSession } from '../../types/auth'
@@ -43,11 +44,11 @@ export function CareerCenterPages({
 
     case 'dashboard':
       return (
-        <CareerDashboardPage
+        <><CareerDashboardPage
           data={data}
           name={session.name}
           onNavigate={onNavigate}
-        />
+        /><CompletionOverview /></>
       )
 
     // ========================================

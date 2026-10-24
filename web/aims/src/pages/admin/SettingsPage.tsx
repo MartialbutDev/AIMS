@@ -1,3 +1,4 @@
+import { AccountEditor } from '../shared/AccountEditor'
 
 import { useState } from 'react'
 
@@ -283,6 +284,7 @@ export function SettingsPage({
           Log Out
         </button>
       </section>
+      <AccountEditor session={session} onLogout={onLogout} />
     </div>
   )
 }

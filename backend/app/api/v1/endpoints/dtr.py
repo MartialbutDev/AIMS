@@ -1,3 +1,4 @@
+from app.core.record_lock import lock_student_term
 
 from fastapi import (
     APIRouter,
@@ -22,13 +23,17 @@ import math
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.assignment_access import ensure_coordinator_student_access
+from app.core.assignment_access import (
+    ensure_coordinator_student_access,
+    get_current_academic_term,
+)
 from app.core.security import get_current_user, require_role
 from app.models.user import User, UserRole
 from app.models.dtr import DTR, DTRStatus
 from app.schemas.dtr import DTRResponse, DTRUpdate
 from app.schemas.pagination import PaginatedResponse
 from app.services.notification_service import NotificationService
+from app.services.deployment_service import DeploymentService
 
 router = APIRouter()
 
@@ -153,6 +158,44 @@ def _fire_dtr_notification(
         )
 
 
+def _require_current_record_term(entry: DTR) -> None:
+    """Fail closed for historical or unclassified DTR modifications."""
+    year, semester = get_current_academic_term()
+    if not entry.academic_year or not entry.semester:
+        raise HTTPException(
+            status_code=409,
+            detail="DTR academic term is unverified; historical reconciliation required",
+        )
+    if (entry.academic_year, entry.semester) != (year, semester):
+        raise HTTPException(
+            status_code=403,
+            detail="Historical DTR records are read-only",
+        )
+
+
+def _require_coordinator_record_access(
+    db: Session,
+    actor: User,
+    entry: DTR,
+    *,
+    mode: str = "read",
+) -> None:
+    """Authorize against the DTR's actual term, never a caller-supplied term."""
+    if not entry.academic_year or not entry.semester:
+        raise HTTPException(
+            status_code=409,
+            detail="DTR academic term is unverified; historical reconciliation required",
+        )
+    ensure_coordinator_student_access(
+        db,
+        actor,
+        entry.student_id,
+        mode=mode,
+        academic_year=entry.academic_year,
+        semester=entry.semester,
+    )
+
+
 # ============================================================
 # STUDENT: CREATE DTR / TIME-IN
 # ============================================================
@@ -181,6 +224,9 @@ async def create_dtr(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only students can submit DTR",
         )
+
+    academic_year, semester = get_current_academic_term()
+    deployment = DeploymentService.require_active_deployment(db, current_user.id)
 
     try:
         date_obj = datetime.strptime(
@@ -216,6 +262,9 @@ async def create_dtr(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Time in must be before time out",
         )
+
+    if date_obj < deployment.deployment_date:
+        raise HTTPException(status_code=403, detail="DTR date precedes official deployment")
 
     existing = (
         db.query(DTR)
@@ -281,6 +330,8 @@ async def create_dtr(
     dtr = DTR(
         id=str(uuid.uuid4()),
         student_id=current_user.id,
+        academic_year=academic_year,
+        semester=semester,
         date=date_obj,
         time_in=time_in_obj,
         time_out=time_out_obj,
@@ -335,10 +386,14 @@ async def get_my_dtr(
             ),
         )
 
+    academic_year, semester = get_current_academic_term()
+
     query = (
         db.query(DTR)
         .filter(
-            DTR.student_id == current_user.id
+            DTR.student_id == current_user.id,
+            DTR.academic_year == academic_year,
+            DTR.semester == semester,
         )
         .order_by(
             DTR.date.desc()
@@ -415,6 +470,13 @@ async def record_time_out(
             status_code=403,
             detail="Access denied",
         )
+
+    _require_current_record_term(dtr)
+    lock_student_term(db, dtr.student_id, dtr.academic_year, dtr.semester)
+    deployment = DeploymentService.require_active_deployment(db, current_user.id)
+    # DTR.date is DateTime; deployment_date is Date. Compare calendar dates.
+    if dtr.date.date() < deployment.deployment_date:
+        raise HTTPException(status_code=403, detail="DTR date precedes official deployment")
 
     if dtr.status != DTRStatus.PENDING:
         raise HTTPException(
@@ -576,6 +638,8 @@ async def get_dtr_summary(
             ),
         )
 
+    academic_year, semester = get_current_academic_term()
+
     row = (
         db.query(
             func.count(DTR.id).label(
@@ -631,7 +695,9 @@ async def get_dtr_summary(
             ).label("total_hours"),
         )
         .filter(
-            DTR.student_id == current_user.id
+            DTR.student_id == current_user.id,
+            DTR.academic_year == academic_year,
+            DTR.semester == semester,
         )
         .one()
     )
@@ -646,6 +712,8 @@ async def get_dtr_summary(
         db.query(Application)
         .filter(
             Application.student_id == current_user.id,
+            Application.academic_year == academic_year,
+            Application.semester == semester,
             Application.status == ApplicationStatus.ACCEPTED,
         )
         .order_by(
@@ -671,7 +739,8 @@ async def get_dtr_summary(
             else None
         )
 
-    required_hours = settings.REQUIRED_INTERNSHIP_HOURS
+    from app.core.completion_hours import required_hours_for_student
+    required_hours = required_hours_for_student(db, current_user.id, academic_year, semester)
 
     total_hours = round(
         float(row.total_hours or 0),
@@ -749,10 +818,11 @@ async def get_dtr(
         )
 
     if current_user.role == UserRole.COORDINATOR:
-        ensure_coordinator_student_access(
+        _require_coordinator_record_access(
             db,
             current_user,
-            dtr.student_id,
+            dtr,
+            mode="read",
         )
 
     elif (
@@ -818,15 +888,19 @@ async def update_dtr_status(
             detail="DTR entry not found",
         )
 
+    _require_current_record_term(dtr)
+    lock_student_term(db, dtr.student_id, dtr.academic_year, dtr.semester)
+
     updates = update_data.model_dump(
         exclude_unset=True
     )
 
     if current_user.role == UserRole.COORDINATOR:
-        ensure_coordinator_student_access(
+        _require_coordinator_record_access(
             db,
             current_user,
-            dtr.student_id,
+            dtr,
+            mode="write",
         )
 
         if set(updates) != {"status"}:
@@ -899,3 +973,29 @@ async def update_dtr_status(
         dtr,
         _student_name(student),
     )
+
+
+@router.get("/{dtr_id}/photo/{photo_type}")
+async def get_student_dtr_photo(
+    dtr_id: str,
+    photo_type: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Student access required")
+    entry = db.query(DTR).filter(DTR.id == dtr_id, DTR.student_id == current_user.id).first()
+    if entry is None:
+        raise HTTPException(status_code=404, detail="DTR entry not found")
+    if photo_type not in ("in", "out"):
+        raise HTTPException(status_code=422, detail="Choose an in or out photo")
+    relative = entry.image_in_path if photo_type == "in" else entry.image_out_path
+    if not relative:
+        raise HTTPException(status_code=404, detail="Photo not uploaded")
+    root = (Path(settings.ASSET_DIR) / "dtr_uploads").resolve()
+    candidate = (Path(settings.ASSET_DIR) / relative.replace("\\", "/")).resolve()
+    if not candidate.is_relative_to(root) or not candidate.is_file():
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return FileResponse(candidate, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})

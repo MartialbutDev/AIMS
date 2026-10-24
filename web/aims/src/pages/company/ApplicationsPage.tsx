@@ -1,117 +1,20 @@
+import { useEffect, useState } from 'react'
+import type { DashboardData } from '../../types/dashboard'
+import { decideCompanyApplication, getCompanyAttachment, listCompanyApplications, type CompanyApplication, type CompanyApplicationPage } from '../../services/companyApplicationService'
+import '../shared/account-editor.css'
 
-import { Icon } from '../../components/Icons'
-
-import type {
-  DashboardData,
-  DashboardMetric,
-} from '../../types/dashboard'
-
-interface ApplicationsPageProps {
-  data: DashboardData
+export function ApplicationsPage(_: {data:DashboardData}) {
+  const [page,setPage]=useState(1),[refresh,setRefresh]=useState(0),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false)
+  const [result,setResult]=useState<CompanyApplicationPage|null>(null),[selected,setSelected]=useState<CompanyApplication|null>(null)
+  const [error,setError]=useState(''),[message,setMessage]=useState(''),[decision,setDecision]=useState<CompanyApplication['status']|null>(null)
+  useEffect(()=>{let active=true;setLoading(true);setError('');listCompanyApplications(page).then(value=>{if(active)setResult(value)}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[page,refresh])
+  async function decide(){if(!selected||!decision)return;setBusy(true);setError('');try{const updated=await decideCompanyApplication(selected.id,decision);setSelected(updated);setDecision(null);setMessage(`Application marked ${updated.status}.`);setRefresh(v=>v+1)}catch(e){setError(e instanceof Error?e.message:'Could not update application.')}finally{setBusy(false)}}
+  async function attachment(kind:'resume'|'application_letter'){if(!selected)return;setBusy(true);setError('');try{const blob=await getCompanyAttachment(selected.id,kind);const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=(selected[kind]?.original_filename || `${kind}-${selected.id}.${blob.type.includes('pdf')?'pdf':'bin'}`).replace(/[\\/]/g,'_');link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}catch(e){setError(e instanceof Error?e.message:'Could not open attachment.')}finally{setBusy(false)}}
+  return <section className="workspace-page"><header className="workspace-page-heading"><div><span className="stake-kicker">HOST TRAINING ESTABLISHMENT</span><h1>Applicant desk</h1><p>Review endorsed applicants for your assigned companies.</p></div><button className="outline-button" onClick={()=>setRefresh(v=>v+1)} disabled={loading||busy}>Refresh</button></header>
+    {error&&<p role="alert" className="account-error">{error}</p>}{message&&<p role="status" className="account-success">{message}</p>}
+    <div className="account-columns"><section className="panel account-form"><h2>Endorsed applicants</h2>{loading?<p>Loading applications…</p>:!result?.items.length?<p>No endorsed applications yet. Applications appear after the school coordinator endorses them.</p>:result.items.map(item=><button key={item.id} className="outline-button company-applicant-row" aria-pressed={selected?.id===item.id} disabled={busy} onClick={()=>{setSelected(item);setDecision(null);setError('');setMessage('')}} style={{textAlign:'left',padding:16}}><strong>{item.student_name||'Student applicant'}</strong><br/>{item.position} · {item.status}<br/><small>{item.company_name} · {new Date(item.applied_date).toLocaleDateString()}</small></button>)}<nav aria-label="Applicant pages" style={{display:'flex',gap:16,alignItems:'center'}}><button className="outline-button" disabled={page===1||loading||busy} onClick={()=>setPage(v=>v-1)}>Previous</button><span>Page {page} of {Math.max(1,result?.total_pages||1)}</span><button className="outline-button" disabled={loading||busy||page>=(result?.total_pages||1)} onClick={()=>setPage(v=>v+1)}>Next</button></nav></section>
+    <section className="panel account-form"><h2>{selected?.student_name||'Application details'}</h2>{!selected?<p>Select an applicant to review their submission.</p>:<><p><strong>{selected.position}</strong> · {selected.company_name}</p><p>Status: {selected.status}</p><p style={{whiteSpace:'pre-wrap'}}>{selected.cover_letter||'No cover message included.'}</p>{selected.resume_id&&<button className="outline-button" disabled={busy} onClick={()=>void attachment('resume')}>Download resume</button>}{selected.application_letter_id&&<button className="outline-button" disabled={busy} onClick={()=>void attachment('application_letter')}>Download application letter</button>}
+    {['endorsed','interview'].includes(selected.status)&&<>{!decision?<><h3>Next step</h3>{selected.status==='endorsed'&&<button className="outline-button" disabled={busy} onClick={()=>setDecision('interview')}>Invite for interview</button>}<button className="primary-button" disabled={busy} onClick={()=>setDecision('accepted')}>Accept applicant</button><button className="outline-button" disabled={busy} onClick={()=>setDecision('rejected')}>Decline applicant</button></>:<div role="group" aria-label="Confirm application decision"><p>Mark this application <strong>{decision}</strong>? The student will receive an in-app update.{decision==='accepted'?' Acceptance creates their pre-deployment record; school confirmation is still required.':''}</p><button className="primary-button" disabled={busy} onClick={()=>void decide()}>{busy?'Saving…':'Confirm decision'}</button> <button className="outline-button" disabled={busy} onClick={()=>setDecision(null)}>Cancel</button></div>}</>}
+    </>}</section></div></section>
 }
 
-function MetricCard({
-  metric,
-}: {
-  metric: DashboardMetric
-}) {
-  return (
-    <article className="metric-card">
-      <div className="metric-topline">
-        <span>{metric.label}</span>
-
-        <span
-          className={`metric-icon metric-icon--${metric.tone}`}
-        >
-          <Icon name={metric.icon} size={18} />
-        </span>
-      </div>
-
-      <strong className="metric-value">
-        {metric.value}
-      </strong>
-
-      <span
-        className={`metric-change metric-change--${metric.tone}`}
-      >
-        {metric.change}
-      </span>
-    </article>
-  )
-}
-
-export function ApplicationsPage({
-  data,
-}: ApplicationsPageProps) {
-  return (
-    <section className="workspace-page">
-      <div className="workspace-page-heading">
-        <div>
-          <span className="welcome-eyebrow">
-            <span className="eyebrow-dot" />
-            LIVE DATABASE DATA
-          </span>
-
-          <h1>Applications &amp; placements</h1>
-
-          <p>
-            Recent application records and current
-            placement totals.
-          </p>
-        </div>
-      </div>
-
-      <section
-        className="metrics-grid"
-        aria-label="Application metrics"
-      >
-        {data.metrics.map((metric) => (
-          <MetricCard
-            key={metric.label}
-            metric={metric}
-          />
-        ))}
-      </section>
-
-      <article className="panel activity-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Recent application activity</h2>
-
-            <p>
-              Latest records available to your workspace
-            </p>
-          </div>
-        </div>
-
-        <div className="activity-list">
-          {data.activities.length === 0 ? (
-            <p className="empty-state">
-              No application activity yet.
-            </p>
-          ) : (
-            data.activities.map((activity, index) => (
-              <div
-                className="activity-row"
-                key={`${activity.title}-${index}`}
-              >
-                <span
-                  className={`activity-avatar activity-avatar--${activity.tone}`}
-                >
-                  {activity.initials}
-                </span>
-
-                <span className="activity-copy">
-                  <strong>{activity.title}</strong>
-                  <small>{activity.detail}</small>
-                </span>
-
-                <time>{activity.time}</time>
-              </div>
-            ))
-          )}
-        </div>
-      </article>
-    </section>
-  )
-}

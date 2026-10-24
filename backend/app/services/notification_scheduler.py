@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from app.core.database import SessionLocal
 from app.models.notification_campaign import NotificationCampaign
 from app.services.notification_campaign_service import deliver_campaign
+from app.services.push_service import process_push_deliveries
 
 
 SCHEDULER_INTERVAL_SECONDS = 5
@@ -57,6 +58,7 @@ def process_due_notification_campaigns() -> int:
                 delivered += 1
 
         db.commit()
+        process_push_deliveries(db)
         return delivered
 
     except Exception:

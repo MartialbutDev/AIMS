@@ -8,6 +8,7 @@ from enum import Enum
 class ApplicationStatus(str, Enum):
     PENDING = "pending"
     REVIEWING = "reviewing"
+    ENDORSED = "endorsed"
     INTERVIEW = "interview"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
@@ -46,6 +47,7 @@ class DocumentSummary(BaseModel):
 class ApplicationResponse(BaseModel):
     id: str
     student_id: str
+    student_name: Optional[str] = None
     company_id: str
     company_name: Optional[str] = None
     position: str

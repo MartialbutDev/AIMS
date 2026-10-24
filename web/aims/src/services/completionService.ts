@@ -1,0 +1,13 @@
+import { apiRequest, apiRequestBlob } from './apiClient'
+export interface ClearanceItem { id:string;label:string;mode:'file'|'physical';status:string;original_filename:string|null;review_notes:string|null }
+export interface FinalEvaluation {status:string;original_filename?:string;feedback?:string;review_notes?:string|null;submitted_at:string}
+export interface CompletionState { legacy_completion?:boolean;can_write?:boolean;deployment_id:string|null;status?:string;academic_year?:string;semester?:string;configured?:boolean;policy_reference?:string|null;required_hours?:number;passing_grade_max?:number|null;expected_weeks?:number[];grade?:number|null;approved_hours?:number|null;ready?:boolean;completed_at?:string|null;completion_notes?:string|null;checks?:{key:string;label:string;passed:boolean;detail:string}[];clearance_items?:ClearanceItem[];company_evaluation?:FinalEvaluation|null;events?:{action:string;created_at:string;actor_id:string;details:Record<string,unknown>}[] }
+const root='/api/v1/completion'
+export const getStudentCompletion=(id:string)=>apiRequest<CompletionState>(`${root}/student/${encodeURIComponent(id)}`)
+export const getCompletion=(id:string)=>apiRequest<CompletionState>(`${root}/${encodeURIComponent(id)}`)
+export const publishCompletionPlan=(id:string,data:FormData)=>apiRequest<CompletionState>(`${root}/${encodeURIComponent(id)}/plan`,{method:'PUT',body:data})
+export const submitCompanyEvaluation=(id:string,data:FormData)=>apiRequest<CompletionState>(`${root}/${encodeURIComponent(id)}/evaluation`,{method:'POST',body:data})
+export const reviewCompanyEvaluation=(id:string,decision:'verified'|'returned',notes:string)=>apiRequest<CompletionState>(`${root}/${encodeURIComponent(id)}/evaluation/review`,{method:'POST',body:JSON.stringify({decision,notes})})
+export const reviewClearanceItem=(id:string,decision:'verified'|'rejected',notes:string)=>apiRequest<CompletionState>(`${root}/items/${encodeURIComponent(id)}/review`,{method:'POST',body:JSON.stringify({decision,notes})})
+export const officiallyComplete=(id:string,notes:string)=>apiRequest<CompletionState>(`${root}/${encodeURIComponent(id)}/complete`,{method:'POST',body:JSON.stringify({acknowledge:true,notes})})
+export async function downloadCompletionFile(path:string,name:string){const blob=await apiRequestBlob(`${root}/${path}`);const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;const extension=blob.type.includes('pdf')?'pdf':blob.type.includes('png')?'png':'jpg';link.download=`${name.replace(/\.[^.]+$/,'')}.${extension}`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}

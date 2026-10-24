@@ -45,7 +45,8 @@ def _matches(text_upper: str, keyword: str) -> bool:
         return False
 
     escaped = re.escape(keyword)
-    escaped = escaped.replace(r"\ ", r"\s+")
+    # OCR frequently separates phrase words with line breaks or punctuation.
+    escaped = escaped.replace(r"\ ", r"[\s:;,./-]+")
 
     pattern = (
         r"(?<![A-Z0-9])"

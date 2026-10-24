@@ -106,11 +106,11 @@ export function CareerDashboardPage({
         <div>
           <div className="cc-eyebrow">
             <span className="cc-eyebrow-dot" />
-            CAREER CENTER OVERVIEW
+            CITC / INDUSTRY LINKAGES
           </div>
 
           <h1>
-            {data.greeting}, {name}.
+            Partnerships with a purpose.
           </h1>
 
           <p>
@@ -140,6 +140,11 @@ export function CareerDashboardPage({
         </div>
       </header>
 
+      <section className="stake-career-brief" aria-label="Partnership agreement priorities">
+        <div><span className="stake-kicker">THE INDUSTRY PARTNERSHIP DESK</span><h2>Build the bridge from<br />campus to the workplace.</h2><p>{name ? (name + ', keep') : 'Keep'} host establishments and agreements ready for the next student placement.</p><button type="button" className="stake-yellow-button" onClick={() => onNavigate('companies')}>Open partnership directory <Icon name="arrow" size={17} /></button></div>
+        <div className="stake-renewal-brief"><span>Agreement watch</span><strong>{loading || error ? '—' : stats.expiring.length}<small>expiring within 30 days</small></strong><p>{loading ? 'Checking partnership records…' : error ? 'Agreement status is unavailable.' : (stats.expired + ' expired · ' + stats.pending + ' unsigned')}</p><button type="button" onClick={() => onNavigate('companies')}>Review agreements <Icon name="arrow" size={16} /></button></div>
+      </section>
+
       {error && (
         <div className="cc-alert cc-alert-error" role="alert">
           {error}
@@ -149,7 +154,7 @@ export function CareerDashboardPage({
       <section className="cc-stats">
         {[
           ['Active Partners', stats.total, 'Registered active HTEs'],
-          ['Signed MOAs', stats.signed, 'Signed agreements'],
+          ['Current MOAs', stats.signed, 'No renewal due within 30 days'],
           ['Unsigned MOAs', stats.pending, 'Awaiting agreements'],
           ['Expiring Soon', stats.expiring.length, 'Within 30 days'],
           ['Expired MOAs', stats.expired, 'Need attention'],
@@ -157,14 +162,14 @@ export function CareerDashboardPage({
           <article className="cc-stat-card" key={String(label)}>
             <span className="cc-stat-label">{label}</span>
             <strong className="cc-stat-value">
-              {loading ? '—' : value}
+              {loading || error ? '—' : value}
             </strong>
             <span className="cc-stat-detail">{detail}</span>
           </article>
         ))}
       </section>
 
-      <section className="cc-bottom-grid">
+      <section className="cc-bottom-grid stake-partnership-grid">
         <article className="cc-card cc-info-card">
           <div className="cc-section-header">
             <div>
@@ -219,7 +224,7 @@ export function CareerDashboardPage({
             </div>
           </div>
 
-          {loading ? (
+          {error ? <div className="cc-mini-empty">Agreement monitoring is unavailable. Reload the page to try again.</div> : loading ? (
             <div className="cc-mini-empty">
               Loading agreements...
             </div>
@@ -290,3 +295,4 @@ export function CareerDashboardPage({
     </main>
   )
 }
+

@@ -20,6 +20,8 @@ import {
   NotificationSettings,
 } from "../../../src/services/notification-settings.service";
 
+import { registerPushDevice, unregisterPushDevice } from "../../../src/services/push.service";
+
 interface SettingSection {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -155,6 +157,10 @@ export default function NotificationPreferencesScreen() {
         [key]: value,
       });
       setSettings(updated);
+      if (key === "push_enabled") {
+        if (value) Alert.alert("Phone notifications", await registerPushDevice());
+        else await unregisterPushDevice();
+      }
     } catch (error) {
       console.error("Error updating setting:", error);
       Alert.alert("Error", "Failed to update notification setting");

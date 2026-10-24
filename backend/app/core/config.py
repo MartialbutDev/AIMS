@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
 
     DEBUG: bool = True
+    DEV_TEST_STUDENT_ID: str = ""
+    DEV_BYPASS_TEST_ONBOARDING: bool = False
 
     API_PREFIX: str = "/api"
 
@@ -145,6 +147,9 @@ class Settings(BaseSettings):
     # ========================================================
     # EMAIL CONFIGURATION
     # ========================================================
+
+    PUSH_DELIVERY_ENABLED: bool = False
+    EXPO_ACCESS_TOKEN: Optional[str] = None
 
     SMTP_HOST: Optional[str] = None
 

@@ -9,7 +9,9 @@ import {
 
 import { CoordinatorDashboardPage } from './CoordinatorDashboardPage'
 import { StudentsPage } from './StudentsPage'
+import { HistoricalStudentsPage } from './HistoricalStudentsPage'
 import { ApplicationsPage } from './ApplicationsPage'
+import { InternshipDocumentReviewPage } from './InternshipDocumentReviewPage'
 import { NotificationsPage } from './NotificationsPage'
 
 interface CoordinatorPagesProps {
@@ -40,8 +42,18 @@ export function CoordinatorPages({
     case 'students':
       return <StudentsPage />
 
+    case 'historical-students':
+      return (
+        <HistoricalStudentsPage
+          onNavigate={onNavigate}
+        />
+      )
+
     case 'applications':
       return <ApplicationsPage />
+
+    case 'document-verification':
+      return <InternshipDocumentReviewPage />
 
     case 'notifications':
       return <NotificationsPage />
@@ -55,11 +67,7 @@ export function CoordinatorPages({
       )
 
     case 'help-center':
-      return (
-        <HelpCenterPage
-          session={session}
-        />
-      )
+      return <HelpCenterPage session={session} />
 
     default:
       return (

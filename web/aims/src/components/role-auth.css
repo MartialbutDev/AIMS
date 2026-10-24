@@ -1,0 +1,117 @@
+.citc-auth { --citc-navy: #0b0b2f; --citc-yellow: #ffc629; min-height: 100dvh; display: grid; grid-template-columns: minmax(340px, .9fr) minmax(510px, 1.1fr); background: #fff; color: var(--citc-navy); }
+.citc-auth button, .citc-auth a, .citc-auth input { -webkit-tap-highlight-color: transparent; }
+.citc-auth :is(button, a, input):focus-visible { outline: 3px solid #b78500; outline-offset: 4px; }
+.citc-identity { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 44px; padding: 42px clamp(30px, 4.4vw, 72px) 30px; background: var(--citc-navy); color: #fff; border-top: 6px solid var(--citc-yellow); }
+.citc-identity::after { content: ''; width: 520px; height: 520px; position: absolute; bottom: -355px; left: -160px; border: 70px solid #ffffff05; border-radius: 50%; pointer-events: none; }
+.citc-system { display: flex; align-items: center; gap: 17px; width: fit-content; }
+.citc-system > span { font: 800 34px/1 Manrope, sans-serif; letter-spacing: -1.5px; }
+.citc-gold { color: var(--citc-yellow); }
+.citc-system small { padding-left: 17px; border-left: 1px solid #ffffff40; color: #d9d9e9; font-size: 9px; line-height: 1.6; letter-spacing: 1.2px; }
+.citc-identity-body { position: relative; z-index: 1; padding: 22px 0; }
+.citc-college-logo { background: #fff; border-radius: 6px; padding: 10px 15px; margin-bottom: 38px; max-width: 400px; }
+.citc-college-logo img { display: block; width: 100%; aspect-ratio: 2.6; object-fit: cover; object-position: center 48%; }
+.citc-auth .citc-overline { margin: 0 0 14px; font-size: 10px; font-weight: 700; line-height: 1.5; letter-spacing: 2px; text-transform: uppercase; }
+.citc-identity .citc-overline { color: var(--citc-yellow); }
+.citc-identity h2 { font: 600 clamp(25px, 2.4vw, 36px)/1.35 Manrope, sans-serif; letter-spacing: -1.1px; margin: 0 0 20px; }
+.citc-identity h2 span { color: var(--citc-yellow); }
+.citc-identity-intro { max-width: 390px; color: #c5c5d7; font-size: 14px; line-height: 1.85; margin: 0; }
+.citc-journey { display: flex; align-items: center; gap: 11px; margin-top: 38px; }
+.citc-journey span { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #ededf5; }
+.citc-journey svg { color: var(--citc-yellow); flex-shrink: 0; }
+.citc-journey i { width: 20px; height: 1px; background: #ffffff35; }
+.citc-university { position: relative; z-index: 1; margin: 0; padding-top: 22px; border-top: 1px solid #ffffff20; color: #b5b5cf; font-size: 10px; line-height: 1.75; letter-spacing: .5px; }
+.citc-workspace { display: flex; flex-direction: column; padding: 36px clamp(30px, 5.5vw, 88px) 25px; min-width: 0; }
+.citc-workspace-top { display: flex; justify-content: space-between; gap: 14px; color: #626277; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+.citc-access-label { display: inline-flex; align-items: center; gap: 7px; font-size: 9px; font-weight: 500; letter-spacing: 0; white-space: nowrap; }
+.citc-access-label > span { width: 6px; height: 6px; border-radius: 50%; background: #b78500; }
+.citc-workspace-content { width: 100%; max-width: 540px; margin: auto; padding: 52px 0; }
+.citc-workspace-content > .citc-overline { color: #68687e; }
+.citc-auth h1 { margin: 0 0 15px; font: 800 clamp(30px, 3vw, 43px)/1.2 Manrope, sans-serif; letter-spacing: -1.8px; }
+.citc-auth h1 > span { color: #b78500; }
+.citc-intro { color: #676779; font-size: 14px; line-height: 1.75; margin: 0 0 29px; }
+.citc-role-list { display: grid; gap: 10px; }
+.citc-role { display: flex; align-items: center; width: 100%; gap: 15px; padding: 17px 18px; border: 1px solid #e3e3eb; border-radius: 8px; background: #fff; color: var(--citc-navy); text-align: left; cursor: pointer; transition: border-color .18s, background .18s, transform .18s; }
+.citc-role:hover { border-color: #d7aa20; background: #fffcf2; transform: translateX(3px); }
+.citc-role-icon { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 8px; background: #f1f1f7; flex-shrink: 0; }
+.citc-role:hover .citc-role-icon { background: var(--citc-yellow); }
+.citc-role-copy { flex: 1; }
+.citc-role-copy strong { display: block; font-size: 14px; font-weight: 700; margin-bottom: 5px; }
+.citc-role-copy small { display: block; color: #68687c; font-size: 11px; line-height: 1.55; }
+.citc-role-number { color: #9292a4; font-size: 10px; }
+.citc-role > svg { flex-shrink: 0; }
+.citc-student-note { display: flex; gap: 10px; align-items: flex-start; margin: 24px 0 0; padding: 17px 0 0; border-top: 1px solid #ededf2; font-size: 11px; line-height: 1.7; color: #6a6a7e; }
+.citc-student-note svg { flex-shrink: 0; margin-top: 2px; }
+.citc-student-note strong { color: #37374e; font-weight: 600; }
+.citc-auth-footer { display: flex; justify-content: space-between; gap: 12px; color: #747487; font-size: 9px; line-height: 1.6; }
+.citc-login-content { max-width: 420px; }
+.citc-back { display: flex; align-items: center; gap: 9px; padding: 4px 0; margin-bottom: 36px; border: 0; background: none; font-size: 12px; cursor: pointer; color: #616177; }
+.citc-back svg { transform: rotate(180deg); }
+.citc-login-role { display: grid; place-items: center; width: 55px; height: 55px; margin-bottom: 24px; border-radius: 12px; background: #fff4ce; color: var(--citc-navy); }
+.citc-login-form { display: flex; flex-direction: column; }
+.citc-login-form label { font-size: 12px; font-weight: 600; margin-bottom: 9px; }
+.citc-login-form input { min-width: 0; width: 100%; height: 49px; border: 1px solid #dadae5; border-radius: 6px; background: #fff; padding: 0 14px; font-size: 13px; color: var(--citc-navy); }
+.citc-login-form input::placeholder { color: #818194; }
+.citc-login-form > input { margin-bottom: 23px; }
+.citc-password-label { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.citc-password-label a { font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+.citc-password-input { position: relative; }
+.citc-password-input input { padding-right: 65px; }
+.citc-password-input button { position: absolute; right: 5px; top: 5px; height: 39px; min-width: 52px; border: 0; border-radius: 4px; background: #f3f3f8; color: #44445c; cursor: pointer; font-size: 11px; font-weight: 600; }
+.citc-sign-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 50px; padding: 13px 18px; margin-top: 26px; border: 1px solid var(--citc-navy); border-radius: 6px; background: var(--citc-navy); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.citc-sign-in svg { color: var(--citc-yellow); }
+.citc-sign-in:hover { background: #242450; }
+.citc-auth button:disabled, .citc-auth input:disabled { opacity: .6; cursor: wait; }
+.citc-login-error { margin: 15px 0 0; padding: 12px; border-left: 3px solid #b32e38; background: #fff0f1; color: #94232c; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.citc-account-note { border-top: 1px solid #ededf2; margin: 26px 0 0; padding-top: 19px; color: #747487; font-size: 11px; line-height: 1.8; }
+@media (min-width: 1500px) { .citc-auth { grid-template-columns: minmax(500px, .9fr) minmax(600px, 1.1fr); } }
+@media (max-width: 1000px) { .citc-auth { grid-template-columns: minmax(310px, .8fr) minmax(420px, 1fr); } .citc-identity { padding-inline: 28px; } .citc-workspace { padding-inline: 30px; } .citc-journey { gap: 7px; } .citc-journey i { width: 9px; } }
+@media (max-width: 760px) {
+  .citc-auth { grid-template-columns: 1fr; }
+  .citc-identity { padding: 21px 24px; gap: 18px; }
+  .citc-system > span { font-size: 27px; }
+  .citc-system small { font-size: 8px; }
+  .citc-identity-body { display: flex; align-items: center; gap: 18px; padding: 0; }
+  .citc-college-logo { width: 225px; max-width: 63%; margin: 0; padding: 5px 9px; }
+  .citc-identity-body > .citc-overline { font-size: 8px; margin: 0; letter-spacing: 1px; max-width: 90px; }
+  .citc-identity h2, .citc-identity-intro, .citc-journey, .citc-university { display: none; }
+  .citc-workspace { min-height: calc(100dvh - 160px); padding: 25px 24px 20px; }
+  .citc-workspace-content { padding: 35px 0; }
+  .citc-workspace-top { font-size: 8px; }
+  .citc-auth-footer { flex-wrap: wrap; }
+  .citc-role { padding: 15px 12px; gap: 12px; }
+  .citc-role-number { display: none; }
+  .citc-back { margin-bottom: 25px; }
+}
+/* Entrance motion runs once; interactive controls stay available throughout. */
+@keyframes citc-rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes citc-logo-in {
+  from { opacity: 0; transform: translateY(8px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes citc-loading { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: no-preference) {
+  .citc-system, .citc-workspace-top { animation: citc-rise-in .5s ease-out backwards; }
+  .citc-college-logo { animation: citc-logo-in .65s ease-out .08s backwards; }
+  .citc-identity-body > .citc-overline, .citc-identity h2, .citc-identity-intro, .citc-journey { animation: citc-rise-in .6s ease-out .16s backwards; }
+  .citc-workspace-content > :is(.citc-overline, h1, .citc-intro), .citc-login-role, .citc-back { animation: citc-rise-in .5s ease-out .1s backwards; }
+  .citc-role { animation: citc-rise-in .45s ease-out .16s backwards; }
+  .citc-role:nth-child(2) { animation-delay: .22s; }
+  .citc-role:nth-child(3) { animation-delay: .28s; }
+  .citc-role:nth-child(4) { animation-delay: .34s; }
+  .citc-role:nth-child(5) { animation-delay: .4s; }
+  .citc-login-form { animation: citc-rise-in .55s ease-out .18s backwards; }
+  .citc-student-note, .citc-account-note { animation: citc-rise-in .5s ease-out .35s backwards; }
+  .citc-role-icon, .citc-role > svg, .citc-sign-in > svg { transition: transform .2s ease; }
+  .citc-role:hover .citc-role-icon { transform: translateY(-2px); }
+  .citc-role:is(:hover, :focus-visible) > svg, .citc-sign-in:is(:hover, :focus-visible) > svg { transform: translateX(4px); }
+  .citc-role:active, .citc-sign-in:active:not(:disabled) { transform: scale(.99); }
+  .citc-login-form[aria-busy="true"] .citc-sign-in > svg { display: none; }
+  .citc-login-form[aria-busy="true"] .citc-sign-in::after { content: ''; flex-shrink: 0; width: 16px; height: 16px; border: 2px solid #ffffff45; border-top-color: var(--citc-yellow); border-radius: 50%; animation: citc-loading .8s linear infinite; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .citc-role { transition: none; }
+  .citc-role:hover { transform: none; }
+}

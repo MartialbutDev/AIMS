@@ -16,6 +16,7 @@ from sqlalchemy import func
 from app.core.database import get_db
 from app.core.security import get_current_user, get_password_hash, require_role
 from app.models.coordinator_assignment import CoordinatorStudentAssignment
+from app.models.dean_coordinator_designation import DeanCoordinatorDesignation
 from app.models.user import User, UserRole
 from app.schemas.user import (
     AdminUserCreate,
@@ -289,6 +290,19 @@ async def create_coordinator_assignment(
     ).first()
     if coordinator is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active coordinator not found")
+
+    # Admins may link students only to a Dean-designated coordinator.
+    # This is an interim safeguard; assignments still need an academic-term
+    # migration before semester-specific authorization is possible.
+    dean_designation = db.query(DeanCoordinatorDesignation.id).filter(
+        DeanCoordinatorDesignation.coordinator_id == coordinator.id,
+        DeanCoordinatorDesignation.is_active.is_(True),
+    ).first()
+    if dean_designation is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Coordinator has no active Dean-authorized designation",
+        )
 
     student = db.query(User).filter(
         User.id == assignment_data.student_id,

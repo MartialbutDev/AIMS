@@ -30,6 +30,10 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, aliased
 
 from app.core.config import settings
+from app.core.assignment_access import (
+    ensure_coordinator_student_access,
+    get_current_academic_term,
+)
 from app.core.database import get_db
 from app.core.security import get_current_user
 
@@ -113,32 +117,33 @@ def _require_reviewer(
     db: Session,
     user: User,
     student_id: str | None = None,
+    *,
+    mode: str = "read",
 ) -> None:
+    """Authorize administrator or current-term assigned coordinator.
 
+    Student-specific coordinator access requires a current-term assignment.
+    Writes additionally require an active current-term Dean designation.
+    """
     if user.role == UserRole.ADMIN:
         return
 
     if user.role != UserRole.COORDINATOR:
         raise HTTPException(
-            403,
-            "Coordinator or administrator access required",
+            status_code=403,
+            detail="Coordinator or administrator access required",
         )
 
     if student_id is None:
+        # Collection routes must independently restrict coordinator results.
         return
 
-    assigned = db.query(
-        CoordinatorStudentAssignment.id
-    ).filter(
-        CoordinatorStudentAssignment.coordinator_id == user.id,
-        CoordinatorStudentAssignment.student_id == student_id,
-    ).first()
-
-    if not assigned:
-        raise HTTPException(
-            403,
-            "Student is not assigned to this coordinator",
-        )
+    ensure_coordinator_student_access(
+        db=db,
+        actor=user,
+        student_id=student_id,
+        mode=mode,
+    )
 
 
 def _submission(
@@ -285,10 +290,13 @@ def _status(
     else:
         next_step = "awaiting_review"
 
+    current_year, current_semester = get_current_academic_term()
     assignment = db.query(
         CoordinatorStudentAssignment
     ).filter(
-        CoordinatorStudentAssignment.student_id == student.id
+        CoordinatorStudentAssignment.student_id == student.id,
+        CoordinatorStudentAssignment.academic_year == current_year,
+        CoordinatorStudentAssignment.semester == current_semester,
     ).first()
 
     coordinator = (
@@ -317,13 +325,33 @@ def _status(
             ),
         }
 
+    # Development-only onboarding UI bypass for one explicitly configured
+    # test student. This does not verify documents, create fake submissions,
+    # or grant coordinator assignments or access to protected resources.
+    dev_bypass = bool(
+        getattr(settings, "DEBUG", False)
+        and getattr(settings, "DEV_BYPASS_TEST_ONBOARDING", False)
+        and str(getattr(settings, "DEV_TEST_STUDENT_ID", "")).strip()
+        and student.role == UserRole.STUDENT
+        and student.is_active
+        and student.is_verified
+        and str(student.student_id or "").strip()
+        == str(settings.DEV_TEST_STUDENT_ID).strip()
+    )
+
+    if dev_bypass:
+        next_step = "completed"
+        if coordinator is None:
+            coordinator_data = {"status": "pending_assignment"}
+
     return {
         "student_id": student.id,
-        "eligible": complete,
+        "eligible": complete or dev_bypass,
         "next_step": next_step,
         "orientation": _submission_data(orientation),
         "cor": _submission_data(cor),
         "coordinator_assignment": coordinator_data,
+        "development_onboarding_bypass": dev_bypass,
     }
 
 
@@ -825,12 +853,14 @@ def verification_queue(
     )
 
     if current_user.role == UserRole.COORDINATOR:
+        current_year, current_semester = get_current_academic_term()
         query = query.join(
             CoordinatorStudentAssignment,
             CoordinatorStudentAssignment.student_id == User.id,
         ).filter(
-            CoordinatorStudentAssignment.coordinator_id
-            == current_user.id
+            CoordinatorStudentAssignment.coordinator_id == current_user.id,
+            CoordinatorStudentAssignment.academic_year == current_year,
+            CoordinatorStudentAssignment.semester == current_semester,
         )
 
     rows = query.order_by(
@@ -932,6 +962,7 @@ def review_submission(
         db,
         current_user,
         submission.student_id,
+        mode="write",
     )
 
     if payload.decision not in {
@@ -942,6 +973,29 @@ def review_submission(
             400,
             "Decision must be verified or rejected",
         )
+
+    if current_user.role == UserRole.COORDINATOR:
+        # Onboarding submissions have no dedicated term columns. Where the
+        # COR supplies a term, prevent review under a different assignment.
+        record_for_term = db.query(StudentOnboarding).filter(
+            StudentOnboarding.student_id == submission.student_id
+        ).first()
+        cor_for_term = (
+            _submission(db, record_for_term.cor_submission_id)
+            if record_for_term else None
+        )
+        if cor_for_term is not None:
+            details = (cor_for_term.validation_result or {}).get("details") or {}
+            cor_year = str(details.get("detected_academic_year") or "").strip()
+            cor_semester = str(details.get("detected_semester") or "").strip()
+            current_year, current_semester = get_current_academic_term()
+            if (cor_year and cor_year != current_year) or (
+                cor_semester and cor_semester != current_semester
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="COR belongs to another academic term",
+                )
 
     if submission.review_status != "pending_review":
         raise HTTPException(

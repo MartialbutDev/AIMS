@@ -37,6 +37,10 @@ import { DeveloperInfoPage } from './DeveloperInfoPage'
 import { SettingsPage } from './SettingsPage'
 import { AdminUserDialog } from './UserDialog'
 
+// Reuse the existing onboarding verification interface.
+// Its API endpoints also authorize System Administrators.
+import { DocumentVerificationPage } from '../coordinator/DocumentVerificationPage'
+
 // ========================================
 // COMPONENT PROPS
 // ========================================
@@ -279,6 +283,14 @@ export function AdminPages({
 
     case 'assignments':
       content = <AssignmentsPage />
+      break
+
+    // ========================================
+    // ONBOARDING DOCUMENT VERIFICATION
+    // ========================================
+
+    case 'document-verification':
+      content = <DocumentVerificationPage />
       break
 
     // ========================================

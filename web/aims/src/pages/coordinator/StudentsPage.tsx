@@ -1,25 +1,16 @@
-﻿import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Icon } from '../../components/Icons'
+import { CompletionPanel } from './CompletionPanel'
+import { StudentRecordDialog } from './StudentRecordDialog'
+import type { ReminderCategory } from '../../services/coordinatorReminderService'
 import {
   getCoordinatorStudentDetail,
-  getCoordinatorStudentFile,
   getCoordinatorStudents,
   saveCoordinatorEvaluation,
   type CoordinatorStudent,
   type CoordinatorStudentDetail,
 } from '../../services/coordinatorService'
 
-const documentLabels: Record<string, string> = {
-  resume: 'Resume',
-  application_letter: 'Application letter',
-  waiver: 'Waiver',
-  medical_certificate: 'Medical certificate',
-  internship_plan: 'Internship plan',
-  insurance: 'Insurance',
-  endorsement_letter: 'Endorsement letter',
-  acceptance_letter: 'Acceptance letter',
-  certificate_of_completion: 'Certificate of completion',
-}
 
 function formatDate(value: string) {
   const date = new Date(value)
@@ -42,8 +33,10 @@ function EvaluationPanel({
   studentId,
   evaluation,
   onSaved,
+  readOnly = false,
 }: {
   studentId: string
+  readOnly?: boolean
   evaluation: CoordinatorStudentDetail['evaluation']
   onSaved: (grade: number, notes: string) => void
 }) {
@@ -74,51 +67,26 @@ function EvaluationPanel({
       <div className="panel-heading"><div><h2>Coordinator summary & grade</h2><p>Grade scale: 1.00 is highest; 5.00 is lowest.</p></div></div>
       <div className="evaluation-fields">
         <label>Final grade
-          <input aria-label="Final grade" type="number" min="1" max="5" step="0.01" required value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="e.g. 1.25" />
+          <input aria-label="Final grade" disabled={readOnly} type="number" min="1" max="5" step="0.01" required value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="e.g. 1.25" />
         </label>
         <label>Evaluation notes
-          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={5000} rows={3} placeholder="Add a concise OJT performance summary…" />
+          <textarea disabled={readOnly} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={5000} rows={3} placeholder="Add a concise OJT performance summary…" />
         </label>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
       {saved && <p className="evaluation-saved" role="status">Evaluation saved.</p>}
-      <button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save grade'} <Icon name="check" size={15} /></button>
+      <button className="primary-button" type="submit" disabled={isSaving || readOnly}>{isSaving ? 'Saving…' : 'Save grade'} <Icon name="check" size={15} /></button>
     </form>
   )
 }
 
-function StudentDetails({
-  detail,
-  onEvaluationSaved,
-}: {
-  detail: CoordinatorStudentDetail
-  onEvaluationSaved: (grade: number, notes: string) => void
-}) {
-  const [preview, setPreview] = useState<{ url: string; title: string; contentType: string } | null>(null)
-  const [fileError, setFileError] = useState('')
-  const [loadingFile, setLoadingFile] = useState('')
-
-  useEffect(() => () => {
-    if (preview) URL.revokeObjectURL(preview.url)
-  }, [preview])
-
-  async function openFile(path: string, title: string) {
-    setLoadingFile(title)
-    setFileError('')
-    try {
-      const file = await getCoordinatorStudentFile(detail.student.id, path)
-      setPreview({ ...file, title })
-    } catch (error) {
-      setFileError(error instanceof Error ? error.message : 'Could not open this file.')
-    } finally {
-      setLoadingFile('')
-    }
-  }
-
+function StudentDetails({ detail, onEvaluationSaved }: { detail: CoordinatorStudentDetail; onEvaluationSaved: (grade: number, notes: string) => void }) {
+  const [closed, setClosed] = useState(false)
+  const [section, setSection] = useState<ReminderCategory | null>(null)
   const { student, journey } = detail
-  const fullName = `${student.first_name} ${student.last_name}`
-  return (
-    <div className="coordinator-detail">
+  const fullName = student.first_name + ' ' + student.last_name
+  const verified = detail.document_statuses.filter(item => item.status === 'verified').length
+  return <div className="coordinator-detail">
       <section className="panel student-profile-card">
         <div className="student-profile-heading">
           <span className="student-profile-avatar">{student.first_name.slice(0, 1)}{student.last_name.slice(0, 1)}</span>
@@ -144,36 +112,16 @@ function StudentDetails({
         {detail.applications.length === 0 ? <p className="empty-state">No applications found.</p> : <div className="coordinator-record-list">{detail.applications.map((application) => <div className="coordinator-record-row" key={application.id}><span><strong>{application.position}</strong><small>{application.company || 'Company unavailable'} · {formatDate(application.applied_date)}</small></span><span className="status-pill"><i />{application.status}</span></div>)}</div>}
       </section>
 
-      <section className="panel coordinator-subpanel">
-        <div className="panel-heading"><div><h2>Required documents</h2><p>{detail.documents.filter((document) => document.status === 'verified').length} verified file(s)</p></div></div>
-        <div className="document-status-grid">{detail.document_statuses.map((item) => {
-          const uploaded = detail.documents.find((document) => document.type === item.type)
-          const label = documentLabels[item.type] ?? item.type.replaceAll('_', ' ')
-          return <div className="document-status-item" key={item.type}><span>{label}</span>{uploaded && <button type="button" className="document-file-button" onClick={() => void openFile(`documents/${uploaded.id}/file`, uploaded.filename || `${label}.file`)} disabled={loadingFile !== ''}>{loadingFile === (uploaded.filename || `${label}.file`) ? 'Opening…' : 'View file'}</button>}<span className={`document-state document-state--${item.status}`}>{item.status.replaceAll('_', ' ')}</span></div>
-        })}</div>
-      </section>
 
-      <section className="panel coordinator-subpanel">
-        <div className="panel-heading"><div><h2>DTR summary & photos</h2><p>{journey.approved_dtr_count} approved · {journey.pending_dtr_count} pending · {journey.rejected_dtr_count} rejected</p></div></div>
-        {detail.dtr_records.length === 0 ? <p className="empty-state">No daily time records found.</p> : <div className="coordinator-record-list">{detail.dtr_records.map((record) => <div className="coordinator-dtr-row" key={record.id}><div className="coordinator-record-row"><span><strong>{formatDate(record.date)}</strong><small>{record.time_in}{record.time_out ? ` – ${record.time_out}` : ''} · {record.total_hours ?? 0}h</small></span><span className="status-pill"><i />{record.status}</span></div>{record.tasks_completed && <p>{record.tasks_completed}</p>}<div className="dtr-photo-actions">{record.image_in_available && <button className="document-file-button" onClick={() => void openFile(`dtr/${record.id}/photo/in`, `DTR ${formatDate(record.date)} check-in`)} disabled={loadingFile !== ''}>View check-in photo</button>}{record.image_out_available && <button className="document-file-button" onClick={() => void openFile(`dtr/${record.id}/photo/out`, `DTR ${formatDate(record.date)} check-out`)} disabled={loadingFile !== ''}>View check-out photo</button>}</div></div>)}</div>}
-        {fileError && <p className="form-error" role="alert">{fileError}</p>}
-      </section>
-
-      <section className="panel coordinator-subpanel">
-        <div className="panel-heading"><div><h2>OJT journals</h2><p>Weekly learning records</p></div></div>
-        {detail.journals.length === 0 ? <p className="empty-state">No journals found.</p> : <div className="coordinator-record-list">{detail.journals.map((journal) => <div className="coordinator-record-row" key={journal.id}><span><strong>Week {journal.week}: {journal.title}</strong><small>{journal.summary || 'No summary provided'}</small></span><span className="status-pill"><i />{journal.status}</span></div>)}</div>}
-      </section>
-
-      <EvaluationPanel
-        key={student.id}
-        studentId={student.id}
-        evaluation={detail.evaluation}
-        onSaved={onEvaluationSaved}
-      />
-
-      {preview && <div className="dialog-backdrop coordinator-file-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null) }}><section className="coordinator-file-dialog" role="dialog" aria-modal="true" aria-label={preview.title}><div className="coordinator-file-heading"><strong>{preview.title}</strong><button className="dialog-close" onClick={() => setPreview(null)} aria-label="Close file preview">×</button></div>{preview.contentType === 'application/pdf' ? <iframe title={preview.title} src={preview.url} /> : preview.contentType.startsWith('image/') ? <img src={preview.url} alt={preview.title} /> : <p className="empty-state">Preview is not available for this file type.</p>}</section></div>}
-    </div>
-  )
+    <section className="sr-summary-grid" aria-label="Student review sections">
+      <button type="button" onClick={() => setSection('documents')}><span className="sr-summary-icon"><Icon name="file" size={23} /></span><strong>Required documents</strong><span>{verified} of {detail.document_statuses.length} verified</span><small>Checklist, status, and file previews <Icon name="arrow" size={15} /></small></button>
+      <button type="button" onClick={() => setSection('dtr')}><span className="sr-summary-icon"><Icon name="clock" size={23} /></span><strong>DTR summary & photos</strong><span>{journey.pending_dtr_count} awaiting review · {journey.rejected_dtr_count} rejected</span><small>Attendance, work logs, and photo pairs <Icon name="arrow" size={15} /></small></button>
+      <button type="button" onClick={() => setSection('journals')}><span className="sr-summary-icon"><Icon name="briefcase" size={23} /></span><strong>OJT journals</strong><span>{detail.journals.filter(item => item.status !== 'draft').length} submitted or reviewed</span><small>Weekly reflections and journal previews <Icon name="arrow" size={15} /></small></button>
+    </section>
+    <CompletionPanel studentId={student.id} gradeVersion={detail.evaluation?.grade} onClosed={setClosed} />
+    <EvaluationPanel readOnly={closed} key={student.id} studentId={student.id} evaluation={detail.evaluation} onSaved={onEvaluationSaved} />
+    {section && <StudentRecordDialog key={student.id + section} detail={detail} category={section} onClose={() => setSection(null)} />}
+  </div>
 }
 
 export function StudentsPage() {
@@ -262,7 +210,7 @@ export function StudentsPage() {
         </aside>
         <div className="coordinator-detail-column">
           {selectedId && detail?.student.id !== selectedId && !error && <div className="panel empty-state">Loading selected student…</div>}
-          {detail?.student.id === selectedId && <StudentDetails detail={detail} onEvaluationSaved={handleEvaluationSaved} />}
+          {detail?.student.id === selectedId && <StudentDetails key={detail.student.id} detail={detail} onEvaluationSaved={handleEvaluationSaved} />}
           {!selectedId && !isLoadingList && <div className="panel empty-state">Select a student to view their OJT record.</div>}
         </div>
       </div>

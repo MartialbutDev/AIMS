@@ -24,6 +24,7 @@ import { BASE_URL } from '../../config/env';
 const { width, height } = Dimensions.get("window");
 
 interface DocumentPreviewProps {
+  headers?: Record<string, string>;
   visible: boolean;
   imageUri: string;
   documentType: string;
@@ -33,6 +34,7 @@ interface DocumentPreviewProps {
 }
 
 export default function DocumentPreview({
+  headers,
   visible,
   imageUri,
   documentType,
@@ -167,7 +169,7 @@ export default function DocumentPreview({
       // ✅ Use direct PDF URL in WebView
       return (
         <WebView
-          source={{ uri: imageUri }}
+          source={{ uri: imageUri, headers }}
           style={styles.webview}
           startInLoadingState={true}
           renderLoading={() => (
@@ -213,7 +215,7 @@ export default function DocumentPreview({
     // ✅ Image preview
     return (
       <Image
-        source={{ uri: imageUri }}
+        source={{ uri: imageUri, headers }}
         style={styles.image}
         resizeMode="contain"
         onLoadStart={() => setLoading(true)}

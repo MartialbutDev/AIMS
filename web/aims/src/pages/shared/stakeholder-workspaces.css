@@ -1,0 +1,190 @@
+/* CITC USTP-CDO. One institutional palette; a distinct desk for each role. */
+.aims-campus-workspace { --aims-navy:#0b0b2f; --aims-yellow:#ffcf40; --aims-ink:#202246; --aims-muted:#656780; --aims-line:#e2e3ec; --aims-paper:#f6f6fa; --blue:#0b0b2f; --ink:#202246; }
+.aims-campus-workspace .sidebar { background:#0b0b2f; }
+.aims-campus-workspace .brand-mark span { background:#ffcf40; }
+.aims-campus-workspace .citc-sidebar-subtitle strong { color:#ffcf40; }
+.aims-campus-workspace .workspace-avatar { background:#ffffff14; color:#ffcf40; }
+.aims-campus-workspace .nav-item--active { background:#ffcf40; color:#0b0b2f; }
+.aims-campus-workspace .nav-item--active:hover { background:#ffdb70; color:#0b0b2f; }
+.aims-campus-workspace .dashboard-main { background:var(--aims-paper); }
+.aims-campus-workspace .dashboard-content { max-width:1600px; }
+.aims-campus-workspace :is(.workspace-page,.cc-page) { color:var(--aims-ink); }
+.aims-campus-workspace .cc-page { --cc-primary:#0b0b2f; --cc-primary-dark:#07071f; --cc-navy:#0b0b2f; --cc-muted:#656780; padding:30px 34px; }
+.aims-campus-workspace :is(.primary-button,.cc-button-primary,.co-button-primary,.dcm-primary-button) { color:#fff; background:#0b0b2f; box-shadow:none; }
+.aims-campus-workspace :is(.primary-button,.cc-button-primary,.co-button-primary):hover { background:#1c1c49; }
+.aims-campus-workspace :is(.outline-button,.panel-link,.text-button,.footer-link,.admin-dashboard-text-action) { color:#0b0b2f; }
+.aims-campus-workspace :is(.panel,.cc-card,.dean-metric,.dean-coordinator-card,.cc-stat-card) { border-color:var(--aims-line); border-radius:10px; box-shadow:none; }
+.aims-campus-workspace :is(.workspace-page-heading h1,.cc-page-header h1) { color:#202246; font-size:clamp(26px,2.6vw,34px); letter-spacing:-1px; line-height:1.25; }
+.aims-campus-workspace :is(.workspace-page-heading p,.cc-page-header p) { font-size:13px; color:#656780; line-height:1.8; }
+.aims-campus-workspace .welcome-eyebrow,.aims-campus-workspace .cc-eyebrow { color:#68617e; font-size:10px; }
+.aims-campus-workspace .eyebrow-dot,.aims-campus-workspace .cc-eyebrow-dot { background:#b28a19; box-shadow:0 0 0 3px #fff4cf; }
+.aims-campus-workspace .panel-heading h2 { font-size:16px; color:#202246; }
+.aims-campus-workspace .panel-heading p { font-size:12px; }
+.aims-campus-workspace :is(table th,.users-table th) { color:#62647d; background:#f8f8fc; font-size:11px; letter-spacing:.5px; }
+.aims-campus-workspace :is(table td,.users-table td) { font-size:12px; padding-top:17px; padding-bottom:17px; }
+.aims-campus-workspace :is(input,select,textarea) { border-color:#d9dbe6; }
+.aims-campus-workspace :is(button,a,input,select,textarea):focus-visible { outline:3px solid #b58a16; outline-offset:3px; }
+.aims-campus-workspace :is(.admin-dashboard-chart-bar,.cc-dashboard-chart-track > span,.dean-completion-track > span) { background:#0b0b2f; }
+.aims-campus-workspace .admin-dashboard-action-icon { background:#efeff5; color:#0b0b2f; }
+.aims-campus-workspace .admin-dashboard-action-list button:hover { border-color:#aaaad0; background:#f7f7fa; }
+.aims-campus-workspace .admin-dashboard-metric-icon { color:#0b0b2f !important; background:#efeff5 !important; border-radius:7px; width:35px; height:35px; }
+.aims-campus-workspace .admin-dashboard-avatar { color:#0b0b2f !important; background:#efeff5 !important; }
+.stake-kicker { display:block; font-size:10px; font-weight:800; letter-spacing:1.7px; color:#7b661d; line-height:1.7; }
+.stake-navy-button,.stake-yellow-button { display:inline-flex; align-items:center; justify-content:center; gap:14px; padding:12px 17px; min-height:44px; border:1px solid transparent; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; }
+.stake-navy-button { background:#0b0b2f; color:#fff; }
+.stake-yellow-button { background:#ffcf40; color:#0b0b2f; }
+.stake-navy-button:hover { background:#1c1c49; }
+.stake-yellow-button:hover { background:#ffdb70; }
+.stake-text-button { padding:5px 0; border:0; background:none; font-size:12px; font-weight:600; cursor:pointer; color:#0b0b2f; }
+.stake-text-button:hover { text-decoration:underline; }
+.stake-note { color:#656780; font-size:12px; line-height:1.8; }
+.stake-empty { padding:38px 18px; text-align:center; color:#656780; }
+.stake-empty h3 { font-size:15px; color:#202246; }
+.stake-empty p { font-size:12px; line-height:1.8; }
+.stake-panel { background:#fff; border:1px solid #e2e3ec; border-radius:10px; padding:25px; min-width:0; }
+.stake-panel-title { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; }
+.stake-panel-title h2 { margin:8px 0 0; color:#202246; font-size:20px; letter-spacing:-.5px; }
+.stake-panel-title p { font-size:12px; color:#656780; line-height:1.8; }
+.stake-footer { display:flex; justify-content:space-between; gap:12px; padding-top:28px; font-size:10px; color:#656780; line-height:1.8; }
+/* Administrator: a numbered operations register, not a welcome-card template. */
+.aims-role-admin .admin-dashboard-page { gap:24px; }
+.aims-role-admin .admin-dashboard-header { margin-bottom:0; padding-bottom:20px; border-bottom:1px solid #dedfeb; }
+.stake-admin-desk { display:grid; grid-template-columns:1fr 1fr; border:1px solid #d6d8e7; border-radius:10px; background:#fff; overflow:hidden; }
+.stake-admin-desk-title { padding:30px; background:#0b0b2f; color:#fff; border-left:5px solid #ffcf40; }
+.stake-admin-desk-title .stake-kicker { color:#ffcf40; }
+.stake-admin-desk-title h2 { font-family:Manrope,'Segoe UI',sans-serif; font-size:clamp(24px,2.4vw,32px); font-weight:600; letter-spacing:-.8px; line-height:1.35; margin:16px 0; }
+.stake-admin-desk-title p { font-size:12px; line-height:1.9; max-width:370px; color:#d5d5ef; margin:0; }
+.stake-admin-register { display:flex; flex-direction:column; justify-content:center; padding:8px 25px; }
+.stake-admin-register button { display:flex; align-items:center; gap:17px; padding:21px 0; border:0; border-bottom:1px solid #e8e8f0; text-align:left; background:#fff; color:#202246; cursor:pointer; }
+.stake-admin-register button:last-child { border-bottom:0; }
+.stake-admin-register button > span { color:#8a8aa7; font:11px Manrope,sans-serif; }
+.stake-admin-register button > div { flex:1; }
+.stake-admin-register strong { display:block; font-size:14px; }
+.stake-admin-register small { display:block; font-size:11px; color:#656780; line-height:1.7; margin-top:5px; }
+.stake-admin-register button > svg { color:#0b0b2f; }
+.stake-admin-register button:hover strong { text-decoration:underline; }
+.aims-role-admin .admin-dashboard-metric { padding:20px; border-top:3px solid #d9d9ec; }
+.aims-role-admin .admin-dashboard-metric:first-child { border-top-color:#0b0b2f; }
+.aims-role-admin .admin-dashboard-metric-value { color:#0b0b2f; font-family:Manrope,sans-serif; }
+.aims-role-admin .admin-dashboard-tasks-panel { background:#fffdf4; border-color:#e9dfbd; }
+.aims-role-admin .admin-dashboard-task-marker { background:#fff1be; color:#745b12; }
+.aims-role-admin .admin-dashboard-action-list button { border-radius:6px; }
+/* Dean: an academic brief with coverage and outcomes emphasized. */
+.aims-role-dean .workspace-page-heading { padding-bottom:22px; border-bottom:1px solid #dadbe5; }
+.aims-role-dean .workspace-page-heading h1 { max-width:620px; font-family:Georgia,'Times New Roman',serif; font-weight:500; font-size:clamp(30px,3vw,43px); letter-spacing:-1.2px; }
+.stake-dean-brief { display:grid; grid-template-columns:1.3fr 1fr; gap:35px; padding:34px; margin:26px 0; border-top:4px solid #0b0b2f; background:#fff; border-radius:0 0 10px 10px; }
+.stake-dean-brief h2 { font-family:Georgia,'Times New Roman',serif; color:#0b0b2f; font-size:31px; font-weight:500; margin:15px 0; line-height:1.3; letter-spacing:-.7px; }
+.stake-dean-brief p { font-size:12px; color:#656780; line-height:1.9; max-width:480px; }
+.stake-dean-brief .stake-yellow-button { margin-top:12px; }
+.stake-dean-coverage { border-left:1px solid #e2e3ec; padding-left:34px; align-self:center; }
+.stake-dean-coverage > span { color:#656780; font-size:12px; }
+.stake-dean-coverage > strong { display:block; font-family:Manrope,sans-serif; font-size:52px; color:#0b0b2f; line-height:1.2; margin:14px 0 18px; }
+.stake-dean-coverage small { font-family:'DM Sans','Segoe UI',sans-serif; display:block; font-size:12px; font-weight:400; color:#656780; margin-top:7px; }
+.stake-coverage-note { display:flex; align-items:center; gap:8px; font-size:12px; color:#5e4d17; padding:12px; background:#fff7db; border:1px solid #eee2b7; border-radius:5px; }
+.stake-yellow-dot { display:inline-block; width:7px; height:7px; background:#c39913; border-radius:50%; flex-shrink:0; }
+.aims-role-dean .dean-metrics { gap:0; border:1px solid #e2e3ec; background:#fff; border-radius:10px; overflow:hidden; }
+.aims-role-dean .dean-metric { border:0; border-right:1px solid #e2e3ec; border-radius:0; background:transparent; padding:25px; }
+.aims-role-dean .dean-metric:last-child { border-right:0; }
+.aims-role-dean .dean-metric > strong { color:#0b0b2f; }
+.aims-role-dean .dean-coordinator-card { background:#fff; border-top:3px solid #0b0b2f; padding:22px; }
+.aims-role-dean .dean-coordinator-heading strong { background:#efeff5; color:#0b0b2f; }
+.aims-role-dean .dean-privacy-note { padding:18px 22px; border-left:3px solid #ffcf40; background:#fff; font-size:12px; line-height:1.8; }
+/* Career center: partnership stewardship and renewal deadlines. */
+.aims-role-career_center .cc-page-header { margin-bottom:20px; }
+.stake-career-brief { display:grid; grid-template-columns:1.6fr 1fr; border:1px solid #dfdfeb; border-radius:12px; overflow:hidden; background:#0b0b2f; color:#fff; margin-bottom:24px; }
+.stake-career-brief > div:first-child { padding:35px; }
+.stake-career-brief .stake-kicker { color:#ffcf40; }
+.stake-career-brief h2 { font:600 clamp(25px,2.6vw,35px)/1.3 Manrope,'Segoe UI',sans-serif; letter-spacing:-1px; margin:15px 0; }
+.stake-career-brief p { font-size:12px; line-height:1.9; color:#d6d6ee; max-width:470px; }
+.stake-career-brief .stake-yellow-button { margin-top:12px; }
+.stake-renewal-brief { margin:24px; padding:23px; background:#fff; color:#202246; border-radius:8px; border-top:4px solid #ffcf40; }
+.stake-renewal-brief > span { font-size:11px; color:#656780; }
+.stake-renewal-brief > strong { display:block; font:700 51px/1.1 Manrope,sans-serif; color:#0b0b2f; margin:15px 0; }
+.stake-renewal-brief small { display:block; margin-top:8px; font:400 12px 'DM Sans','Segoe UI',sans-serif; color:#656780; }
+.stake-renewal-brief p { color:#656780; }
+.stake-renewal-brief > button { display:flex; align-items:center; justify-content:space-between; width:100%; border:0; border-top:1px solid #e2e3ec; background:none; padding:16px 0 0; color:#0b0b2f; font-size:12px; font-weight:700; cursor:pointer; }
+.aims-role-career_center .cc-stat-card { border-bottom:3px solid #e5e5ef; }
+.aims-role-career_center .cc-stat-card:nth-last-child(-n+2) { border-bottom-color:#d9b13a; }
+.aims-role-career_center .cc-stat-value { color:#0b0b2f; }
+.aims-role-career_center .stake-partnership-grid { grid-template-columns:1fr 1.35fr; }
+.aims-role-career_center .stake-partnership-grid > article:first-child { order:2; }
+.aims-role-career_center .stake-partnership-grid > article:last-child { order:1; border-top:3px solid #ffcf40; }
+.aims-role-career_center .cc-watch-days { color:#725818; background:#fff3c6; }
+.aims-role-career_center .cc-button-secondary { background:#fff; color:#0b0b2f; border-color:#d9daea; }
+.aims-role-career_center .cc-dashboard-chart-track span { background:#0b0b2f; }
+/* Company: a partner desk, applicant register and personal notebook. */
+.stake-page-heading { display:flex; justify-content:space-between; align-items:center; gap:24px; margin-bottom:26px; }
+.stake-page-heading h1 { color:#0b0b2f; font:600 clamp(30px,3.5vw,45px)/1.18 Manrope,'Segoe UI',sans-serif; letter-spacing:-1.5px; margin:13px 0; }
+.stake-page-heading h1 em { font-style:normal; color:#6a6b88; font-weight:500; }
+.stake-page-heading p { color:#656780; font-size:13px; line-height:1.8; }
+.stake-employer-desk { display:grid; grid-template-columns:1.1fr 1fr; border:1px solid #e2e3ec; border-radius:12px; overflow:hidden; margin-bottom:20px; }
+.stake-employer-mission { position:relative; padding:35px; background:#0b0b2f; color:#fff; border-bottom:5px solid #ffcf40; }
+.stake-employer-mission .stake-kicker { color:#ffcf40; }
+.stake-employer-mission h2 { font:500 clamp(25px,2.6vw,34px)/1.35 Georgia,'Times New Roman',serif; margin:22px 0 15px; }
+.stake-employer-mission p { color:#d6d6ed; font-size:12px; line-height:1.9; max-width:390px; margin-bottom:24px; }
+.stake-employer-register { background:#fff; padding:26px; }
+.stake-employer-register > .stake-kicker { margin:0 0 12px; }
+.stake-employer-metric { display:flex; align-items:center; justify-content:space-between; gap:15px; padding:17px 0; border-bottom:1px solid #e8e8ef; }
+.stake-employer-metric:last-child { border-bottom:0; }
+.stake-employer-metric > span { display:flex; align-items:center; gap:13px; font-size:12px; color:#35365a; }
+.stake-employer-metric > span > svg { color:#0b0b2f; }
+.stake-employer-metric small { display:block; margin-top:5px; font-size:10px; line-height:1.6; color:#656780; }
+.stake-employer-metric > strong { font:600 28px Manrope,sans-serif; color:#0b0b2f; }
+.stake-employer-links { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:25px; }
+.stake-employer-links button { display:flex; align-items:center; gap:16px; padding:23px; border:1px solid #e2e3ec; border-radius:8px; background:#fff; color:#0b0b2f; text-align:left; cursor:pointer; }
+.stake-employer-links button > span { flex:1; }
+.stake-employer-links strong { display:block; font-size:14px; }
+.stake-employer-links small { display:block; margin-top:6px; color:#656780; font-size:11px; line-height:1.7; }
+.stake-employer-links button:hover { border-color:#9999c7; }
+.stake-employer-columns { display:grid; grid-template-columns:1.45fr 1fr; gap:23px; margin-bottom:25px; }
+.stake-employer-activity { display:flex; gap:14px; padding:20px 0; border-bottom:1px solid #e8e8f0; }
+.stake-employer-activity:last-child { border-bottom:0; padding-bottom:0; }
+.stake-letter-avatar { display:grid; place-items:center; flex-shrink:0; width:36px; height:36px; border-radius:50%; background:#efeff5; color:#0b0b2f; font-size:11px; font-weight:700; }
+.stake-employer-activity strong { font-size:13px; line-height:1.7; }
+.stake-employer-activity p { color:#656780; font-size:12px; line-height:1.8; margin:5px 0; }
+.stake-employer-activity time { color:#777991; font-size:10px; }
+.stake-company-checklist { background:#fffdf2; border:1px solid #e8dfb5; border-radius:8px; padding:25px; }
+.stake-company-checklist h2 { margin:10px 0; font-family:Georgia,serif; font-size:24px; font-weight:500; }
+.stake-company-checklist label { display:flex; align-items:flex-start; gap:12px; padding:15px 0; font-size:12px; line-height:1.8; border-bottom:1px solid #e9e3c8; cursor:pointer; }
+.stake-company-checklist input { accent-color:#0b0b2f; width:16px; height:16px; flex-shrink:0; margin:3px 0 0; }
+.stake-company-checklist input:checked + span { text-decoration:line-through; color:#777991; }
+.stake-company-partner-note { margin-top:27px; padding-top:20px; border-top:1px solid #e2d69c; color:#786520; }
+.stake-company-partner-note > strong { display:block; font-size:12px; line-height:1.8; margin:8px 0; }
+.stake-company-partner-note p { color:#77725b; font-size:11px; line-height:1.8; }
+.stake-horizontal-chart { display:grid; gap:17px; margin-top:28px; }
+.stake-horizontal-chart > div { display:grid; grid-template-columns:64px 1fr 45px; gap:15px; align-items:center; font-size:12px; color:#656780; }
+.stake-horizontal-chart > div > div { height:15px; background:#f0f0f8; border-radius:3px; overflow:hidden; }
+.stake-horizontal-chart i { display:block; height:100%; background:#0b0b2f; border-right:4px solid #ffcf40; }
+.stake-horizontal-chart strong { color:#202246; }
+@media(max-width:1100px) {
+ .stake-admin-desk,.stake-career-brief,.stake-employer-desk { grid-template-columns:1fr 1fr; }
+ .stake-dean-brief { gap:24px; padding:27px; }
+ .stake-employer-columns { grid-template-columns:1.1fr 1fr; }
+}
+@media(max-width:800px) {
+ .stake-admin-desk,.stake-career-brief,.stake-employer-desk,.stake-employer-columns,.stake-dean-brief { grid-template-columns:1fr; }
+ .stake-dean-coverage { padding:25px 0 0; border-left:0; border-top:1px solid #e2e3ec; }
+ .stake-renewal-brief { margin-top:0; }
+ .aims-role-career_center .stake-partnership-grid { grid-template-columns:1fr; }
+ .stake-page-heading { align-items:flex-start; }
+ .aims-role-dean .dean-metric { border-bottom:1px solid #e2e3ec; }
+}
+@media(max-width:600px) {
+ .aims-campus-workspace .cc-page { padding:24px 18px; }
+ .stake-page-heading { flex-direction:column; }
+ .stake-page-heading h1 { font-size:34px; }
+ .stake-employer-links { grid-template-columns:1fr; gap:12px; }
+ .stake-admin-desk-title,.stake-employer-mission,.stake-career-brief > div:first-child { padding:25px; }
+ .stake-admin-register,.stake-employer-register { padding:15px 22px; }
+ .stake-dean-brief { padding:24px; }
+ .stake-dean-brief h2 { font-size:28px; }
+ .stake-dean-coverage > strong { font-size:43px; }
+ .stake-panel,.stake-company-checklist { padding:21px; }
+ .stake-panel-title { flex-wrap:wrap; }
+ .stake-footer { flex-direction:column; }
+ .aims-role-dean .dean-coordinator-card { padding:18px; }
+}
+.aims-role-admin .admin-dashboard-metrics { grid-template-columns:repeat(4,minmax(0,1fr)); }
+@media(max-width:1250px) { .aims-role-admin .admin-dashboard-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:420px) { .aims-role-admin .admin-dashboard-metric { padding:15px; } .aims-role-admin .admin-dashboard-metric-top { align-items:flex-start; flex-direction:column; } .aims-role-admin .admin-dashboard-metric-change { text-align:left; font-size:10px; } }
+@media(max-width:600px) { .aims-role-dean .workspace-page-heading { flex-direction:column; align-items:flex-start; } .aims-role-dean .workspace-page-heading .outline-button { min-height:42px; font-size:12px; padding:10px 15px; } }

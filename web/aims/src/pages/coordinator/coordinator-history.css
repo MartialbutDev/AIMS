@@ -1,0 +1,103 @@
+
+.co-history-panel {
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.co-history-toolbar {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.co-history-toolbar .coordinator-search {
+  flex: 1 1 270px;
+}
+
+.co-history-term {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.co-history-term select {
+  min-width: 210px;
+  padding: 11px;
+  border: 1px solid var(--border-color, #d8dce4);
+  border-radius: 9px;
+  background: var(--surface, #fff);
+  color: inherit;
+}
+
+.co-history-notice {
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 12px 15px;
+  border-radius: 10px;
+  background: rgba(110, 120, 145, .09);
+  margin: 0 0 16px;
+}
+
+.co-history-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.co-history-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 4px;
+  border-bottom: 1px solid rgba(110, 120, 145, .17);
+}
+
+.co-history-row:last-child {
+  border-bottom: 0;
+}
+
+.co-history-person {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+  overflow-wrap: anywhere;
+}
+
+.co-history-person span {
+  font-size: 13px;
+  opacity: .7;
+}
+
+.co-history-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: right;
+  font-size: 13px;
+}
+
+.co-history-readonly {
+  color: #80601e;
+}
+
+.co-term-note {
+  font-size: 13px;
+  opacity: .85;
+}
+
+@media (max-width: 650px) {
+  .co-history-row {
+    flex-wrap: wrap;
+  }
+
+  .co-history-meta {
+    width: 100%;
+    text-align: left;
+    padding-left: 52px;
+  }
+}

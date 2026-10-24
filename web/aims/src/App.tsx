@@ -1,11 +1,22 @@
-import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom'
+
+import {
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+} from 'react-router-dom'
+
 import { RoleLogin } from './components/RoleLogin'
 import { RoleSelector } from './components/RoleSelector'
 import { RoleDashboardPage } from './pages/RoleDashboardPage'
 import { readAdminLandingPage } from './pages/admin/SettingsPage'
 import { useAuthSession } from './hooks/useAuthSession'
+
 import type { UserRole, UserSession } from './types/auth'
+
 import './App.css'
+import { EmailActionPage } from './pages/shared/EmailActionPage'
 
 const ROLE_PATHS: Record<UserRole, string> = {
   admin: 'admin',
@@ -20,25 +31,32 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
     'dashboard',
     'users',
     'assignments',
+    'document-verification',
     'notifications',
     'developer-info',
     'settings',
     'help-center',
   ],
+
   coordinator: [
     'dashboard',
     'students',
+    'historical-students',
     'applications',
+    'document-verification',
     'notifications',
     'settings',
     'help-center',
   ],
+
   dean: [
     'dashboard',
+    'coordinators',
     'notifications',
     'settings',
     'help-center',
   ],
+
   career_center: [
     'dashboard',
     'companies',
@@ -48,8 +66,10 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
     'settings',
     'help-center',
   ],
+
   company: [
     'dashboard',
+    'interns',
     'applications',
     'notifications',
     'developer-info',
@@ -60,7 +80,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
 
 function getRoleFromPath(value?: string): UserRole | null {
   const role = (Object.keys(ROLE_PATHS) as UserRole[]).find(
-    (item) => ROLE_PATHS[item] === value
+    (item) => ROLE_PATHS[item] === value,
   )
 
   return role ?? null
@@ -77,11 +97,14 @@ interface LoginRouteProps {
   login: (
     role: UserRole,
     identifier: string,
-    password: string
+    password: string,
   ) => Promise<void>
 }
 
-function LoginRoute({ isSigningIn, login }: LoginRouteProps) {
+function LoginRoute({
+  isSigningIn,
+  login,
+}: LoginRouteProps) {
   const { role: rolePath } = useParams<{ role: string }>()
   const navigate = useNavigate()
   const role = getRoleFromPath(rolePath)
@@ -107,7 +130,10 @@ interface DashboardRouteProps {
   onLogout: () => void
 }
 
-function DashboardRoute({ session, onLogout }: DashboardRouteProps) {
+function DashboardRoute({
+  session,
+  onLogout,
+}: DashboardRouteProps) {
   const { workspace, section } = useParams<{
     workspace: string
     section?: string
@@ -120,15 +146,30 @@ function DashboardRoute({ session, onLogout }: DashboardRouteProps) {
   const requestedRole = getRoleFromPath(workspace)
 
   if (!requestedRole || requestedRole !== session.role) {
-    return <Navigate to={getDashboardPath(session.role)} replace />
+    return (
+      <Navigate
+        to={getDashboardPath(session.role)}
+        replace
+      />
+    )
   }
 
   if (!section) {
-    return <Navigate to={getDashboardPath(session.role)} replace />
+    return (
+      <Navigate
+        to={getDashboardPath(session.role)}
+        replace
+      />
+    )
   }
 
   if (!ALLOWED_SECTIONS[session.role].includes(section)) {
-    return <Navigate to={getDashboardPath(session.role)} replace />
+    return (
+      <Navigate
+        to={getDashboardPath(session.role)}
+        replace
+      />
+    )
   }
 
   return (
@@ -165,6 +206,9 @@ function App() {
 
   return (
     <Routes>
+      <Route path="/forgot-password" element={<EmailActionPage mode="forgot" />} />
+      <Route path="/reset-password" element={<EmailActionPage mode="reset" />} />
+      <Route path="/verify-email" element={<EmailActionPage mode="verify" />} />
       <Route
         path="/"
         element={
@@ -221,7 +265,9 @@ function App() {
 
       <Route
         path="*"
-        element={<Navigate to={dashboardPath} replace />}
+        element={
+          <Navigate to={dashboardPath} replace />
+        }
       />
     </Routes>
   )

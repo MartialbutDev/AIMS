@@ -5,7 +5,13 @@ AIMS SQLAlchemy Models
 Import all database models here so SQLAlchemy can register
 them with Base.metadata.
 
-This includes the Student Onboarding Verification System.
+Includes:
+- Core models
+- Notification models
+- Coordinator models
+- Dean coordinator designation
+- Document review
+- Student onboarding verification
 """
 
 # ============================================================
@@ -35,6 +41,20 @@ from app.models.coordinator_assignment import CoordinatorStudentAssignment
 from app.models.coordinator_evaluation import CoordinatorEvaluation
 
 # ============================================================
+# DEAN MODELS
+# ============================================================
+
+from app.models.dean_coordinator_designation import (
+    DeanCoordinatorDesignation,
+)
+
+# ============================================================
+# DOCUMENT REVIEW MODELS
+# ============================================================
+
+from app.models.document_review import DocumentReview
+
+# ============================================================
 # STUDENT ONBOARDING VERIFICATION MODELS
 # ============================================================
 
@@ -42,3 +62,7 @@ from app.models.student_onboarding import (
     StudentOnboarding,
     StudentOnboardingSubmission,
 )
+
+from app.models.push import PushDevice, PushDelivery
+
+from app.models.completion import CompletionPlan, ClearanceItem, CompanyFinalEvaluation, InternshipCompletion, CompletionEvent

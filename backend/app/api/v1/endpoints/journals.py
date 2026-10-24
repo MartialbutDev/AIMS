@@ -1,3 +1,4 @@
+from app.core.record_lock import lock_student_term
 
 from fastapi import (
     APIRouter,
@@ -34,6 +35,8 @@ from app.models.journal import Journal, JournalStatus
 from app.schemas.journal import JournalResponse, JournalUpdate
 from app.schemas.pagination import PaginatedResponse
 from app.services.notification_service import NotificationService
+from app.services.deployment_service import DeploymentService
+from app.core.assignment_access import get_current_academic_term
 
 router = APIRouter()
 
@@ -195,6 +198,20 @@ def _fire_journal_notification(
         )
 
 
+def _require_current_journal_term(journal: Journal) -> None:
+    year, semester = get_current_academic_term()
+    if not journal.academic_year or not journal.semester:
+        raise HTTPException(status_code=409, detail="Journal academic term is unverified; reconciliation required")
+    if (journal.academic_year, journal.semester) != (year, semester):
+        raise HTTPException(status_code=403, detail="Historical journals are read-only")
+
+
+def _authorize_coordinator_journal(db: Session, actor: User, journal: Journal, mode: str = "read") -> None:
+    if not journal.academic_year or not journal.semester:
+        raise HTTPException(status_code=409, detail="Journal academic term is unverified; reconciliation required")
+    ensure_coordinator_student_access(db, actor, journal.student_id, mode=mode, academic_year=journal.academic_year, semester=journal.semester)
+
+
 # ============================================================
 # STUDENT: CREATE JOURNAL
 # ============================================================
@@ -219,6 +236,9 @@ async def create_journal(
             detail="Only students can create journals",
         )
 
+    academic_year, semester = get_current_academic_term()
+    DeploymentService.require_active_deployment(db, current_user.id)
+
     if week < 1 or week > 52:
         raise HTTPException(
             status_code=400,
@@ -230,6 +250,8 @@ async def create_journal(
         .filter(
             Journal.student_id == current_user.id,
             Journal.week == week,
+            Journal.academic_year == academic_year,
+            Journal.semester == semester,
             Journal.status != JournalStatus.REJECTED,
         )
         .first()
@@ -255,6 +277,8 @@ async def create_journal(
     journal = Journal(
         id=str(uuid.uuid4()),
         student_id=current_user.id,
+        academic_year=academic_year,
+        semester=semester,
         week=week,
         title=title.strip(),
         summary=(
@@ -310,10 +334,14 @@ async def get_my_journals(
             ),
         )
 
+    academic_year, semester = get_current_academic_term()
+
     query = (
         db.query(Journal)
         .filter(
-            Journal.student_id == current_user.id
+            Journal.student_id == current_user.id,
+            Journal.academic_year == academic_year,
+            Journal.semester == semester,
         )
         .order_by(
             Journal.week.desc()
@@ -421,6 +449,8 @@ async def get_journal_summary(
             ),
         )
 
+    academic_year, semester = get_current_academic_term()
+
     row = (
         db.query(
             func.count(
@@ -478,7 +508,9 @@ async def get_journal_summary(
             ).label("rejected"),
         )
         .filter(
-            Journal.student_id == current_user.id
+            Journal.student_id == current_user.id,
+            Journal.academic_year == academic_year,
+            Journal.semester == semester,
         )
         .one()
     )
@@ -520,11 +552,7 @@ async def get_journal_file(
         )
 
     if current_user.role == UserRole.COORDINATOR:
-        ensure_coordinator_student_access(
-            db,
-            current_user,
-            journal.student_id,
-        )
+        _authorize_coordinator_journal(db, current_user, journal, mode="read")
 
     elif (
         current_user.role != UserRole.ADMIN
@@ -615,11 +643,7 @@ async def get_journal(
         )
 
     if current_user.role == UserRole.COORDINATOR:
-        ensure_coordinator_student_access(
-            db,
-            current_user,
-            journal.student_id,
-        )
+        _authorize_coordinator_journal(db, current_user, journal, mode="read")
 
     elif (
         current_user.role != UserRole.ADMIN
@@ -707,6 +731,11 @@ async def update_journal(
             ),
         )
 
+    _require_current_journal_term(journal)
+    lock_student_term(db, journal.student_id, journal.academic_year, journal.semester)
+    if current_user.role == UserRole.STUDENT:
+        DeploymentService.require_active_deployment(db, current_user.id)
+
     old_status = journal.status
 
     updates = journal_data.model_dump(
@@ -714,11 +743,7 @@ async def update_journal(
     )
 
     if current_user.role == UserRole.COORDINATOR:
-        ensure_coordinator_student_access(
-            db,
-            current_user,
-            journal.student_id,
-        )
+        _authorize_coordinator_journal(db, current_user, journal, mode="write")
 
         if set(updates) != {"status"}:
             raise HTTPException(
@@ -856,6 +881,10 @@ async def replace_journal_file(
             ),
         )
 
+    _require_current_journal_term(journal)
+    lock_student_term(db, journal.student_id, journal.academic_year, journal.semester)
+    DeploymentService.require_active_deployment(db, current_user.id)
+
     if journal.status != JournalStatus.DRAFT:
         raise HTTPException(
             status_code=400,
@@ -931,6 +960,10 @@ async def delete_journal(
                 "your own journals"
             ),
         )
+
+    _require_current_journal_term(journal)
+    lock_student_term(db, journal.student_id, journal.academic_year, journal.semester)
+    DeploymentService.require_active_deployment(db, current_user.id)
 
     if journal.status != JournalStatus.DRAFT:
         raise HTTPException(

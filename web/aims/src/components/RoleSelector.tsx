@@ -1,62 +1,36 @@
-import { Brand } from './Brand'
+import { AuthIdentity } from './AuthIdentity'
 import { Icon } from './Icons'
 import { roleDescriptions, roleLabels, roles } from '../types/auth'
 import type { UserRole } from '../types/auth'
 
-interface RoleSelectorProps {
-  onSelectRole: (role: UserRole) => void
-}
-
+interface RoleSelectorProps { onSelectRole: (role: UserRole) => void }
 const roleIcons: Record<UserRole, 'users' | 'briefcase' | 'chart' | 'settings'> = {
-  coordinator: 'users',
-  dean: 'chart',
-  career_center: 'briefcase',
-  company: 'briefcase',
-  admin: 'settings',
+  coordinator: 'users', dean: 'chart', career_center: 'briefcase', company: 'briefcase', admin: 'settings',
 }
 
 export function RoleSelector({ onSelectRole }: RoleSelectorProps) {
   return (
-    <main className="auth-layout">
-      <section className="auth-panel">
-        <Brand />
-        <div className="auth-content role-content">
-          <div className="eyebrow"><span className="eyebrow-dot" /> ONE CAMPUS. EVERY OPPORTUNITY.</div>
-          <h1>Welcome to a smarter<br /><span>internship experience.</span></h1>
-          <p className="auth-intro">A simpler way to bring students, educators, and employers together. Choose your workspace to get started.</p>
-          <div className="role-grid">
+    <main className="citc-auth">
+      <AuthIdentity />
+      <section className="citc-workspace" aria-labelledby="workspace-heading">
+        <header className="citc-workspace-top"><span>CITC INTERNSHIP PORTAL</span><span className="citc-access-label"><span />Authorized access</span></header>
+        <div className="citc-workspace-content">
+          <p className="citc-overline">YOUR WORKSPACE</p>
+          <h1 id="workspace-heading">Welcome to AIMS<span>.</span></h1>
+          <p className="citc-intro">One internship journey. A shared commitment.<br />Choose your role to access your workspace.</p>
+          <div className="citc-role-list">
             {roles.map((role, index) => (
-              <button className={`role-card role-card--${role}`} key={role} onClick={() => onSelectRole(role)}>
-                <span className="role-icon"><Icon name={roleIcons[role]} size={19} /></span>
-                <span className="role-card-copy">
-                  <strong>{roleLabels[role]}</strong>
-                  <small>{roleDescriptions[role]}</small>
-                </span>
-                <span className="role-arrow"><Icon name="arrow" size={17} /></span>
-                <span className="role-index">0{index + 1}</span>
+              <button className="citc-role" type="button" key={role} onClick={() => onSelectRole(role)}>
+                <span className="citc-role-icon"><Icon name={roleIcons[role]} size={22} /></span>
+                <span className="citc-role-copy"><strong>{roleLabels[role]}</strong><small>{roleDescriptions[role]}</small></span>
+                <span className="citc-role-number" aria-hidden="true">0{index + 1}</span><Icon name="arrow" size={19} />
               </button>
             ))}
           </div>
-          <p className="secure-note"><span className="secure-dot" /> A secure workspace for the USTP community</p>
+          <p className="citc-student-note"><Icon name="users" size={18} /><span>Student intern? Access your internship through the <strong>AIMS mobile app.</strong></span></p>
         </div>
-        <footer className="auth-footer"><span>© 2026 USTP AIMS</span><span>Built for better beginnings.</span></footer>
+        <footer className="citc-auth-footer"><span>© {new Date().getFullYear()} USTP · CITC</span><span>Academic Internship Management System</span></footer>
       </section>
-      <aside className="auth-aside">
-        <div className="aside-orb aside-orb--one" />
-        <div className="aside-orb aside-orb--two" />
-        <div className="aside-topline"><span>YOUR NEXT CHAPTER STARTS HERE</span><span>01 — 05</span></div>
-        <div className="aside-message">
-          <span className="aside-kicker">CAREERS, CONNECTED.</span>
-          <h2>Where learning<br />meets the <em>real world.</em></h2>
-          <p>Every great career begins with an opportunity. Let’s make the connection.</p>
-        </div>
-        <div className="aside-card">
-          <div className="aside-card-icon"><Icon name="briefcase" size={18} /></div>
-          <div><strong>One platform. Shared progress.</strong><span>Everything your internship journey needs, in one place.</span></div>
-          <span className="aside-card-arrow"><Icon name="arrow" size={17} /></span>
-        </div>
-        <div className="aside-bottom"><span>UNIVERSITY OF SCIENCE AND TECHNOLOGY OF SOUTHERN PHILIPPINES</span><div className="aside-pips"><i /><i /><i /><i /><i /></div></div>
-      </aside>
     </main>
   )
 }

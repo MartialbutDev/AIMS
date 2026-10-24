@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 def ensure_database_schema() -> None:
     """Development bootstrap. Use Alembic for real migrations."""
 
-    Base.metadata.create_all(bind=engine)
+    # Official completion uses an owner-run Alembic migration. Do not make
+    # application startup depend on new foreign-key/ALTER privileges.
+    from app.core.completion_schema import COMPLETION_TABLES
+    Base.metadata.create_all(bind=engine,tables=[table for name,table in Base.metadata.tables.items() if name not in COMPLETION_TABLES])
 
     inspector = inspect(engine)
 

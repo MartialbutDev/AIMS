@@ -1,9 +1,5 @@
 
-"""Assign only when COR faculty uniquely matches a Dean-approved coordinator.
-
-No assignment is created on missing/ambiguous names or unapproved
-coordinators. Never silently replace an existing student assignment.
-"""
+"""Assign students to Dean-authorized coordinators by academic term."""
 
 from __future__ import annotations
 
@@ -11,14 +7,21 @@ import re
 
 from sqlalchemy.orm import Session
 
-from app.models.coordinator_assignment import CoordinatorStudentAssignment
-from app.models.dean_coordinator_designation import DeanCoordinatorDesignation
+from app.models.coordinator_assignment import (
+    CoordinatorStudentAssignment,
+)
+from app.models.dean_coordinator_designation import (
+    DeanCoordinatorDesignation,
+)
 from app.models.user import User, UserRole
 
 
 def _name_key(value: str) -> str:
     return " ".join(
-        re.findall(r"[A-Z]+", (value or "").upper())
+        re.findall(
+            r"[A-Z]+",
+            (value or "").upper(),
+        )
     )
 
 
@@ -26,7 +29,8 @@ def _coordinator_names_match(
     extracted: str,
     coordinator: User,
 ) -> bool:
-    # Conservative matching: no fuzzy matching for access control.
+    """Use conservative matching for authorization."""
+
     target = _name_key(extracted)
     first = _name_key(coordinator.first_name)
     last = _name_key(coordinator.last_name)
@@ -47,18 +51,7 @@ def try_assign_coordinator(
     student: User,
     cor_details: dict,
 ) -> dict:
-
-    existing = db.query(
-        CoordinatorStudentAssignment
-    ).filter(
-        CoordinatorStudentAssignment.student_id == student.id
-    ).first()
-
-    if existing:
-        return {
-            "status": "already_assigned",
-            "coordinator_id": existing.coordinator_id,
-        }
+    """Assign a student for the term detected in the COR."""
 
     faculty = str(
         cor_details.get("detected_faculty") or ""
@@ -72,7 +65,11 @@ def try_assign_coordinator(
         cor_details.get("detected_semester") or ""
     ).strip()
 
-    if not faculty or not year or semester not in {"1", "2"}:
+    if (
+        not faculty
+        or not re.fullmatch(r"\d{4}-\d{4}", year)
+        or semester not in {"1", "2"}
+    ):
         return {
             "status": "pending_assignment",
             "reason": (
@@ -81,15 +78,39 @@ def try_assign_coordinator(
             ),
         }
 
+    existing = (
+        db.query(CoordinatorStudentAssignment)
+        .filter(
+            CoordinatorStudentAssignment.student_id
+            == student.id,
+            CoordinatorStudentAssignment.academic_year
+            == year,
+            CoordinatorStudentAssignment.semester
+            == semester,
+        )
+        .first()
+    )
+
+    if existing:
+        return {
+            "status": "already_assigned",
+            "coordinator_id": existing.coordinator_id,
+            "academic_year": year,
+            "semester": semester,
+        }
+
     rows = (
         db.query(DeanCoordinatorDesignation, User)
         .join(
             User,
-            User.id == DeanCoordinatorDesignation.coordinator_id,
+            User.id
+            == DeanCoordinatorDesignation.coordinator_id,
         )
         .filter(
-            DeanCoordinatorDesignation.academic_year == year,
-            DeanCoordinatorDesignation.semester == semester,
+            DeanCoordinatorDesignation.academic_year
+            == year,
+            DeanCoordinatorDesignation.semester
+            == semester,
             DeanCoordinatorDesignation.is_active.is_(True),
             User.role == UserRole.COORDINATOR,
             User.is_active.is_(True),
@@ -100,7 +121,10 @@ def try_assign_coordinator(
     matches = [
         (designation, coordinator)
         for designation, coordinator in rows
-        if _coordinator_names_match(faculty, coordinator)
+        if _coordinator_names_match(
+            faculty,
+            coordinator,
+        )
     ]
 
     if len(matches) != 1:
@@ -118,6 +142,8 @@ def try_assign_coordinator(
         CoordinatorStudentAssignment(
             student_id=student.id,
             coordinator_id=coordinator.id,
+            academic_year=year,
+            semester=semester,
         )
     )
 
@@ -126,4 +152,6 @@ def try_assign_coordinator(
     return {
         "status": "assigned",
         "coordinator_id": coordinator.id,
+        "academic_year": year,
+        "semester": semester,
     }
