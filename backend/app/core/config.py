@@ -1,181 +1,95 @@
 
 """
 AIMS Application Configuration
-
-Centralized settings for:
-- FastAPI
-- PostgreSQL
-- Authentication
-- CORS
-- OCR / Tesseract
-- File Storage
-- Internship Requirements
-- Student Onboarding Verification
-- Email Services
-- Google Cloud
-- Notification Scheduler
+Supports local Windows development and Ubuntu EC2 deployment.
 """
 
 import os
-
+import shutil
+from pathlib import Path
 from typing import List, Optional
 
-from pydantic_settings import (
-    BaseSettings,
-    SettingsConfigDict,
+from pydantic import model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+# Find Tesseract automatically where possible.
+DEFAULT_TESSERACT_PATH = (
+    shutil.which("tesseract")
+    or (
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        if os.name == "nt"
+        else "/usr/bin/tesseract"
+    )
 )
 
 
 class Settings(BaseSettings):
-
-    # ========================================================
-    # APPLICATION SETTINGS
-    # ========================================================
-
+    # Application
     APP_NAME: str = "AIMS"
     APP_VERSION: str = "1.0.0"
-
     DEBUG: bool = True
     DEV_TEST_STUDENT_ID: str = ""
     DEV_BYPASS_TEST_ONBOARDING: bool = False
-
     API_PREFIX: str = "/api"
 
-    # ========================================================
-    # DATABASE SETTINGS
-    # ========================================================
-
+    # Database
     DATABASE_URL: str = (
         "postgresql://aims:aims_password@localhost:5432/aims_db"
     )
+    DB_POOL_SIZE: int = 3
+    DB_MAX_OVERFLOW: int = 2
 
-    # ========================================================
-    # FILE STORAGE SETTINGS
-    # ========================================================
+    # File storage
+    ASSET_DIR: str = str(BASE_DIR / "assets")
 
-    ASSET_DIR: str = os.path.join(
-        os.path.dirname(
-            os.path.dirname(
-                os.path.dirname(__file__)
-            )
-        ),
-        "assets",
-    )
-
-    # ========================================================
-    # JWT AUTHENTICATION
-    # ========================================================
-
-    SECRET_KEY: str = (
-        "your-super-secret-key-change-in-production"
-    )
-
+    # Authentication
+    SECRET_KEY: str = "dev-only-change-me"
     ALGORITHM: str = "HS256"
-
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
-    # ========================================================
-    # CORS CONFIGURATION
-    # ========================================================
-
+    # CORS: configure additional origins through .env if needed.
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:19000",
         "http://localhost:5173",
     ]
 
-    # ========================================================
-    # REDIS CONFIGURATION
-    # ========================================================
-
+    # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # ========================================================
-    # OCR / TESSERACT CONFIGURATION
-    # ========================================================
+    # OCR
+    TESSERACT_PATH: str = DEFAULT_TESSERACT_PATH
 
-    TESSERACT_PATH: str = (
-        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-    )
-
-    # ========================================================
-    # INTERNSHIP REQUIREMENTS
-    # ========================================================
-
+    # Internship requirements
     REQUIRED_INTERNSHIP_HOURS: int = 486
 
-    # ========================================================
-    # STUDENT ONBOARDING VERIFICATION
-    # ========================================================
-
-    # Official Practicum subject codes from USTP PRISM COR.
-    #
-    # Example:
-    # PRACTICUM_SUBJECT_CODES="IT401,IT402"
-    #
-    # IMPORTANT:
-    # Replace these with actual USTP subject codes.
-    # Do not assume the example codes are official.
-
+    # Student onboarding
     PRACTICUM_SUBJECT_CODES: str = ""
-
-    # Current academic year expected in the COR.
-    #
-    # Example: 2026-2027
-
     CURRENT_ACADEMIC_YEAR: str = ""
-
-    # Current semester.
-    #
-    # Accepted by the current validator:
-    # 1      = First Semester
-    # 2      = Second Semester
-    # summer = Summer Term
-
     CURRENT_SEMESTER: str = ""
 
-    # ========================================================
-    # GOOGLE CLOUD SETTINGS
-    # ========================================================
-
+    # Google Cloud Storage, if still used by the application
     GOOGLE_CLOUD_PROJECT: Optional[str] = None
-
     GCS_BUCKET_NAME: Optional[str] = None
-
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
 
-    # ========================================================
-    # EMAIL CONFIGURATION
-    # ========================================================
-
+    # Email and push notifications
     PUSH_DELIVERY_ENABLED: bool = False
     EXPO_ACCESS_TOKEN: Optional[str] = None
-
     SMTP_HOST: Optional[str] = None
-
     SMTP_PORT: int = 587
-
     SMTP_USERNAME: Optional[str] = None
-
     SMTP_PASSWORD: Optional[str] = None
-
     SMTP_USE_TLS: bool = True
-
     EMAIL_FROM: Optional[str] = None
-
     PASSWORD_RESET_URL: Optional[str] = None
-
     EMAIL_VERIFICATION_URL: Optional[str] = None
 
-    # ========================================================
-    # NOTIFICATION SCHEDULER
-    # ========================================================
-
-    RUN_NOTIFICATION_SCHEDULER: bool = True
-
-    # ========================================================
-    # ENVIRONMENT CONFIGURATION
-    # ========================================================
+    # Notification scheduler
+    RUN_NOTIFICATION_SCHEDULER: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -184,9 +98,26 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @model_validator(mode="after")
+    def validate_production_settings(self):
+        if not self.DEBUG:
+            if (
+                not self.SECRET_KEY
+                or self.SECRET_KEY == "dev-only-change-me"
+                or len(self.SECRET_KEY) < 32
+            ):
+                raise ValueError(
+                    "Set a strong SECRET_KEY in the environment "
+                    "before running AIMS in production."
+                )
 
-# ============================================================
-# GLOBAL SETTINGS INSTANCE
-# ============================================================
+            if self.DEV_BYPASS_TEST_ONBOARDING:
+                raise ValueError(
+                    "Development onboarding bypass must be disabled "
+                    "in production."
+                )
+
+        return self
+
 
 settings = Settings()

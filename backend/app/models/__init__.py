@@ -21,6 +21,7 @@ Includes:
 from app.models.user import User
 from app.models.company import Company
 from app.models.application import Application
+from app.models.internship_deployment import InternshipDeployment
 from app.models.document import Document
 from app.models.dtr import DTR
 from app.models.journal import Journal
