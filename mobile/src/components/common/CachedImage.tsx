@@ -71,7 +71,7 @@ export default function CachedImage({
   if (error) {
     return (
       <View style={[styles.errorContainer, { backgroundColor: colors.border }]}>
-        <ActivityIndicator size="small" color={colors.primary} />
+        <ActivityIndicator size="small" color={colors.accent} />
       </View>
     );
   }
@@ -79,7 +79,7 @@ export default function CachedImage({
   if (isLoading && showLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.border }]}>
-        <ActivityIndicator size="small" color={colors.primary} />
+        <ActivityIndicator size="small" color={colors.accent} />
       </View>
     );
   }

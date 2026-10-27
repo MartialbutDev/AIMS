@@ -26,9 +26,7 @@ class CoordinatorEvaluation(Base):
         UniqueConstraint(
             "coordinator_id",
             "student_id",
-            "academic_year",
-            "semester",
-            name="uq_coordinator_evaluation_term",
+            name="uq_coordinator_evaluation_owner",
         ),
     )
 

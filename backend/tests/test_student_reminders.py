@@ -33,7 +33,7 @@ class StudentReminderTests(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
         tables = [User, Notification, CoordinatorStudentAssignment, DeanCoordinatorDesignation, CoordinatorEvaluation, Company, Application, Document, DTR, Journal]
-        Base.metadata.create_all(self.engine)
+        Base.metadata.create_all(self.engine, tables=[model.__table__ for model in tables])
         self.db = Session(self.engine)
         self.actor = SimpleNamespace(id="c1", role=UserRole.COORDINATOR)
         reminder.get_current_academic_term = lambda: ("2026-2027", "1")

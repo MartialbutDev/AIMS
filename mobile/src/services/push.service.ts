@@ -1,3 +1,5 @@
+import { getStudentReminderRoute } from '../utils/studentReminderRoute'
+import { notificationsChanged } from './notification.service'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
@@ -5,7 +7,6 @@ import { router } from 'expo-router'
 import api from './api'
 
 const TOKEN_KEY = 'aims_push_token'
-const allowedRoutes = new Set(['/(student)/completion','/(student)/documents','/(student)/dtr','/(student)/journals','/(student)/applications','/(student)/notifications'])
 export async function registerPushDevice(): Promise<string> {
   if (Platform.OS === 'web' || Constants.executionEnvironment === 'storeClient') return 'Push requires an AIMS development or production build.'
   const projectId = Constants.easConfig?.projectId || Constants.expoConfig?.extra?.eas?.projectId || process.env.EXPO_PUBLIC_EAS_PROJECT_ID
@@ -36,12 +37,21 @@ export async function listenForPushNavigation(): Promise<()=>void> {
   Notifications.setNotificationHandler({handleNotification:async()=>({shouldShowBanner:true,shouldShowList:true,shouldPlaySound:true,shouldSetBadge:false})})
   const navigate = async (response:import('expo-notifications').NotificationResponse) => {
     if (!await SecureStore.getItemAsync('access_token')) return
-    const route = response.notification.request.content.data?.route
-    router.push((typeof route === 'string' && allowedRoutes.has(route) ? route : '/(student)/notifications') as never)
-    await Notifications.clearLastNotificationResponseAsync()
+    const id = response.notification.request.content.data?.notification_id
+    try {
+      // Verify inbox ownership before following a notification from a shared phone.
+      if (typeof id !== 'string') return
+      const {data: notice} = await api.get(`/notifications/detail/${encodeURIComponent(id)}`)
+      await api.put(`/notifications/${encodeURIComponent(id)}/read`)
+      notificationsChanged()
+      const route = getStudentReminderRoute(notice.data) ?? '/(student)/notifications'
+      router.push(route as never)
+    } catch { router.push('/(student)/notifications') }
+    finally { await Notifications.clearLastNotificationResponseAsync() }
   }
   const last = await Notifications.getLastNotificationResponseAsync()
   if (last) await navigate(last)
   const subscription = Notifications.addNotificationResponseReceivedListener(response=>{void navigate(response)})
-  return ()=>subscription.remove()
+  const received = Notifications.addNotificationReceivedListener(() => notificationsChanged())
+  return ()=>{subscription.remove(); received.remove()}
 }

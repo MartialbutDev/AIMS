@@ -1,6 +1,6 @@
 """AIMS authentication endpoints (mobile + web).
 
-Password reset and email verification require SMTP and frontend action URLs.
+Legacy reset links and email verification use SMTP; mobile OTP uses EmailJS.
 They never return secret tokens to unauthenticated callers.
 """
 
@@ -65,6 +65,7 @@ def _token_response(user: User) -> LoginResponse:
             "sub": user.id,
             "role": user.role.value,
             "purpose": "access",
+            "pwd": hashlib.sha256(user.hashed_password.encode()).hexdigest(),
         }),
         token_type="bearer",
         user=user,
@@ -381,6 +382,7 @@ async def change_password(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    db.refresh(current_user, with_for_update=True)
     if not verify_password(
         password_data.current_password,
         current_user.hashed_password,

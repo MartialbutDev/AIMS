@@ -224,14 +224,14 @@ export default function HelpSupportScreen() {
       activeOpacity={0.7}
     >
       <View style={[styles.guideIcon, { backgroundColor: `${colors.primary}15` }]}>
-        <Ionicons name={item.icon} size={28} color={colors.primary} />
+        <Ionicons name={item.icon} size={28} color={colors.accent} />
       </View>
       <Text style={[styles.guideTitle, { color: colors.textPrimary }]}>{item.title}</Text>
       <Text style={[styles.guideDescription, { color: colors.textSecondary }]}>
         {item.description}
       </Text>
       <View style={styles.guideArrow}>
-        <Ionicons name="arrow-forward-outline" size={18} color={colors.primary} />
+        <Ionicons name="arrow-forward-outline" size={18} color={colors.accent} />
       </View>
     </TouchableOpacity>
   );
@@ -262,7 +262,7 @@ export default function HelpSupportScreen() {
             onPress={handleContactSupport}
           >
             <View style={[styles.quickActionIcon, { backgroundColor: `${colors.primary}15` }]}>
-              <Ionicons name="mail-outline" size={24} color={colors.primary} />
+              <Ionicons name="mail-outline" size={24} color={colors.accent} />
             </View>
             <Text style={[styles.quickActionLabel, { color: colors.textPrimary }]}>
               Contact Support

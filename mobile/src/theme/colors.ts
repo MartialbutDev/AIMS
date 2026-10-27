@@ -1,5 +1,10 @@
 // src/theme/colors.ts
 export const lightColors = {
+  accent: '#000080',
+  accentMuted: '#EBEBF8',
+  onAccent: '#FFFFFF',
+  inputBackground: '#FFFFFF',
+  tabBackground: '#FFFFFF',
   // Background
   background: '#F6F8FC',
   card: '#FFFFFF',
@@ -50,49 +55,55 @@ export const lightColors = {
 };
 
 export const darkColors = {
+  // Readable foreground accents are separate from filled button backgrounds.
+  accent: '#FFC629',
+  accentMuted: '#342D20',
+  onAccent: '#0B0B2F',
+  inputBackground: '#101629',
+  tabBackground: '#171D33',
   // Background
-  background: '#0F172A',    // Dark slate
-  card: '#1E293B',          // Dark card
+  background: '#0B0D1B',    
+  card: '#151A2E',          
   
   // Text
-  textPrimary: '#F1F5F9',   // Light text
-  textSecondary: '#94A3B8', // Gray text
-  textTertiary: '#64748B',  // Darker gray text
+  textPrimary: '#F4F6FF',   
+  textSecondary: '#BCC5DA', 
+  textTertiary: '#9AA8C4',  
   
   // Brand - Darker Navy for dark mode
-  primary: '#000066',      // ✅ Darker Navy for dark mode
-  primaryLight: '#1A1A8E',
-  primaryDark: '#000040',
+  primary: '#353E7C',      
+  primaryLight: '#46529B',
+  primaryDark: '#252C5B',
   
   // Status
-  success: '#22C55E',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  info: '#3B82F6',
+  success: '#6EE7B7',
+  warning: '#FFD46B',
+  error: '#FF9FA9',
+  info: '#A8CFFF',
   
   // Borders
-  border: '#334155',
-  borderLight: '#1E293B',
+  border: '#35415F',
+  borderLight: '#252F48',
   
   // Surfaces
-  surface: '#1E293B',
-  surfaceSecondary: '#334155',
-  surfaceTertiary: '#0F172A',
+  surface: '#151A2E',
+  surfaceSecondary: '#1D253D',
+  surfaceTertiary: '#27324B',
   
   // Shadows
   shadow: '#000000',
   
   // Gradients
-  gradientStart: '#000066',
-  gradientEnd: '#1A1A8E',
+  gradientStart: '#171B3A',
+  gradientEnd: '#242B53',
   
   // Status Badge Colors (adjusted for dark mode)
-  pending: '#F59E0B',
-  approved: '#34D399',
-  rejected: '#F87171',
-  submitted: '#60A5FA',
-  draft: '#94A3B8',
-  reviewing: '#A78BFA',
+  pending: '#FFD46B',
+  approved: '#6EE7B7',
+  rejected: '#FF9FA9',
+  submitted: '#A8CFFF',
+  draft: '#AAB6CE',
+  reviewing: '#D2B5FF',
   
   // Additional colors for components
   white: '#FFFFFF',

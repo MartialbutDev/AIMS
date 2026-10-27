@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 # backend/app/services/notification_service.py
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -49,7 +50,7 @@ class NotificationService:
         if unread_only:
             query = query.filter(Notification.is_read == False)
         return (
-            query.order_by(Notification.created_at.desc())
+            query.order_by(Notification.created_at.desc(), Notification.id.desc())
             .offset(skip)
             .limit(limit)
             .all()
@@ -80,7 +81,7 @@ class NotificationService:
         )
         if notification:
             notification.is_read = True
-            notification.read_at = func.now()
+            notification.read_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.commit()
             db.refresh(notification)
         return notification
@@ -93,7 +94,7 @@ class NotificationService:
                 Notification.user_id == user_id,
                 Notification.is_read == False,
             )
-            .update({"is_read": True, "read_at": func.now()})
+            .update({"is_read": True, "read_at": datetime.now(timezone.utc).replace(tzinfo=None)})
         )
         db.commit()
         return result
@@ -109,6 +110,8 @@ class NotificationService:
             .first()
         )
         if notification:
+            from app.models.push import PushDelivery
+            db.query(PushDelivery).filter_by(notification_id=notification.id).delete(synchronize_session=False)
             db.delete(notification)
             db.commit()
             return True
@@ -127,6 +130,9 @@ class NotificationService:
         company_name: str,
     ) -> Notification:
         """Create notification for application status change."""
+
+        if db.info.get('workflow_notifications'):
+            return None  # Captured in the workflow transaction; never duplicate after commit.
 
         status_messages = {
             "pending": (
@@ -185,6 +191,9 @@ class NotificationService:
     ) -> Notification:
         """Create notification for DTR status change."""
 
+        if db.info.get('workflow_notifications'):
+            return None  # Captured in the workflow transaction; never duplicate after commit.
+
         status_messages = {
             "pending": f"Your DTR for {date} has been recorded. Please don't forget to clock out.",
             "submitted": f"Your DTR for {date} has been submitted for approval.",
@@ -217,6 +226,9 @@ class NotificationService:
         week: int,
     ) -> Notification:
         """Create notification for journal status change."""
+
+        if db.info.get('workflow_notifications'):
+            return None  # Captured in the workflow transaction; never duplicate after commit.
 
         status_messages = {
             "draft": f"Your Week {week} journal has been saved as a draft.",
@@ -251,6 +263,9 @@ class NotificationService:
         doc_type: str,
     ) -> Notification:
         """Create notification for document verification."""
+
+        if db.info.get('workflow_notifications'):
+            return None  # Captured in the workflow transaction; never duplicate after commit.
 
         status_messages = {
             "uploaded": f"Your {doc_type} has been uploaded successfully.",

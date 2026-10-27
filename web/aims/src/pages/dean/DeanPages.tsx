@@ -1,4 +1,4 @@
-import { CompletionOverview } from '../../components/CompletionOverview'
+import { DirectPlacementsPage } from '../shared/DirectPlacementsPage'
 
 import type { UserSession } from '../../types/auth'
 
@@ -31,13 +31,16 @@ export function DeanPages({
   onLogout,
 }: DeanPagesProps) {
   switch (section) {
+    case 'direct-placements':
+      return <DirectPlacementsPage role="dean" />
+
     // ========================================
     // DEAN DASHBOARD / ANALYTICS
     // ========================================
 
     case 'dashboard':
     case 'analytics':
-      return <><DeanDashboardPage /><CompletionOverview /></>
+      return <DeanDashboardPage />
 
     // ========================================
     // COORDINATOR MANAGEMENT

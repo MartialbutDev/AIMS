@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, ForeignKey, Text, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -32,7 +33,7 @@ class Notification(Base):
     is_read = Column(Boolean, default=False)
     read_at = Column(DateTime, nullable=True)
     
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), server_default=func.now())
     
     # Relationships
     user = relationship("User", backref="notifications")

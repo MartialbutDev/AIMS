@@ -136,7 +136,7 @@ export default function DTRDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Loading DTR details...
           </Text>
@@ -200,7 +200,7 @@ export default function DTRDetailScreen() {
         {/* ----- summary card ----- */}
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.dateRow}>
-            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+            <Ionicons name="calendar-outline" size={20} color={colors.accent} />
             <Text style={[styles.dateText, { color: colors.textPrimary }]}>
               {formatDate(dtr.date)}
             </Text>
@@ -256,7 +256,7 @@ export default function DTRDetailScreen() {
                 Total Hours
               </Text>
               <View style={styles.timeValueRow}>
-                <Ionicons name="time-outline" size={18} color={colors.primary} />
+                <Ionicons name="time-outline" size={18} color={colors.accent} />
                 <Text
                   style={[
                     styles.timeValue,
@@ -274,7 +274,7 @@ export default function DTRDetailScreen() {
         {dtr.location_address && (
           <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              <Ionicons name="location-outline" size={16} color={colors.primary} /> Location
+              <Ionicons name="location-outline" size={16} color={colors.accent} /> Location
             </Text>
             <Text style={[styles.sectionText, { color: colors.textSecondary }]}>
               {dtr.location_address}

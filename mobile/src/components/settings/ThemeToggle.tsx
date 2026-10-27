@@ -9,17 +9,20 @@ export default function ThemeToggle() {
 
   return (
     <TouchableOpacity
-      style={[styles.container, { backgroundColor: colors.card }]}
+      style={[styles.container, { backgroundColor: colors.card, borderColor: isDark ? colors.border : "rgba(0,0,0,0.02)" }]}
+      accessibilityRole="switch"
+      accessibilityLabel="Dark mode"
+      accessibilityState={{ checked: isDark }}
       onPress={toggleTheme}
       activeOpacity={0.7}
     >
       <View style={styles.content}>
         <View style={styles.leftSection}>
-          <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}10` }]}>
+          <View style={[styles.iconContainer, { backgroundColor: isDark ? colors.accentMuted : `${colors.primary}10` }]}>
             <Ionicons 
               name={isDark ? "moon-outline" : "sunny-outline"} 
               size={22} 
-              color={colors.primary} 
+              color={colors.accent} 
             />
           </View>
           <View style={styles.textContainer}>
@@ -35,14 +38,14 @@ export default function ThemeToggle() {
         {/* ✅ Only the track and thumb should animate, not the whole section */}
         <View style={styles.toggleContainer}>
           <MotiView
-            style={[styles.toggleTrack, { backgroundColor: isDark ? colors.primary : colors.border }]}
+            style={[styles.toggleTrack, { backgroundColor: isDark ? colors.accent : colors.border }]}
           >
             <MotiView
               animate={{
                 translateX: isDark ? 18 : 0,
               }}
               transition={{ type: "spring", damping: 15 }}
-              style={[styles.toggleThumb, { backgroundColor: colors.card }]}
+              style={[styles.toggleThumb, { backgroundColor: isDark ? colors.onAccent : colors.card }]}
             />
           </MotiView>
         </View>

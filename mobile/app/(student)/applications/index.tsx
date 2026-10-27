@@ -138,7 +138,7 @@ export default function ApplicationsScreen() {
               { backgroundColor: `${colors.primary}10` },
             ]}
           >
-            <Text style={[styles.companyInitial, { color: colors.primary }]}>
+            <Text style={[styles.companyInitial, { color: colors.accent }]}>
               {item.company_name?.charAt(0) ?? "?"}
             </Text>
           </View>
@@ -262,7 +262,7 @@ export default function ApplicationsScreen() {
           style={styles.addButton}
           onPress={() => router.push("/(student)/applications/new" as any)}
         >
-          <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
+          <Ionicons name="add-circle-outline" size={28} color={colors.accent} />
         </TouchableOpacity>
       </View>
 
@@ -298,6 +298,11 @@ export default function ApplicationsScreen() {
         </View>
       </View>
 
+      <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/(student)/applications/direct-placements" as never)} style={{ marginHorizontal: 20, marginBottom: 14, padding: 16, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 14, flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <Ionicons name="people-outline" size={24} color={colors.accent} />
+        <View style={{ flex: 1 }}><Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "700" }}>Direct placements</Text><Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>Review school-arranged company proposals</Text></View><Ionicons name="chevron-forward" size={18} color={colors.accent} />
+      </TouchableOpacity>
+
       <View style={styles.filtersWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.filtersContainer}>
@@ -315,7 +320,7 @@ export default function ApplicationsScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={refresh}
-            tintColor={colors.primary}
+            tintColor={colors.accent}
           />
         }
         onScroll={handleScroll}
@@ -352,7 +357,7 @@ export default function ApplicationsScreen() {
         ListFooterComponent={
           isLoading && applications.length > 0 ? (
             <View style={styles.loaderContainer}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
             </View>
           ) : null
         }

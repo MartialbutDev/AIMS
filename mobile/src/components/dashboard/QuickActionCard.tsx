@@ -1,3 +1,4 @@
+import { readableAccent } from "../../theme/readableAccent";
 // src/components/dashboard/QuickActionCard.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { MotiView } from "moti";
@@ -24,15 +25,7 @@ export default function QuickActionCard({
 }: QuickActionCardProps) {
   const { colors, isDark } = useTheme();
 
-  // ✅ Only Apply Internship icon turns white in dark mode
-  const getIconColor = () => {
-    // Apply Internship icon (briefcase-outline) turns white in dark mode
-    if (icon === "briefcase-outline" && isDark) {
-      return "#FFFFFF";
-    }
-    // All other icons keep their original color
-    return color;
-  };
+  const iconColor = isDark ? readableAccent(color, colors.card) : color;
 
   return (
     <MotiView
@@ -46,7 +39,7 @@ export default function QuickActionCard({
           styles.card,
           {
             backgroundColor: colors.card,
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            borderColor: isDark ? colors.border : 'rgba(0,0,0,0.06)',
           }
         ]}
         onPress={onPress}
@@ -56,12 +49,12 @@ export default function QuickActionCard({
           <View style={[
             styles.iconContainer,
             {
-              backgroundColor: `${color}15`,
-              borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+              backgroundColor: `${iconColor}18`,
+              borderColor: isDark ? colors.borderLight : 'rgba(0,0,0,0.08)',
               borderWidth: 1,
             }
           ]}>
-            <Ionicons name={icon} size={22} color={getIconColor()} />
+            <Ionicons name={icon} size={22} color={iconColor} />
           </View>
           <View style={styles.textContainer}>
             <Text style={[styles.label, { color: colors.textPrimary }]}>{label}</Text>

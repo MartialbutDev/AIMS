@@ -115,7 +115,7 @@ export default function AboutScreen() {
         colors={isDark ? ['rgba(0,0,128,0.15)', 'rgba(0,0,128,0.05)'] : ['rgba(0,0,128,0.08)', 'rgba(0,0,128,0.02)']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.adviserCard, { borderColor: colors.primary }]}
+        style={[styles.adviserCard, { borderColor: colors.accent }]}
       >
         <View style={styles.adviserHeader}>
           <View style={[styles.adviserAvatar, { backgroundColor: `${colors.primary}15` }]}>
@@ -127,8 +127,8 @@ export default function AboutScreen() {
           <View style={styles.adviserInfo}>
             <Text style={[styles.adviserName, { color: colors.textPrimary }]}>{member.name}</Text>
             <View style={[styles.adviserRolePill, { backgroundColor: `${colors.primary}20` }]}>
-              <Ionicons name="school-outline" size={12} color={colors.primary} />
-              <Text style={[styles.adviserRoleText, { color: colors.primary }]}>{member.role}</Text>
+              <Ionicons name="school-outline" size={12} color={colors.accent} />
+              <Text style={[styles.adviserRoleText, { color: colors.accent }]}>{member.role}</Text>
             </View>
           </View>
         </View>
@@ -143,8 +143,8 @@ export default function AboutScreen() {
               activeOpacity={0.7}
               accessibilityLabel="LinkedIn Profile"
             >
-              <Ionicons name="logo-linkedin" size={16} color={colors.primary} />
-              <Text style={[styles.adviserSocialBtnText, { color: colors.primary }]}>Connect</Text>
+              <Ionicons name="logo-linkedin" size={16} color={colors.accent} />
+              <Text style={[styles.adviserSocialBtnText, { color: colors.accent }]}>Connect</Text>
             </TouchableOpacity>
           )}
           {member.social?.email && (
@@ -154,8 +154,8 @@ export default function AboutScreen() {
               activeOpacity={0.7}
               accessibilityLabel="Send Email"
             >
-              <Ionicons name="mail-outline" size={16} color={colors.primary} />
-              <Text style={[styles.adviserSocialBtnText, { color: colors.primary }]}>Email</Text>
+              <Ionicons name="mail-outline" size={16} color={colors.accent} />
+              <Text style={[styles.adviserSocialBtnText, { color: colors.accent }]}>Email</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -187,7 +187,7 @@ export default function AboutScreen() {
           {member.name}
         </Text>
         <View style={[styles.memberRolePill, { backgroundColor: `${colors.primary}10` }]}>
-          <Text style={[styles.memberRoleText, { color: colors.primary }]} numberOfLines={1}>
+          <Text style={[styles.memberRoleText, { color: colors.accent }]} numberOfLines={1}>
             {member.role}
           </Text>
         </View>
@@ -202,7 +202,7 @@ export default function AboutScreen() {
               activeOpacity={0.7}
               accessibilityLabel={`${member.name} GitHub`}
             >
-              <Ionicons name="logo-github" size={14} color={colors.primary} />
+              <Ionicons name="logo-github" size={14} color={colors.accent} />
             </TouchableOpacity>
           )}
           {member.social?.linkedin && (
@@ -212,7 +212,7 @@ export default function AboutScreen() {
               activeOpacity={0.7}
               accessibilityLabel={`${member.name} LinkedIn`}
             >
-              <Ionicons name="logo-linkedin" size={14} color={colors.primary} />
+              <Ionicons name="logo-linkedin" size={14} color={colors.accent} />
             </TouchableOpacity>
           )}
         </View>
@@ -285,7 +285,7 @@ export default function AboutScreen() {
             style={styles.heroGradient}
           />
           <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}15` }]}>
-            <Ionicons name="school-outline" size={40} color={colors.primary} />
+            <Ionicons name="school-outline" size={40} color={colors.accent} />
           </View>
           <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>{APP_NAME}</Text>
           <View style={styles.heroBadge}>
@@ -311,7 +311,7 @@ export default function AboutScreen() {
               transition={{ type: "spring", delay: stat.delay }}
               style={[styles.statCard, { backgroundColor: colors.card, borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
             >
-              <Text style={[styles.statValue, { color: colors.primary }]}>{stat.value}</Text>
+              <Text style={[styles.statValue, { color: colors.accent }]}>{stat.value}</Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{stat.label}</Text>
             </MotiView>
           ))}

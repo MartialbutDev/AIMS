@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import uuid
 
 from sqlalchemy import Column, DateTime, Enum as SQLEnum, Integer, String, Text
@@ -24,4 +25,4 @@ class NotificationCampaign(Base):
     recipient_count = Column(Integer, nullable=True)
     sent_at = Column(DateTime, nullable=True)
     failure_reason = Column(Text, nullable=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), server_default=func.now(), nullable=False)

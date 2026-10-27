@@ -1,4 +1,3 @@
-from app.core.record_lock import lock_student_term
 
 from fastapi import (
     APIRouter,
@@ -732,7 +731,6 @@ async def update_journal(
         )
 
     _require_current_journal_term(journal)
-    lock_student_term(db, journal.student_id, journal.academic_year, journal.semester)
     if current_user.role == UserRole.STUDENT:
         DeploymentService.require_active_deployment(db, current_user.id)
 
@@ -882,7 +880,6 @@ async def replace_journal_file(
         )
 
     _require_current_journal_term(journal)
-    lock_student_term(db, journal.student_id, journal.academic_year, journal.semester)
     DeploymentService.require_active_deployment(db, current_user.id)
 
     if journal.status != JournalStatus.DRAFT:
@@ -962,7 +959,6 @@ async def delete_journal(
         )
 
     _require_current_journal_term(journal)
-    lock_student_term(db, journal.student_id, journal.academic_year, journal.semester)
     DeploymentService.require_active_deployment(db, current_user.id)
 
     if journal.status != JournalStatus.DRAFT:

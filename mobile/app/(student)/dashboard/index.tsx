@@ -1,3 +1,4 @@
+import { useNotificationRefresh } from '../../../src/hooks/useNotificationRefresh';
 
 import { router, useFocusEffect } from "expo-router";
 import {
@@ -184,6 +185,9 @@ export default function DashboardScreen() {
 
   const [notificationCount, setNotificationCount] =
     useState(0);
+  useNotificationRefresh(async () => {
+    try { const count = await notificationService.getNotificationCount(); setNotificationCount(Math.max(0, count.unread)); } catch { /* Preserve last known badge while offline. */ }
+  });
 
   const [greeting, setGreeting] =
     useState(getGreeting());
@@ -679,8 +683,8 @@ export default function DashboardScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
           />
         }
       >
@@ -746,7 +750,6 @@ export default function DashboardScreen() {
         </TouchableOpacity>
 
         {/* ============================================= */}
-        <TouchableOpacity onPress={() => router.push('/(student)/completion' as never)} style={{ marginHorizontal: 20, marginBottom: 18, padding: 18, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }}><Text style={{ color: colors.textPrimary, fontWeight: '700' }}>Final clearance & official completion</Text><Text style={{ color: colors.textSecondary, marginTop: 6, lineHeight: 20 }}>View approved requirements, submit final files, and track school completion.</Text></TouchableOpacity>
         {/* DASHBOARD STATISTICS */}
         {/* ============================================= */}
 
@@ -758,7 +761,7 @@ export default function DashboardScreen() {
               icon="briefcase-outline"
               value={stats.applications}
               label="Applications"
-              color={colors.primary}
+              color={colors.accent}
               onPress={() =>
                 navigateTo(
                   "/(student)/applications"
@@ -822,7 +825,7 @@ export default function DashboardScreen() {
               icon="briefcase-outline"
               label="Apply Internship"
               subtitle="Start your application"
-              color={colors.primary}
+              color={colors.accent}
               onPress={() =>
                 navigateTo(
                   "/(student)/applications/new"

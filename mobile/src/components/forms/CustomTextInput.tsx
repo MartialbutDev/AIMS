@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import Colors from "../../theme/colors";
+import { useTheme } from "../../context/ThemeContext";
 
 export interface CustomTextInputProps extends TextInputProps {
   label: string;
@@ -20,13 +21,14 @@ export interface CustomTextInputProps extends TextInputProps {
 
 const CustomTextInput = forwardRef<TextInput, CustomTextInputProps>(
   ({ label, icon, secure = false, error, ...props }, ref) => {
+    const { colors, isDark } = useTheme();
     const [isPasswordVisible, setIsPasswordVisible] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
 
     return (
       <View style={styles.wrapper}>
         {/* Label */}
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, isDark && { color: colors.textSecondary }]}>{label}</Text>
 
         {/* Input Container */}
         <View
@@ -34,13 +36,14 @@ const CustomTextInput = forwardRef<TextInput, CustomTextInputProps>(
             styles.inputContainer,
             isFocused && styles.focusedContainer,
             error ? styles.errorContainer : null,
+            isDark && { backgroundColor: colors.inputBackground, borderColor: error ? colors.error : isFocused ? colors.accent : colors.border, shadowOpacity: 0 },
           ]}
         >
           {/* Left Icon */}
           <Ionicons
             name={icon}
             size={22}
-            color={isFocused ? Colors.primary : "#8A8A8A"}
+            color={isDark ? (isFocused ? colors.accent : colors.textTertiary) : isFocused ? Colors.primary : "#8A8A8A"}
             style={styles.leftIcon}
           />
 
@@ -48,8 +51,10 @@ const CustomTextInput = forwardRef<TextInput, CustomTextInputProps>(
           <TextInput
             ref={ref}
             {...props}
-            style={styles.input}
-            placeholderTextColor="#A0A0A0"
+            style={[styles.input, isDark && { color: colors.textPrimary }]}
+            placeholderTextColor={isDark ? colors.textTertiary : "#A0A0A0"}
+            selectionColor={colors.accent}
+            keyboardAppearance={isDark ? "dark" : "light"}
             secureTextEntry={secure && !isPasswordVisible}
             autoCapitalize="none"
             autoCorrect={false}
@@ -66,14 +71,14 @@ const CustomTextInput = forwardRef<TextInput, CustomTextInputProps>(
               <Ionicons
                 name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
                 size={22}
-                color="#8A8A8A"
+                color={isDark ? colors.textTertiary : "#8A8A8A"}
               />
             </TouchableOpacity>
           )}
         </View>
 
         {/* Error */}
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <Text style={[styles.errorText, isDark && { color: colors.error }]}>{error}</Text> : null}
       </View>
     );
   }

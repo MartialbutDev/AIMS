@@ -249,7 +249,7 @@ export default function TimeOutDTRScreen() {
                     { backgroundColor: `${colors.primary}15` },
                   ]}
                 >
-                  <Ionicons name="camera-outline" size={32} color={colors.primary} />
+                  <Ionicons name="camera-outline" size={32} color={colors.accent} />
                 </View>
                 <Text style={[styles.cameraBoxTitle, { color: colors.textPrimary }]}>
                   Take Time-Out Photo
@@ -308,9 +308,9 @@ export default function TimeOutDTRScreen() {
             >
               {isGettingLocation ? (
                 <>
-                  <ActivityIndicator size="small" color={colors.primary} />
+                  <ActivityIndicator size="small" color={colors.accent} />
                   <Text
-                    style={[styles.locationButtonText, { color: colors.primary }]}
+                    style={[styles.locationButtonText, { color: colors.accent }]}
                   >
                     Getting location…
                   </Text>
@@ -320,10 +320,10 @@ export default function TimeOutDTRScreen() {
                   <Ionicons
                     name="location-outline"
                     size={20}
-                    color={colors.primary}
+                    color={colors.accent}
                   />
                   <Text
-                    style={[styles.locationButtonText, { color: colors.primary }]}
+                    style={[styles.locationButtonText, { color: colors.accent }]}
                   >
                     Get Current Location
                   </Text>

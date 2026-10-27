@@ -140,7 +140,7 @@ export default function JournalsScreen() {
               { backgroundColor: `${colors.primary}10` },
             ]}
           >
-            <Text style={[styles.weekBadgeText, { color: colors.primary }]}>
+            <Text style={[styles.weekBadgeText, { color: colors.accent }]}>
               {getWeekLabel(item.week)}
             </Text>
           </View>
@@ -310,7 +310,7 @@ export default function JournalsScreen() {
           style={styles.addButton}
           onPress={() => router.push("/(student)/journals/new" as any)}
         >
-          <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
+          <Ionicons name="add-circle-outline" size={28} color={colors.accent} />
         </TouchableOpacity>
       </View>
 
@@ -318,7 +318,7 @@ export default function JournalsScreen() {
       {summary && (
         <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>
+            <Text style={[styles.statValue, { color: colors.accent }]}>
               {summary.total}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
@@ -398,7 +398,7 @@ export default function JournalsScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={refresh}
-            tintColor={colors.primary}
+            tintColor={colors.accent}
           />
         }
         onScroll={handleScroll}
@@ -437,7 +437,7 @@ export default function JournalsScreen() {
         ListFooterComponent={
           isLoading && journals.length > 0 ? (
             <View style={styles.loaderContainer}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
             </View>
           ) : null
         }

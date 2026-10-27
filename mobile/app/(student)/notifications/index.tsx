@@ -1,9 +1,10 @@
+import { useNotificationRefresh } from '../../../src/hooks/useNotificationRefresh';
 import { getStudentReminderRoute } from "../../../src/utils/studentReminderRoute";
 // app/(student)/notifications/index.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -39,7 +40,7 @@ const getNotificationIcon = (type: string): keyof typeof Ionicons.glyphMap => {
 const getNotificationColor = (type: string, colors: any): string => {
   switch (type) {
     case 'application':
-      return colors.primary;
+      return colors.accent;
     case 'dtr':
       return '#10B981';
     case 'journal':
@@ -75,30 +76,36 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  const [page, setPage] = useState(0);
+  const [error, setError] = useState('');
+  const sequence = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; ++sequence.current; }; }, []);
+  useNotificationRefresh(() => fetchNotifications());
+  useEffect(() => { void fetchNotifications(); }, [page]);
 
   const fetchNotifications = async () => {
+    const seq = ++sequence.current;
     try {
       const [data, count] = await Promise.all([
-        notificationService.getNotifications(),
+        notificationService.getNotifications(page * 30, 30),
         notificationService.getNotificationCount(),
       ]);
+      if (!mounted.current || seq !== sequence.current) return;
+      setError('');
       setNotifications(data);
       setUnreadCount(count.unread);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      if (mounted.current && seq === sequence.current) setError('Unable to load notifications. Pull down to retry.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (mounted.current && seq === sequence.current) { setLoading(false); setRefreshing(false); }
     }
   };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchNotifications();
-  }, []);
+  }, [page]);
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
@@ -108,9 +115,9 @@ export default function NotificationsScreen() {
           n.id === notificationId ? { ...n, is_read: true } : n
         )
       );
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setUnreadCount((await notificationService.getNotificationCount()).unread);
     } catch (error) {
-      console.error('Error marking as read:', error);
+      Alert.alert('Unable to update', 'Please retry marking this notification as read.');
     }
   };
 
@@ -122,7 +129,7 @@ export default function NotificationsScreen() {
       );
       setUnreadCount(0);
     } catch (error) {
-      console.error('Error marking all as read:', error);
+      Alert.alert('Unable to update', 'Please retry marking notifications as read.');
     }
   };
 
@@ -138,9 +145,9 @@ export default function NotificationsScreen() {
           onPress: async () => {
             try {
               await notificationService.deleteNotification(notificationId);
-              setNotifications(prev => prev.filter(n => n.id !== notificationId));
+              await fetchNotifications();
             } catch (error) {
-              console.error('Error deleting notification:', error);
+              Alert.alert('Unable to delete', 'Please try again.');
             }
           },
         },
@@ -164,13 +171,13 @@ export default function NotificationsScreen() {
           if (!item.is_read) {
             handleMarkAsRead(item.id);
           }
-          const reminderRoute = getStudentReminderRoute(item.data);
+          const reminderRoute = getStudentReminderRoute(item.data) ?? ({application: '/(student)/applications', document: '/(student)/documents', dtr: '/(student)/dtr', journal: '/(student)/journals'} as Record<string,string>)[item.type];
           if (reminderRoute) {
             Alert.alert(item.title, item.message, [
               { text: "Close", style: "cancel" },
-              { text: "Open section", onPress: () => router.push(reminderRoute) },
+              { text: "Open section", onPress: () => router.push(reminderRoute as never) },
             ]);
-          }
+          } else { Alert.alert(item.title, item.message); }
         }}
         activeOpacity={0.7}
       >
@@ -235,31 +242,35 @@ export default function NotificationsScreen() {
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Notifications</Text>
         {unreadCount > 0 && (
           <TouchableOpacity style={styles.markAllButton} onPress={handleMarkAllAsRead}>
-            <Text style={[styles.markAllText, { color: colors.primary }]}>Mark all read</Text>
+            <Text style={[styles.markAllText, { color: colors.accent }]}>Mark all read</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {unreadCount > 0 && (
         <View style={[styles.unreadBanner, { backgroundColor: `${colors.primary}10` }]}>
-          <Text style={[styles.unreadBannerText, { color: colors.primary }]}>
+          <Text style={[styles.unreadBannerText, { color: colors.accent }]}>
             You have {unreadCount} unread notification{unreadCount > 1 ? 's' : ''}
           </Text>
         </View>
       )}
 
+      {!!error && <Text accessibilityRole="alert" style={{color: colors.error, padding: 16}}>{error}</Text>}
+      <View style={{flexDirection: 'row', padding: 16, gap: 24}}>
+        <TouchableOpacity onPress={() => router.push('/(student)/notifications/preferences')}><Text style={{color: colors.accent, fontWeight: '700'}}>Preferences</Text></TouchableOpacity>
+      </View>
       <FlatList
         data={notifications}
         renderItem={renderNotificationItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
         }
         onScroll={handleScroll}
         scrollEventThrottle={16}
         ListEmptyComponent={renderEmpty}
-        ListFooterComponent={<View style={styles.listFooter} />}
+        ListFooterComponent={<View style={{flexDirection: 'row', justifyContent: 'space-between', padding: 20}}><TouchableOpacity disabled={page === 0} onPress={() => setPage(p => p - 1)}><Text style={{color: page === 0 ? colors.textTertiary : colors.accent}}>Previous</Text></TouchableOpacity><Text style={{color: colors.textSecondary}}>Page {page + 1}</Text><TouchableOpacity disabled={notifications.length < 30} onPress={() => setPage(p => p + 1)}><Text style={{color: notifications.length < 30 ? colors.textTertiary : colors.accent}}>Next</Text></TouchableOpacity></View>}
       />
     </View>
   );

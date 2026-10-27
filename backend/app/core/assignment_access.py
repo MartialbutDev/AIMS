@@ -180,7 +180,3 @@ def ensure_coordinator_student_access(
         semester=semester,
         mode=mode,
     )
-    if mode == "write":
-        from app.core.record_lock import lock_student_term
-        year, term = get_current_academic_term()
-        lock_student_term(db, student_id, academic_year or year, semester or term)

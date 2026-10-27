@@ -32,14 +32,14 @@ export default function HeroCard({
   onNotificationPress,
   onProfilePress,
 }: HeroCardProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   return (
     <MotiView
       from={{ opacity: 0, translateY: -20 }}
       animate={{ opacity: 1, translateY: 0 }}
       transition={{ type: "timing", duration: 600 }}
-      style={styles.container}
+      style={[styles.container, isDark && { borderWidth: 1, borderColor: colors.border }]}
     >
       {/* Background photo */}
       <ImageBackground
@@ -49,7 +49,7 @@ export default function HeroCard({
       >
         {/* Dark gradient overlay for text readability */}
         <LinearGradient
-          colors={[
+          colors={isDark ? ["rgba(11, 11, 47, 0.90)", "rgba(22, 27, 59, 0.84)", "rgba(11, 13, 27, 0.96)"] : [
             "rgba(15, 23, 42, 0.75)",   // slate-900/75 at top
             "rgba(30, 64, 175, 0.65)",   // blue-900/65 in middle
             "rgba(15, 23, 42, 0.85)",    // slate-900/85 at bottom

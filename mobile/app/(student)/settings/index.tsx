@@ -80,7 +80,7 @@ export default function SettingsScreen() {
   ];
 
   const renderSetting = (item: SettingItem, index: number) => {
-    const iconColor = isDark ? "#FFFFFF" : (item.color || colors.primary);
+    const iconColor = item.color || colors.accent;
 
     return (
       <TouchableOpacity
@@ -115,14 +115,14 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Appearance</Text>
-          <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.card, borderWidth: isDark ? 1 : 0, borderColor: colors.border }]}>
             <ThemeToggle />
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Settings</Text>
-          <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.card, borderWidth: isDark ? 1 : 0, borderColor: colors.border }]}>
             {settings.map((item, index) => renderSetting(item, index))}
           </View>
         </View>

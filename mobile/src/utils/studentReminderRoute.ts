@@ -1,6 +1,11 @@
 const REMINDER_ROUTES = [
-  '/(student)/completion',
+  '/(student)/applications/direct-placements',
   '/(student)/documents',
+  '/(student)/documents/templates',
+  '/(student)/applications',
+  '/(student)/pre-deployment',
+  '/onboarding',
+  '/(student)/notifications',
   '/(student)/dtr',
   '/(student)/journals',
 ] as const;
@@ -12,6 +17,5 @@ export function getStudentReminderRoute(value: unknown): typeof REMINDER_ROUTES[
   }
   if (!payload || typeof payload !== 'object') return null;
   const record = payload as Record<string, unknown>;
-  if (record.source !== 'coordinator_reminder' && record.source !== 'internship_completion') return null;
   return REMINDER_ROUTES.find(route => route === record.route) ?? null;
 }

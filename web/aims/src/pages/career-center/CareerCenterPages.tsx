@@ -1,4 +1,4 @@
-import { CompletionOverview } from '../../components/CompletionOverview'
+import { DirectPlacementsPage } from '../shared/DirectPlacementsPage'
 
 import type { DashboardData } from '../../types/dashboard'
 import type { UserSession } from '../../types/auth'
@@ -38,17 +38,20 @@ export function CareerCenterPages({
   onNavigate,
 }: CareerCenterPagesProps) {
   switch (section) {
+    case 'direct-placements':
+      return <DirectPlacementsPage role="career_center" />
+
     // ========================================
     // DASHBOARD
     // ========================================
 
     case 'dashboard':
       return (
-        <><CareerDashboardPage
+        <CareerDashboardPage
           data={data}
           name={session.name}
           onNavigate={onNavigate}
-        /><CompletionOverview /></>
+        />
       )
 
     // ========================================

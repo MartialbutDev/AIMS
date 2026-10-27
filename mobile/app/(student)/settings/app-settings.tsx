@@ -175,7 +175,7 @@ export default function AppSettingsScreen() {
           >
             <View style={styles.settingLeft}>
               <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                <Ionicons name="language-outline" size={22} color={colors.primary} />
+                <Ionicons name="language-outline" size={22} color={colors.accent} />
               </View>
               <View>
                 <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
@@ -221,7 +221,7 @@ export default function AppSettingsScreen() {
             </View>
             <View style={styles.settingRight}>
               {clearingCache ? (
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator size="small" color={colors.accent} />
               ) : (
                 <Ionicons name="chevron-forward-outline" size={20} color={colors.textSecondary} />
               )}
@@ -241,7 +241,7 @@ export default function AppSettingsScreen() {
           >
             <View style={styles.settingLeft}>
               <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                <Ionicons name="document-text-outline" size={22} color={colors.primary} />
+                <Ionicons name="document-text-outline" size={22} color={colors.accent} />
               </View>
               <View>
                 <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
@@ -264,7 +264,7 @@ export default function AppSettingsScreen() {
           >
             <View style={styles.settingLeft}>
               <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                <Ionicons name="shield-outline" size={22} color={colors.primary} />
+                <Ionicons name="shield-outline" size={22} color={colors.accent} />
               </View>
               <View>
                 <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
@@ -289,7 +289,7 @@ export default function AppSettingsScreen() {
           <View style={styles.settingItem}>
             <View style={styles.settingLeft}>
               <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                <Ionicons name="information-circle-outline" size={22} color={colors.primary} />
+                <Ionicons name="information-circle-outline" size={22} color={colors.accent} />
               </View>
               <View>
                 <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
@@ -305,7 +305,7 @@ export default function AppSettingsScreen() {
           <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
             <View style={styles.settingLeft}>
               <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}15` }]}>
-                <Ionicons name="build-outline" size={22} color={colors.primary} />
+                <Ionicons name="build-outline" size={22} color={colors.accent} />
               </View>
               <View>
                 <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>
@@ -364,7 +364,7 @@ export default function AppSettingsScreen() {
                   {lang.name}
                 </Text>
                 {selectedLanguage === lang.code && (
-                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  <Ionicons name="checkmark-circle" size={24} color={colors.accent} />
                 )}
               </TouchableOpacity>
             ))}

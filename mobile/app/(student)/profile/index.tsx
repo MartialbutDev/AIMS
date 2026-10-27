@@ -300,7 +300,7 @@ export default function ProfileScreen() {
             My Documents
           </Text>
           <TouchableOpacity onPress={() => router.push("/(student)/documents")}>
-            <Text style={[styles.seeAllText, { color: colors.primary }]}>
+            <Text style={[styles.seeAllText, { color: colors.accent }]}>
               See All
             </Text>
           </TouchableOpacity>
@@ -310,7 +310,7 @@ export default function ProfileScreen() {
           {loadingDocs ? (
             // Loading state
             <View style={styles.docLoadingContainer}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
               <Text style={[styles.docLoadingText, { color: colors.textSecondary }]}>
                 Loading documents...
               </Text>
@@ -385,7 +385,7 @@ export default function ProfileScreen() {
                   >
                     <View style={styles.docItemLeft}>
                       <View style={[styles.docIcon, { backgroundColor: `${colors.primary}10` }]}>
-                        <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+                        <Ionicons name="document-text-outline" size={20} color={colors.accent} />
                       </View>
                       <View>
                         <Text style={[styles.docName, { color: colors.textPrimary }]}>
@@ -416,10 +416,10 @@ export default function ProfileScreen() {
                 style={[styles.viewAllButton, { borderColor: colors.border }]}
                 onPress={() => router.push("/(student)/documents")}
               >
-                <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                <Text style={[styles.viewAllText, { color: colors.accent }]}>
                   View All Documents
                 </Text>
-                <Ionicons name="arrow-forward-outline" size={16} color={colors.primary} />
+                <Ionicons name="arrow-forward-outline" size={16} color={colors.accent} />
               </TouchableOpacity>
             </>
           )}
@@ -465,7 +465,7 @@ export default function ProfileScreen() {
         <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
           {loadingOnboarding ? (
             <View style={styles.internshipLoading}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
               <Text style={[styles.docLoadingText, { color: colors.textSecondary }]}>
                 Loading coordinator information...
               </Text>
@@ -480,8 +480,8 @@ export default function ProfileScreen() {
                 accessibilityRole="button"
                 style={[styles.internshipRetry, { borderColor: colors.border }]}
               >
-                <Ionicons name="refresh-outline" size={16} color={colors.primary} />
-                <Text style={[styles.internshipRetryText, { color: colors.primary }]}>
+                <Ionicons name="refresh-outline" size={16} color={colors.accent} />
+                <Text style={[styles.internshipRetryText, { color: colors.accent }]}>
                   Try Again
                 </Text>
               </TouchableOpacity>
@@ -498,7 +498,7 @@ export default function ProfileScreen() {
                   <Ionicons
                     name="school-outline"
                     size={22}
-                    color={colors.primary}
+                    color={colors.accent}
                   />
                 </View>
                 <View style={styles.internshipHeaderText}>
@@ -625,7 +625,7 @@ export default function ProfileScreen() {
           
           <Text style={[styles.studentName, { color: colors.textPrimary }]}>{fullName}</Text>
           <Text style={[styles.studentId, { color: colors.textSecondary }]}>ID: {profile.student_id}</Text>
-          <Text style={[styles.userRole, { color: colors.primary, backgroundColor: `${colors.primary}10` }]}>
+          <Text style={[styles.userRole, { color: colors.accent, backgroundColor: `${colors.primary}10` }]}>
             {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
           </Text>
         </View>
@@ -745,7 +745,7 @@ export default function ProfileScreen() {
           <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
             <TouchableOpacity style={styles.menuItem} onPress={handleChangePassword}>
               <View style={styles.menuItemLeft}>
-                <Ionicons name="key-outline" size={22} color={colors.primary} />
+                <Ionicons name="key-outline" size={22} color={colors.accent} />
                 <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>Change Password</Text>
               </View>
               <Ionicons name="chevron-forward-outline" size={20} color={colors.textSecondary} />
@@ -755,7 +755,7 @@ export default function ProfileScreen() {
 
             <TouchableOpacity style={styles.menuItem} onPress={() => console.log("Privacy Settings")}>
               <View style={styles.menuItemLeft}>
-                <Ionicons name="shield-outline" size={22} color={colors.primary} />
+                <Ionicons name="shield-outline" size={22} color={colors.accent} />
                 <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>Privacy Settings</Text>
               </View>
               <Ionicons name="chevron-forward-outline" size={20} color={colors.textSecondary} />
@@ -765,7 +765,7 @@ export default function ProfileScreen() {
 
             <TouchableOpacity style={styles.menuItem} onPress={() => console.log("Notification Settings")}>
               <View style={styles.menuItemLeft}>
-                <Ionicons name="notifications-outline" size={22} color={colors.primary} />
+                <Ionicons name="notifications-outline" size={22} color={colors.accent} />
                 <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>Notification Settings</Text>
               </View>
               <Ionicons name="chevron-forward-outline" size={20} color={colors.textSecondary} />

@@ -1,6 +1,6 @@
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -150,8 +150,11 @@ class DeploymentService:
                 detail="Coordinator role required",
             )
 
+        identity = db.query(InternshipDeployment.student_id).filter(InternshipDeployment.id == deployment_id).first()
+        if identity:
+            db.query(User).filter(User.id == identity[0]).with_for_update().first()
         deployment = (
-            db.query(InternshipDeployment)
+            db.query(InternshipDeployment).populate_existing()
             .filter(
                 InternshipDeployment.id == deployment_id
             )
@@ -212,6 +215,20 @@ class DeploymentService:
                 detail="Deployment does not match an accepted application",
             )
 
+        from app.services import direct_placement_service as direct_service
+        direct_service.ensure_application_ready(db, application)
+        if direct_service.available(db):
+            from app.models.direct_placement import DirectPlacement
+            direct = db.query(DirectPlacement).filter(DirectPlacement.application_id == application.id).first()
+            if direct:
+                from app.models.company import Company
+                company = db.query(Company).filter(Company.id == application.company_id).one()
+                earliest = max(company.moa_signed_at, company.moa_effective_at,
+                    (direct.student_decided_at + timedelta(hours=8)).date(),
+                    (application.decided_at + timedelta(hours=8)).date() if application.decided_at else date.min)
+                if deployment_date < earliest or deployment_date > company.moa_expires_at:
+                    raise HTTPException(422, 'The deployment date must follow student acknowledgement, company acceptance and MOA effectivity')
+
         checklist = cls.get_checklist(db, deployment)
 
         if not checklist["ready_for_deployment"]:
@@ -229,7 +246,7 @@ class DeploymentService:
                 },
             )
 
-        if deployment_date > date.today():
+        if deployment_date > datetime.now(timezone(timedelta(hours=8))).date():
             raise HTTPException(
                 status_code=422,
                 detail="Deployment date cannot be in the future",
@@ -263,8 +280,6 @@ class DeploymentService:
                 InternshipDeployment.confirmed_at.isnot(None),
                 InternshipDeployment.deployment_date.isnot(None),
             )
-            .populate_existing()
-            .with_for_update()
             .first()
         )
 

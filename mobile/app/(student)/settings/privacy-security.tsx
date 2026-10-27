@@ -214,7 +214,7 @@ export default function PrivacySecurityScreen() {
         >
           <View style={styles.itemLeft}>
             <View style={[styles.iconContainer, { backgroundColor: `${colors.primary}10` }]}>
-              <Ionicons name={item.icon} size={20} color={colors.primary} />
+              <Ionicons name={item.icon} size={20} color={colors.accent} />
             </View>
             <View style={styles.itemTextContainer}>
               <Text style={[styles.itemLabel, { color: colors.textPrimary }]}>
@@ -354,7 +354,7 @@ export default function PrivacySecurityScreen() {
         {sections.map((section, sectionIndex) => (
           <View key={sectionIndex} style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name={section.icon} size={18} color={colors.primary} />
+              <Ionicons name={section.icon} size={18} color={colors.accent} />
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
                 {section.title}
               </Text>

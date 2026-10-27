@@ -149,7 +149,14 @@ class Settings(BaseSettings):
     # ========================================================
 
     PUSH_DELIVERY_ENABLED: bool = False
+    EMAIL_NOTIFICATION_DELIVERY_ENABLED: bool = False
+    NOTIFICATION_WEB_URL: str = ""
     EXPO_ACCESS_TOKEN: Optional[str] = None
+
+    EMAILJS_SERVICE_ID: str = ""
+    EMAILJS_OTP_TEMPLATE_ID: str = ""
+    EMAILJS_PUBLIC_KEY: str = ""
+    EMAILJS_PRIVATE_KEY: Optional[str] = None
 
     SMTP_HOST: Optional[str] = None
 

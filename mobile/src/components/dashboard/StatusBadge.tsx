@@ -15,13 +15,13 @@ export default function StatusBadge({ status, type = "status" }: StatusBadgeProp
     if (type === "priority") {
       switch (status.toLowerCase()) {
         case "high":
-          return "#EF4444";
+          return colors.error;
         case "medium":
-          return "#F59E0B";
+          return colors.warning;
         case "low":
-          return "#6B7280";
+          return colors.textSecondary;
         default:
-          return "#6B7280";
+          return colors.textSecondary;
       }
     }
     switch (status.toLowerCase()) {
@@ -38,7 +38,7 @@ export default function StatusBadge({ status, type = "status" }: StatusBadgeProp
       case "reviewing":
         return colors.reviewing;
       case "in progress":
-        return colors.primary;
+        return colors.accent;
       default:
         return colors.textSecondary;
     }

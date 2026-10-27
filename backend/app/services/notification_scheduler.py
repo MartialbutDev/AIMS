@@ -58,7 +58,14 @@ def process_due_notification_campaigns() -> int:
                 delivered += 1
 
         db.commit()
-        process_push_deliveries(db)
+        # A transport failure must not block the other delivery channel.
+        from app.services.notification_email_service import process_email_deliveries
+        for worker in (process_push_deliveries, process_email_deliveries):
+            try:
+                worker(db)
+            except Exception:
+                db.rollback()
+                logger.exception('Notification transport worker failed')
         return delivered
 
     except Exception:

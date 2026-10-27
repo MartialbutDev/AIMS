@@ -224,7 +224,7 @@ export default function NewDTRScreen() {
             onPress={() => setShowDatePicker(true)}
             activeOpacity={0.7}
           >
-            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+            <Ionicons name="calendar-outline" size={20} color={colors.accent} />
             <Text style={[styles.pickerText, { color: colors.textPrimary }]}>{formatDate(date)}</Text>
             <Ionicons name="chevron-down-outline" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -249,8 +249,8 @@ export default function NewDTRScreen() {
               onPress={setCurrentTime}
               activeOpacity={0.7}
             >
-              <Ionicons name="time-outline" size={16} color={colors.primary} />
-              <Text style={[styles.timeNowText, { color: colors.primary }]}>Now</Text>
+              <Ionicons name="time-outline" size={16} color={colors.accent} />
+              <Text style={[styles.timeNowText, { color: colors.accent }]}>Now</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity
@@ -284,7 +284,7 @@ export default function NewDTRScreen() {
               activeOpacity={0.8}
             >
               <View style={[styles.cameraIconCircle, { backgroundColor: `${colors.primary}15` }]}>
-                <Ionicons name="camera-outline" size={32} color={colors.primary} />
+                <Ionicons name="camera-outline" size={32} color={colors.accent} />
               </View>
               <Text style={[styles.cameraBoxTitle, { color: colors.textPrimary }]}>Take Time-In Photo</Text>
               <Text style={[styles.cameraBoxSub, { color: colors.textSecondary }]}>Take a photo to verify your time-in</Text>
@@ -301,8 +301,8 @@ export default function NewDTRScreen() {
                   style={[styles.retakeButton, { borderColor: colors.border }]}
                   onPress={pickImage}
                 >
-                  <Ionicons name="refresh-outline" size={14} color={colors.primary} />
-                  <Text style={[styles.retakeText, { color: colors.primary }]}>Retake</Text>
+                  <Ionicons name="refresh-outline" size={14} color={colors.accent} />
+                  <Text style={[styles.retakeText, { color: colors.accent }]}>Retake</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -328,11 +328,11 @@ export default function NewDTRScreen() {
               disabled={isGettingLocation}
             >
               {isGettingLocation ? (
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator size="small" color={colors.accent} />
               ) : (
                 <>
-                  <Ionicons name="location-outline" size={20} color={colors.primary} />
-                  <Text style={[styles.locationButtonText, { color: colors.primary }]}>Get Current Location</Text>
+                  <Ionicons name="location-outline" size={20} color={colors.accent} />
+                  <Text style={[styles.locationButtonText, { color: colors.accent }]}>Get Current Location</Text>
                 </>
               )}
             </TouchableOpacity>

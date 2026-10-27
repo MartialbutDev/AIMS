@@ -198,7 +198,7 @@ export default function JournalDetailScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Loading journal...
           </Text>
@@ -269,7 +269,7 @@ export default function JournalDetailScreen() {
                 { backgroundColor: `${colors.primary}10` },
               ]}
             >
-              <Text style={[styles.weekBadgeText, { color: colors.primary }]}>
+              <Text style={[styles.weekBadgeText, { color: colors.accent }]}>
                 Week {journal.week}
               </Text>
             </View>
@@ -340,7 +340,7 @@ export default function JournalDetailScreen() {
               <Ionicons
                 name="document-text-outline"
                 size={36}
-                color={colors.primary}
+                color={colors.accent}
               />
             </View>
             <Text style={[styles.fileLabel, { color: colors.textSecondary }]}>
@@ -365,10 +365,10 @@ export default function JournalDetailScreen() {
               <Ionicons
                 name="swap-horizontal-outline"
                 size={18}
-                color={colors.primary}
+                color={colors.accent}
               />
               <Text
-                style={[styles.replaceButtonText, { color: colors.primary }]}
+                style={[styles.replaceButtonText, { color: colors.accent }]}
               >
                 Replace PDF
               </Text>
@@ -383,7 +383,7 @@ export default function JournalDetailScreen() {
               <Ionicons
                 name="chatbubble-ellipses-outline"
                 size={20}
-                color={colors.primary}
+                color={colors.accent}
               />
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
                 Feedback

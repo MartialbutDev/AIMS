@@ -47,6 +47,10 @@ target_metadata = Base.metadata
 # Existing backup tables must not be modified or dropped
 # by Alembic autogeneration.
 EXCLUDED_TABLES = {
+    "retired_private_messages",
+    "retired_private_message_notifications",
+    "retired_private_message_push_deliveries",
+    "retired_private_message_email_deliveries",
     "coordinator_student_assignments_backup_pre_term",
 }
 

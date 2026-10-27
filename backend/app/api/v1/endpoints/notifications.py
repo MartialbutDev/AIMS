@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import Query, APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -136,8 +136,8 @@ async def cancel_admin_notification_campaign(
 
 @router.get("/", response_model=List[NotificationResponse])
 async def get_notifications(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     unread_only: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -227,3 +227,10 @@ async def delete_notification(
         )
     
     return {"message": "Notification deleted successfully"}
+
+@router.get('/detail/{notification_id}', response_model=NotificationResponse)
+async def notification_detail(notification_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    notice = db.query(Notification).filter_by(id=notification_id, user_id=current_user.id).first()
+    if notice is None:
+        raise HTTPException(404, 'Notification not found')
+    return notice

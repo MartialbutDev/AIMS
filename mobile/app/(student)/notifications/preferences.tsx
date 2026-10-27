@@ -1,3 +1,4 @@
+import { communicationService, DeliveryStatus } from '../../../src/services/communication.service';
 // app/(student)/notifications/preferences.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -127,6 +128,7 @@ const SETTINGS_SECTIONS: SettingSection[] = [
 
 export default function NotificationPreferencesScreen() {
   const { colors, isDark } = useTheme();
+  const [delivery, setDelivery] = useState<DeliveryStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
@@ -140,6 +142,7 @@ export default function NotificationPreferencesScreen() {
       setLoading(true);
       const data = await notificationSettingsService.getSettings();
       setSettings(data);
+      setDelivery(await communicationService.delivery());
     } catch (error) {
       console.error("Error loading notification settings:", error);
       Alert.alert("Error", "Failed to load notification settings");
@@ -262,7 +265,7 @@ export default function NotificationPreferencesScreen() {
       <View key={section.title} style={[styles.section, { backgroundColor: colors.card }]}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderLeft}>
-            <Ionicons name={section.icon} size={20} color={colors.primary} />
+            <Ionicons name={section.icon} size={20} color={colors.accent} />
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
               {section.title}
             </Text>
@@ -275,7 +278,7 @@ export default function NotificationPreferencesScreen() {
             }}
             disabled={saving}
           >
-            <Text style={[styles.sectionToggleAll, { color: colors.primary }]}>
+            <Text style={[styles.sectionToggleAll, { color: colors.accent }]}>
               {allEnabled ? "Disable All" : "Enable All"}
             </Text>
           </TouchableOpacity>
@@ -297,7 +300,7 @@ export default function NotificationPreferencesScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Loading settings...
           </Text>
@@ -318,7 +321,7 @@ export default function NotificationPreferencesScreen() {
           Notification Preferences
         </Text>
         <TouchableOpacity onPress={handleReset} style={styles.resetButton}>
-          <Ionicons name="refresh-outline" size={22} color={colors.primary} />
+          <Ionicons name="refresh-outline" size={22} color={colors.accent} />
         </TouchableOpacity>
       </View>
 
@@ -327,10 +330,18 @@ export default function NotificationPreferencesScreen() {
         contentContainerStyle={styles.content}
       >
         {/* Push Notifications Toggle */}
+        <View style={{backgroundColor: colors.card, padding: 20, borderRadius: 18, marginBottom: 18, gap: 12}}>
+          <Text style={{color: colors.textPrimary, fontSize: 18, fontWeight: '700'}}>Delivery status</Text>
+          <Text style={{color: colors.textSecondary, lineHeight: 22}}>Your activity inbox remains available. These settings control optional email and phone alerts.</Text>
+          <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.push_delivery_enabled ? 'Expo delivery enabled.' : 'Phone push awaits Expo setup.'} {delivery?.registered_devices ?? 0} registered devices.</Text>
+          <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.email_configured && delivery.email_delivery_enabled ? 'Email delivery enabled.' : 'Email awaits SMTP setup.'} {delivery?.email_verified ? 'Email verified.' : 'Verify your email before receiving email alerts.'}</Text>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}><Text style={{color: colors.textPrimary}}>Send email updates</Text><Switch disabled={saving || !delivery} value={delivery?.email_enabled ?? false} onValueChange={async value => { setSaving(true); try { await communicationService.email(value); setDelivery(await communicationService.delivery()); } catch { Alert.alert('Unable to save', 'Please retry your email preference.'); } finally { setSaving(false); } }} trackColor={{false: colors.border, true: colors.accent}} thumbColor="#ffffff" /></View>
+          <Text style={{color: colors.textTertiary, fontSize: 12}}>{delivery?.email.queued ?? 0} queued · {delivery?.email.smtp_accepted ?? 0} accepted by mail server · {delivery?.email.failed ?? 0} failed</Text>
+        </View>
         <View style={[styles.pushSection, { backgroundColor: colors.card }]}>
           <View style={styles.pushSectionLeft}>
             <View style={[styles.pushIcon, { backgroundColor: `${colors.primary}15` }]}>
-              <Ionicons name="notifications" size={24} color={colors.primary} />
+              <Ionicons name="notifications" size={24} color={colors.accent} />
             </View>
             <View>
               <Text style={[styles.pushLabel, { color: colors.textPrimary }]}>
@@ -377,7 +388,7 @@ export default function NotificationPreferencesScreen() {
             onPress={handleReset}
             disabled={saving}
           >
-            <Ionicons name="refresh-outline" size={20} color={colors.primary} />
+            <Ionicons name="refresh-outline" size={20} color={colors.accent} />
             <Text style={[styles.quickActionText, { color: colors.textPrimary }]}>
               Reset
             </Text>

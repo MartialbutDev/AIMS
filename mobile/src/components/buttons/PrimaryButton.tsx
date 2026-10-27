@@ -1,6 +1,6 @@
 // src/components/buttons/PrimaryButton.tsx
 import { Pressable, StyleSheet, Text } from "react-native";
-import Colors from "../../theme/colors";
+import { useTheme } from "../../context/ThemeContext";
 
 type Props = {
   title: string;
@@ -13,10 +13,12 @@ export default function PrimaryButton({
   onPress,
   disabled = false,
 }: Props) {
+  const { colors, isDark } = useTheme();
   return (
     <Pressable
       style={({ pressed }) => [
         styles.button,
+        isDark && { backgroundColor: colors.accent },
         disabled && styles.buttonDisabled,
         pressed && !disabled && styles.buttonPressed,
       ]}
@@ -25,7 +27,7 @@ export default function PrimaryButton({
       accessibilityRole="button"
       accessibilityState={{ disabled }}
     >
-      <Text style={[styles.text, disabled && styles.textDisabled]}>{title}</Text>
+      <Text style={[styles.text, isDark && { color: colors.onAccent }, disabled && styles.textDisabled]}>{title}</Text>
     </Pressable>
   );
 }

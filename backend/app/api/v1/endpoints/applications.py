@@ -1,3 +1,4 @@
+from app.services import direct_placement_service as direct_service
 
 import math
 import uuid
@@ -228,7 +229,10 @@ def _get_application(
     )
 
     if lock:
-        query = query.with_for_update(
+        identity = db.query(Application.student_id).filter(Application.id == application_id).first()
+        if identity:
+            db.query(User).filter(User.id == identity[0]).with_for_update().first()
+        query = query.populate_existing().with_for_update(
             of=Application,
         )
 
@@ -277,6 +281,8 @@ async def create_application(
         )
 
     academic_year, semester = _current_term()
+    db.query(User).filter(User.id == current_user.id).with_for_update().first()
+    direct_service.require_no_direct_conflict(db, current_user.id, academic_year, semester)
 
     company = (
         db.query(Company)
@@ -679,6 +685,11 @@ async def update_application_status(
                     detail="Invalid HTE application status transition",
                 )
 
+            if requested_status in (ApplicationStatus.INTERVIEW, ApplicationStatus.ACCEPTED):
+                direct_service.ensure_application_ready(db, application)
+            if requested_status == ApplicationStatus.ACCEPTED:
+                direct_service.require_no_direct_conflict(db, application.student_id, application.academic_year, application.semester, application.id)
+
             if requested_status in (
                 ApplicationStatus.ACCEPTED,
                 ApplicationStatus.REJECTED,
@@ -714,6 +725,7 @@ async def update_application_status(
                         )
 
         application.status = requested_status
+        direct_service.application_changed(db, application, current_user.id)
         application.updated_date = func.now()
 
         # Create the PRE_DEPLOYMENT record only after HTE acceptance.
@@ -784,6 +796,7 @@ async def withdraw_application(
             )
 
         application.status = ApplicationStatus.WITHDRAWN
+        direct_service.application_changed(db, application, current_user.id)
         application.updated_date = func.now()
 
         db.commit()

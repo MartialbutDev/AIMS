@@ -131,7 +131,7 @@ export default function DocumentDetailScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Loading document...
           </Text>
@@ -214,7 +214,7 @@ export default function DocumentDetailScreen() {
             <Ionicons
               name="document-text-outline"
               size={48}
-              color={colors.primary}
+              color={colors.accent}
             />
           </View>
 
@@ -252,7 +252,7 @@ export default function DocumentDetailScreen() {
               <Ionicons
                 name="document-outline"
                 size={18}
-                color={colors.primary}
+                color={colors.accent}
               />
               <Text
                 style={[styles.fileNameText, { color: colors.textPrimary }]}
@@ -400,7 +400,7 @@ export default function DocumentDetailScreen() {
                   activeOpacity={0.7}
                 >
                   <Text
-                    style={[styles.showMoreText, { color: colors.primary }]}
+                    style={[styles.showMoreText, { color: colors.accent }]}
                   >
                     {showFullOcr ? "Show less" : "Show more"}
                   </Text>
@@ -411,7 +411,7 @@ export default function DocumentDetailScreen() {
                         : "chevron-down-outline"
                     }
                     size={16}
-                    color={colors.primary}
+                    color={colors.accent}
                   />
                 </TouchableOpacity>
               )}

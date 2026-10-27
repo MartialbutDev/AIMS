@@ -16,17 +16,17 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
   const getStatusColor = (status?: string) => {
     switch (status) {
       case "pending":
-        return "#F59E0B";
+        return colors.pending;
       case "approved":
-        return "#10B981";
+        return colors.approved;
       case "rejected":
-        return "#EF4444";
+        return colors.rejected;
       case "submitted":
-        return "#3B82F6";
+        return colors.submitted;
       case "draft":
-        return "#6B7280";
+        return colors.draft;
       case "reviewing":
-        return "#8B5CF6";
+        return colors.reviewing;
       default:
         return colors.textSecondary;
     }

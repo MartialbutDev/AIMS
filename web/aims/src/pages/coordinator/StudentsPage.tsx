@@ -1,6 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+﻿import { useEffect, useState, type FormEvent } from 'react'
 import { Icon } from '../../components/Icons'
-import { CompletionPanel } from './CompletionPanel'
 import { StudentRecordDialog } from './StudentRecordDialog'
 import type { ReminderCategory } from '../../services/coordinatorReminderService'
 import {
@@ -33,10 +32,8 @@ function EvaluationPanel({
   studentId,
   evaluation,
   onSaved,
-  readOnly = false,
 }: {
   studentId: string
-  readOnly?: boolean
   evaluation: CoordinatorStudentDetail['evaluation']
   onSaved: (grade: number, notes: string) => void
 }) {
@@ -67,21 +64,20 @@ function EvaluationPanel({
       <div className="panel-heading"><div><h2>Coordinator summary & grade</h2><p>Grade scale: 1.00 is highest; 5.00 is lowest.</p></div></div>
       <div className="evaluation-fields">
         <label>Final grade
-          <input aria-label="Final grade" disabled={readOnly} type="number" min="1" max="5" step="0.01" required value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="e.g. 1.25" />
+          <input aria-label="Final grade" type="number" min="1" max="5" step="0.01" required value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="e.g. 1.25" />
         </label>
         <label>Evaluation notes
-          <textarea disabled={readOnly} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={5000} rows={3} placeholder="Add a concise OJT performance summary…" />
+          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={5000} rows={3} placeholder="Add a concise OJT performance summary…" />
         </label>
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
       {saved && <p className="evaluation-saved" role="status">Evaluation saved.</p>}
-      <button className="primary-button" type="submit" disabled={isSaving || readOnly}>{isSaving ? 'Saving…' : 'Save grade'} <Icon name="check" size={15} /></button>
+      <button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save grade'} <Icon name="check" size={15} /></button>
     </form>
   )
 }
 
 function StudentDetails({ detail, onEvaluationSaved }: { detail: CoordinatorStudentDetail; onEvaluationSaved: (grade: number, notes: string) => void }) {
-  const [closed, setClosed] = useState(false)
   const [section, setSection] = useState<ReminderCategory | null>(null)
   const { student, journey } = detail
   const fullName = student.first_name + ' ' + student.last_name
@@ -118,8 +114,7 @@ function StudentDetails({ detail, onEvaluationSaved }: { detail: CoordinatorStud
       <button type="button" onClick={() => setSection('dtr')}><span className="sr-summary-icon"><Icon name="clock" size={23} /></span><strong>DTR summary & photos</strong><span>{journey.pending_dtr_count} awaiting review · {journey.rejected_dtr_count} rejected</span><small>Attendance, work logs, and photo pairs <Icon name="arrow" size={15} /></small></button>
       <button type="button" onClick={() => setSection('journals')}><span className="sr-summary-icon"><Icon name="briefcase" size={23} /></span><strong>OJT journals</strong><span>{detail.journals.filter(item => item.status !== 'draft').length} submitted or reviewed</span><small>Weekly reflections and journal previews <Icon name="arrow" size={15} /></small></button>
     </section>
-    <CompletionPanel studentId={student.id} gradeVersion={detail.evaluation?.grade} onClosed={setClosed} />
-    <EvaluationPanel readOnly={closed} key={student.id} studentId={student.id} evaluation={detail.evaluation} onSaved={onEvaluationSaved} />
+    <EvaluationPanel key={student.id} studentId={student.id} evaluation={detail.evaluation} onSaved={onEvaluationSaved} />
     {section && <StudentRecordDialog key={student.id + section} detail={detail} category={section} onClose={() => setSection(null)} />}
   </div>
 }

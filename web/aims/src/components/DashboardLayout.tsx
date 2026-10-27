@@ -1,3 +1,4 @@
+import { useNotificationCount } from '../hooks/useNotificationCount'
 
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -38,6 +39,7 @@ const NAV_BY_ROLE = {
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Students', slug: 'students', icon: 'users' },
     { label: 'Document review', slug: 'document-verification', icon: 'check' },
+    { label: 'Approved forms', slug: 'document-templates', icon: 'file' },
     {
       label: 'History',
       slug: 'historical-students',
@@ -45,12 +47,14 @@ const NAV_BY_ROLE = {
     },
     { label: 'Applications', slug: 'applications', icon: 'file' },
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
+    { label: 'Direct placements', slug: 'direct-placements', icon: 'briefcase' },
   ],
 
   dean: [
     { label: 'Program overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Coordinators', slug: 'coordinators', icon: 'users' },
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
+    { label: 'Direct placements', slug: 'direct-placements', icon: 'briefcase' },
   ],
 
   career_center: [
@@ -59,6 +63,7 @@ const NAV_BY_ROLE = {
     { label: 'Applications', slug: 'applications', icon: 'file' },
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
     { label: 'Developer info', slug: 'developer-info', icon: 'file' },
+    { label: 'Partnership review', slug: 'direct-placements', icon: 'briefcase' },
   ],
 
   company: [
@@ -83,6 +88,7 @@ export function DashboardLayout({
   data,
   onLogout,
 }: DashboardLayoutProps) {
+  const unreadNotifications = useNotificationCount(session.accessToken)
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -118,6 +124,8 @@ export function DashboardLayout({
     assignments: 'Assignments',
     students: 'Students',
     'historical-students': 'History',
+    'direct-placements': session.role === 'career_center' ? 'Partnership review' : 'Direct placements',
+    'document-templates': 'Approved forms',
     companies: 'Companies',
     applications: 'Applications',
     notifications: 'Notifications',
@@ -363,7 +371,7 @@ export function DashboardLayout({
           </div>
 
           <div className="topbar-actions">
-            {<><span className="citc-topbar-campus">CITC / USTP Cagayan de Oro</span><button type="button" className="citc-topbar-button" aria-label="Open notifications" onClick={() => goTo('notifications')}><Icon name="bell" size={17} /></button></>}
+            {<><span className="citc-topbar-campus">CITC / USTP Cagayan de Oro</span><button type="button" className="citc-topbar-button" aria-label={`Open notifications (${unreadNotifications} unread)`} onClick={() => goTo('notifications')}><Icon name="bell" size={17} />{unreadNotifications > 0 && <span className="aims-bell-count">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}</button></>}
             <span className="today-label">
               <Icon name="clock" size={15} />
               Today

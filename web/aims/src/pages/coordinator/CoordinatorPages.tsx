@@ -1,3 +1,5 @@
+import { DirectPlacementsPage } from '../shared/DirectPlacementsPage'
+import { DocumentTemplatesPage } from './DocumentTemplatesPage'
 
 import type { DashboardData } from '../../types/dashboard'
 import type { UserSession } from '../../types/auth'
@@ -30,6 +32,9 @@ export function CoordinatorPages({
   onNavigate,
 }: CoordinatorPagesProps) {
   switch (section) {
+    case 'direct-placements':
+      return <DirectPlacementsPage role="coordinator" />
+
     case 'dashboard':
       return (
         <CoordinatorDashboardPage
@@ -38,6 +43,9 @@ export function CoordinatorPages({
           onNavigate={onNavigate}
         />
       )
+
+    case 'document-templates':
+      return <DocumentTemplatesPage />
 
     case 'students':
       return <StudentsPage />

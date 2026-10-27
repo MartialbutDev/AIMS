@@ -1,3 +1,4 @@
+import { useNotificationRefresh } from '../../src/hooks/useNotificationRefresh';
 
 import React, {
   useCallback,
@@ -18,7 +19,6 @@ import {
 
 import {
   router,
-  useFocusEffect,
 } from "expo-router";
 
 import { Ionicons } from "@expo/vector-icons";
@@ -203,16 +203,8 @@ export default function StudentOnboardingScreen() {
     };
   }, []);
 
-  // Check again whenever the onboarding screen is focused.
-  useFocusEffect(
-    useCallback(() => {
-      void loadStatus();
-
-      return () => {
-        requestIdRef.current += 1;
-      };
-    }, [loadStatus])
-  );
+  // Review decisions refresh while the app is active, including foreground push events.
+  useNotificationRefresh(async () => { if (!uploadingRef.current) await loadStatus(); });
 
   // ============================================================
   // REFRESH STATUS
@@ -435,7 +427,7 @@ export default function StudentOnboardingScreen() {
                   : "school-outline"
               }
               size={26}
-              color={colors.primary}
+              color={colors.accent}
             />
           </View>
 
@@ -500,7 +492,7 @@ export default function StudentOnboardingScreen() {
             <Ionicons
               name="document-text-outline"
               size={20}
-              color={colors.primary}
+              color={colors.accent}
             />
 
             <Text
@@ -639,7 +631,7 @@ export default function StudentOnboardingScreen() {
       >
         <ActivityIndicator
           size="large"
-          color={colors.primary}
+          color={colors.accent}
         />
 
         <Text
@@ -746,7 +738,7 @@ export default function StudentOnboardingScreen() {
             <Ionicons
               name="information-circle-outline"
               size={23}
-              color={colors.primary}
+              color={colors.accent}
             />
 
             <Text
@@ -874,7 +866,7 @@ export default function StudentOnboardingScreen() {
               style={[
                 styles.refreshButton,
                 {
-                  borderColor: colors.primary,
+                  borderColor: colors.accent,
                 },
               ]}
               disabled={
@@ -886,21 +878,21 @@ export default function StudentOnboardingScreen() {
             >
               {refreshing ? (
                 <ActivityIndicator
-                  color={colors.primary}
+                  color={colors.accent}
                 />
               ) : (
                 <>
                   <Ionicons
                     name="refresh-outline"
                     size={19}
-                    color={colors.primary}
+                    color={colors.accent}
                   />
 
                   <Text
                     style={[
                       styles.refreshText,
                       {
-                        color: colors.primary,
+                        color: colors.accent,
                       },
                     ]}
                   >

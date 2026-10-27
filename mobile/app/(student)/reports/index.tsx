@@ -94,7 +94,7 @@ export default function ReportsScreen() {
         label: "Applications",
         value: summary.applications.toString(),
         change: `${summary.applications} total`,
-        color: colors.primary,
+        color: colors.accent,
         trend: summary.applications > 0 ? "up" : "neutral",
       },
       {
@@ -188,9 +188,9 @@ export default function ReportsScreen() {
     };
 
     const chartConfig = {
-      backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-      backgroundGradientFrom: isDark ? '#1E293B' : '#FFFFFF',
-      backgroundGradientTo: isDark ? '#1E293B' : '#FFFFFF',
+      backgroundColor: isDark ? colors.card : '#FFFFFF',
+      backgroundGradientFrom: isDark ? colors.card : '#FFFFFF',
+      backgroundGradientTo: isDark ? colors.card : '#FFFFFF',
       decimalPlaces: 0,
       color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
       labelColor: (opacity = 1) => isDark ? `rgba(255, 255, 255, ${opacity})` : `rgba(0, 0, 0, ${opacity})`,
@@ -276,7 +276,7 @@ export default function ReportsScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading reports...</Text>
         </View>
       </View>
@@ -301,7 +301,7 @@ export default function ReportsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
         }
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -403,7 +403,7 @@ export default function ReportsScreen() {
                   <Ionicons 
                     name={item.type === 'application' ? 'briefcase-outline' : item.type === 'dtr' ? 'calendar-outline' : 'book-outline'} 
                     size={20} 
-                    color={colors.primary} 
+                    color={colors.accent} 
                   />
                 </View>
                 <View style={styles.recentActivityContent}>

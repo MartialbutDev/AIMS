@@ -699,8 +699,7 @@ export default function LoginScreen() {
                       style={[
                         styles.forgotText,
                         {
-                          color:
-                            colors.primary,
+                          color: colors.accent,
                         },
                       ]}
                     >
@@ -901,8 +900,7 @@ export default function LoginScreen() {
                         style={[
                           styles.signUpLink,
                           {
-                            color:
-                              colors.primary,
+                            color: colors.accent,
                           },
                         ]}
                       >

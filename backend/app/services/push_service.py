@@ -11,7 +11,7 @@ from app.models.notification_settings import NotificationSettings
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
-ROUTES = {'/(student)/completion','/(student)/documents','/(student)/dtr','/(student)/journals','/(student)/applications','/(student)/notifications'}
+ROUTES = {'/(student)/documents','/(student)/dtr','/(student)/journals','/(student)/applications','/(student)/applications/direct-placements','/(student)/notifications','/(student)/documents/templates','/(student)/pre-deployment','/onboarding'}
 
 def expo_request(path, payload):
     headers = {'Content-Type':'application/json', 'Accept':'application/json'}
@@ -24,10 +24,10 @@ def expo_request(path, payload):
         raise RuntimeError('Expo rejected the push request')
     return result['data']
 
-def push_allowed(db, user_id, notification=None):
+def push_allowed(db, user_id, notification=None, channel='push'):
     user = db.query(User).filter(User.id == user_id, User.is_active.is_(True)).first()
     preferences = db.query(NotificationSettings).filter(NotificationSettings.user_id == user_id).first()
-    if not user or (preferences is not None and not preferences.push_enabled):
+    if not user or (channel == 'push' and preferences is not None and not preferences.push_enabled):
         return False
     if preferences is None or notification is None:
         return True
@@ -37,6 +37,7 @@ def push_allowed(db, user_id, notification=None):
             data = {}
     except (ValueError,TypeError):
         data = {}
+    if data.get('source') == 'message': return False
     kind = getattr(notification.type,'value',notification.type)
     status = data.get('status')
     reminder = data.get('source') == 'coordinator_reminder'

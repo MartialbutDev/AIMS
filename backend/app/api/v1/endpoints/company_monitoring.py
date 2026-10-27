@@ -158,8 +158,7 @@ def get_intern(
         # Same response for unknown and out-of-company records.
         raise HTTPException(status_code=404, detail="Intern deployment not found")
     deployment, student, company = row
-    from app.core.completion_hours import required_hours_for_student
-    required_hours = required_hours_for_student(db, student.id, year, semester)
+    required_hours = settings.REQUIRED_INTERNSHIP_HOURS
     result = MonitoringDetail(
         intern=intern_response(*row), records_available=False, required_hours=required_hours,
         approved_hours=None, remaining_hours=None, progress_percent=None,

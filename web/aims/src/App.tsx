@@ -42,11 +42,13 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
     'dashboard',
     'students',
     'historical-students',
+    'document-templates',
     'applications',
     'document-verification',
     'notifications',
     'settings',
     'help-center',
+    'direct-placements',
   ],
 
   dean: [
@@ -55,6 +57,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
     'notifications',
     'settings',
     'help-center',
+    'direct-placements',
   ],
 
   career_center: [
@@ -65,6 +68,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
     'developer-info',
     'settings',
     'help-center',
+    'direct-placements',
   ],
 
   company: [

@@ -8,7 +8,7 @@ import Animated from "react-native-reanimated";
 import { useTheme } from "../../context/ThemeContext";
 import type { DeploymentStatus } from "../../services/deployment.service";
 
-const DARK_MODE_ACCENT = "#FCBA04";
+
 
 interface InternshipProgressCardProps {
   progress: number;
@@ -41,11 +41,11 @@ export default function InternshipProgressCard({
   const { colors, isDark } = useTheme();
 
   const accentColor = isDark
-    ? DARK_MODE_ACCENT
+    ? colors.accent
     : colors.primary;
 
   const gradientColors = isDark
-    ? (["#1E293B", "#0F172A"] as const)
+    ? ([colors.card, colors.surfaceSecondary] as const)
     : (["#FFFFFF", "#F8FAFC"] as const);
 
   const safeProgress = Number.isFinite(progress)
@@ -54,12 +54,12 @@ export default function InternshipProgressCard({
 
   const statusColor =
     deploymentStatus === "DEPLOYED"
-      ? "#10B981"
+      ? colors.approved
       : deploymentStatus === "COMPLETED"
-        ? "#0EA5E9"
+        ? colors.info
         : deploymentStatus === "CANCELLED"
-          ? "#EF4444"
-          : "#F59E0B";
+          ? colors.rejected
+          : colors.pending;
 
   return (
     <MotiView
@@ -72,7 +72,7 @@ export default function InternshipProgressCard({
         colors={gradientColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.gradient}
+        style={[styles.gradient, isDark && { borderWidth: 1, borderColor: colors.border }]}
       >
         <View style={styles.header}>
           <Text
@@ -100,7 +100,7 @@ export default function InternshipProgressCard({
               styles.progressBarTrack,
               {
                 backgroundColor: isDark
-                  ? "#334155"
+                  ? colors.border
                   : "#E8EDF5",
               },
             ]}
@@ -122,7 +122,7 @@ export default function InternshipProgressCard({
             styles.statsContainer,
             {
               backgroundColor: isDark
-                ? "#1E293B"
+                ? colors.surfaceSecondary
                 : "#F8FAFC",
             },
           ]}
@@ -166,7 +166,7 @@ export default function InternshipProgressCard({
               styles.statDivider,
               {
                 backgroundColor: isDark
-                  ? "#334155"
+                  ? colors.border
                   : "#E8EDF5",
               },
             ]}
@@ -211,7 +211,7 @@ export default function InternshipProgressCard({
               styles.statDivider,
               {
                 backgroundColor: isDark
-                  ? "#334155"
+                  ? colors.border
                   : "#E8EDF5",
               },
             ]}
@@ -259,7 +259,7 @@ export default function InternshipProgressCard({
               styles.deploymentSection,
               {
                 borderTopColor: isDark
-                  ? "#334155"
+                  ? colors.border
                   : "#E8EDF5",
               },
             ]}

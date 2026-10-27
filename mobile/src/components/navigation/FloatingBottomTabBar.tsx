@@ -9,7 +9,7 @@ import { useTheme } from "../../context/ThemeContext";
 
 // ✅ Custom colors
 const LIGHT_MODE_ACTIVE = "#000080"; // Navy Blue
-const DARK_MODE_ACTIVE = "#FCBA04";  // Yellow/Gold
+const DARK_MODE_ACTIVE = "#FFC629";  // Yellow/Gold
 
 interface TabItem {
   name: string;
@@ -77,8 +77,8 @@ export default function FloatingBottomTabBar({
         style={[
           styles.container,
           {
-            backgroundColor: isDark ? 'rgba(30,41,59,0.95)' : 'rgba(255,255,255,0.95)',
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            backgroundColor: isDark ? colors.tabBackground : 'rgba(255,255,255,0.95)',
+            borderColor: isDark ? colors.border : 'rgba(0,0,0,0.06)',
           },
           animatedStyle,
         ]}
@@ -92,7 +92,7 @@ export default function FloatingBottomTabBar({
             return (
               <TouchableOpacity
                 key={tab.name}
-                style={styles.tabItem}
+                style={[styles.tabItem, isDark && isActive && { backgroundColor: colors.accentMuted }]}
                 onPress={() => handleTabPress(tab)}
                 activeOpacity={0.7}
                 accessibilityLabel={tab.label}
@@ -114,7 +114,7 @@ export default function FloatingBottomTabBar({
                   />
                   {tab.badge && tab.badge > 0 ? (
                     <View style={[styles.badge, { backgroundColor: colors.error }]}>
-                      <Text style={styles.badgeText}>{tab.badge}</Text>
+                      <Text style={[styles.badgeText, isDark && { color: colors.background }]}>{tab.badge}</Text>
                     </View>
                   ) : null}
                 </MotiView>

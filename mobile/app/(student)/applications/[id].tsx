@@ -116,7 +116,7 @@ export default function ApplicationDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading application...</Text>
         </View>
       </SafeAreaView>
@@ -155,7 +155,7 @@ export default function ApplicationDetailScreen() {
         <View style={[styles.statusHeader, { backgroundColor: colors.card }]}>
           <View style={styles.companySection}>
             <View style={[styles.companyAvatar, { backgroundColor: `${colors.primary}10` }]}>
-              <Text style={[styles.companyInitial, { color: colors.primary }]}>{application.company_name.charAt(0)}</Text>
+              <Text style={[styles.companyInitial, { color: colors.accent }]}>{application.company_name.charAt(0)}</Text>
             </View>
             <View>
               <Text style={[styles.companyName, { color: colors.textPrimary }]}>{application.company_name}</Text>

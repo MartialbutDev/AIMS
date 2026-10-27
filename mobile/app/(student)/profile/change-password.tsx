@@ -109,7 +109,7 @@ export default function ChangePasswordScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={[styles.infoCard, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}20` }]}>
-          <Ionicons name="information-circle-outline" size={24} color={colors.primary} />
+          <Ionicons name="information-circle-outline" size={24} color={colors.accent} />
           <Text style={[styles.infoText, { color: colors.textPrimary }]}>
             Password must be at least 6 characters long
           </Text>

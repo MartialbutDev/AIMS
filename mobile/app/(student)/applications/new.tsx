@@ -294,7 +294,7 @@ export default function NewApplicationScreen() {
                         <Ionicons
                           name="document-text-outline"
                           size={18}
-                          color={colors.primary}
+                          color={colors.accent}
                         />
                       </View>
                       <View>
@@ -478,7 +478,7 @@ export default function NewApplicationScreen() {
       >
         {loadingCompanies ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="large" color={colors.accent} />
             <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
               Loading companies...
             </Text>
@@ -530,7 +530,7 @@ export default function NewApplicationScreen() {
                       <Text
                         style={[
                           styles.companyInitial,
-                          { color: colors.primary },
+                          { color: colors.accent },
                         ]}
                       >
                         {company.name.charAt(0)}
@@ -561,7 +561,7 @@ export default function NewApplicationScreen() {
                       <Ionicons
                         name="checkmark-circle"
                         size={20}
-                        color={colors.primary}
+                        color={colors.accent}
                         style={styles.companyCheck}
                       />
                     )}
@@ -677,7 +677,7 @@ export default function NewApplicationScreen() {
 
               {loadingDocs ? (
                 <View style={styles.docLoadingContainer}>
-                  <ActivityIndicator size="small" color={colors.primary} />
+                  <ActivityIndicator size="small" color={colors.accent} />
                   <Text
                     style={[
                       styles.docLoadingText,

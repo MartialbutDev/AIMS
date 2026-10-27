@@ -21,7 +21,7 @@ from app.api.v1.endpoints import dtr as endpoint
 class ClockOutTests(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine('sqlite://', connect_args={'check_same_thread': False}, poolclass=StaticPool)
-        Base.metadata.create_all(self.engine)
+        Base.metadata.create_all(self.engine, tables=[User.__table__, DTR.__table__])
         self.db = Session(self.engine)
         self.user = User(id='student', first_name='Test', last_name='Student', email='test@example.invalid', hashed_password='unused', role=UserRole.STUDENT, is_active=True)
         self.db.add(self.user)

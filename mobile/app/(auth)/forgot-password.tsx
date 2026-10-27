@@ -1,254 +1,108 @@
-// app/(auth)/forgot-password.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Dimensions,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-
+import { useState, useEffect, useRef } from "react";
+import { ActivityIndicator, Dimensions, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AppLogo from "../../src/components/common/AppLogo";
 import { APP_NAME, APP_VERSION } from "../../src/constants/app";
 import { useTheme } from "../../src/context/ThemeContext";
-
+import { passwordResetService as service, PasswordResetError } from "../../src/services/password-reset.service";
 const { height } = Dimensions.get("window");
+type Step = 'email' | 'code' | 'password' | 'done';
 
 export default function ForgotPasswordScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
-  const [studentId, setStudentId] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
-
-  const validateForm = (): boolean => {
-    if (!studentId.trim()) {
-      setError("Student ID is required");
-      return false;
-    } else if (studentId.trim().length < 8) {
-      setError("Please enter a valid student ID");
-      return false;
-    } else {
-      setError("");
-      return true;
-    }
+  const [step, setStep] = useState<Step>('email'), [email, setEmail] = useState(''), [otp, setOtp] = useState('');
+  const [challenge, setChallenge] = useState(''), [grant, setGrant] = useState('');
+  const [password, setPassword] = useState(''), [confirmation, setConfirmation] = useState(''), [visible, setVisible] = useState(false);
+  const [loading, setLoading] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [retryAt, setRetryAt] = useState(0), [expiresAt, setExpiresAt] = useState(0), [now, setNow] = useState(Date.now());
+  const mounted = useRef(true), pending = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => { if (step === 'done') return; const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, [step]);
+  const seconds = Math.max(0, Math.ceil((retryAt - now) / 1000));
+  const expired = !!expiresAt && now >= expiresAt;
+  const backToLogin = () => router.replace('/(auth)/login');
+  const failed = (e: unknown) => {
+    setError(e instanceof Error ? e.message : 'Unable to complete this request. Please retry.');
+    if (e instanceof PasswordResetError && e.retryAfter) { setRetryAt(Date.now() + e.retryAfter * 1000); setNow(Date.now()); }
   };
-
-  const handleSendResetLink = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
-    setLoading(true);
-    setSuccess(false);
-
+  const send = async () => {
+    if (pending.current || Date.now() < retryAt) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 255) { setError('Enter the email address registered with AIMS.'); return; }
+    pending.current = true; setLoading(true); setError(''); setNotice('');
     try {
-      console.log({ studentId: studentId.trim() });
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setSuccess(true);
-      setStudentId("");
-    } catch (error) {
-      console.log(error);
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+      const data = await service.request(email);
+      if (!mounted.current) return;
+      setEmail(email.trim()); setChallenge(data.challenge_id); setGrant(''); setOtp(''); setPassword(''); setConfirmation('');
+      setRetryAt(Date.now() + data.resend_after * 1000); setExpiresAt(Date.now() + data.expires_in * 1000); setNow(Date.now());
+      setNotice(data.message); setStep('code');
+    } catch (e) { if (mounted.current) failed(e); }
+    finally { pending.current = false; if (mounted.current) setLoading(false); }
   };
-
-  const handleBackToLogin = () => {
-    router.back();
+  const verify = async () => {
+    if (pending.current) return;
+    if (!/^[0-9]{6}$/.test(otp)) { setError('Enter the six-digit code from your email.'); return; }
+    if (Date.now() >= expiresAt) { setError('This code has expired. Request a new code.'); return; }
+    pending.current = true; setLoading(true); setError('');
+    try {
+      const data = await service.verify(challenge, otp);
+      if (!mounted.current) return;
+      setGrant(data.reset_token); setOtp(''); setNotice('Email verified. Choose your new password.');
+      setExpiresAt(Date.now() + data.expires_in * 1000); setNow(Date.now()); setStep('password');
+    } catch (e) { if (mounted.current) failed(e); }
+    finally { pending.current = false; if (mounted.current) setLoading(false); }
   };
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-
-      <View style={[
-        styles.navySection,
-        { backgroundColor: isDark ? "#000066" : "#000080" }
-      ]}>
-        <View style={styles.circleTopLeft} pointerEvents="none" />
-        <View style={styles.circleBottomRight} pointerEvents="none" />
-        <View style={styles.dotGridTopRight} pointerEvents="none">
-          {Array.from({ length: 16 }).map((_, i) => (
-            <View key={`dot-tr-${i}`} style={styles.dot} />
-          ))}
-        </View>
-        <View style={styles.dotGridBottomLeft} pointerEvents="none">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <View key={`dot-bl-${i}`} style={styles.dot} />
-          ))}
-        </View>
-      </View>
-
-      {/* ✅ Dark Mode Toggle Button - OUTSIDE the navy section */}
-      <TouchableOpacity
-        style={[
-          styles.themeToggle,
-          {
-            backgroundColor: isDark
-              ? "rgba(0,0,0,0.5)"
-              : "rgba(255,255,255,0.2)",
-          },
-        ]}
-        onPress={toggleTheme}
-        activeOpacity={0.7}
-      >
-        <Ionicons
-          name={isDark ? "sunny-outline" : "moon-outline"}
-          size={24}
-          color="#FFFFFF"
-        />
-      </TouchableOpacity>
-
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: 'transparent' }]}>
-        <KeyboardAvoidingView
-          style={styles.keyboardView}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-            bounces={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            <View style={styles.headerContent}>
-              <View style={styles.logoWrapper}>
-                <AppLogo size={100} decorative={true} variant="login" />
-              </View>
-              <Text style={[styles.brandTitle, { color: '#FFFFFF' }]}>
-                A<Text style={[styles.brandTitleAccent, { color: "#F5A623" }]}>I</Text>MS
-              </Text>
-              <Text style={[styles.systemTitle, { color: '#FFFFFF', opacity: 0.9 }]}>
-                Academic Internship Management System
-              </Text>
-            </View>
-
-            <View style={styles.cardWrapper}>
-              <View style={[styles.card, { backgroundColor: colors.card }]}>
-                <View style={styles.cardHeader}>
-                  <Text style={[styles.welcomeText, { color: colors.textPrimary }]}>Reset Password</Text>
-                  <Text style={[styles.subtitleText, { color: colors.textSecondary }]}>
-                    Enter your student ID to receive a password reset link
-                  </Text>
-                </View>
-
-                <View style={styles.formContainer}>
-                  {success && (
-                    <View style={[styles.successContainer, { backgroundColor: `${colors.success}15`, borderColor: `${colors.success}30` }]}>
-                      <Ionicons
-                        name="checkmark-circle-outline"
-                        size={24}
-                        color={colors.success}
-                        style={styles.successIcon}
-                      />
-                      <Text style={[styles.successText, { color: colors.textPrimary }]}>
-                        Reset link sent successfully!{'\n'}
-                        Please check your email for instructions.
-                      </Text>
-                    </View>
-                  )}
-
-                  <View style={styles.fieldWrapper}>
-                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Student ID</Text>
-                    <View
-                      style={[
-                        styles.inputWrapper,
-                        { backgroundColor: colors.background, borderColor: colors.border },
-                        isFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
-                        error ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
-                      ]}
-                    >
-                      <Ionicons
-                        name="person-outline"
-                        size={20}
-                        color={isFocused ? colors.primary : colors.textSecondary}
-                        style={styles.inputIcon}
-                      />
-                      <TextInput
-                        style={[styles.input, { color: colors.textPrimary }]}
-                        placeholder="Enter your student ID"
-                        placeholderTextColor={colors.textTertiary}
-                        value={studentId}
-                        onChangeText={(text) => {
-                          setStudentId(text);
-                          if (error) setError("");
-                          if (success) setSuccess(false);
-                        }}
-                        onFocus={() => setIsFocused(true)}
-                        onBlur={() => setIsFocused(false)}
-                        returnKeyType="done"
-                        onSubmitEditing={handleSendResetLink}
-                        autoCapitalize="characters"
-                        autoCorrect={false}
-                        editable={!loading}
-                        accessibilityLabel="Student ID"
-                      />
-                    </View>
-                    {error ? <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text> : null}
-                  </View>
-
-                  <TouchableOpacity
-                    style={[styles.resetButton, loading && styles.resetButtonDisabled, { backgroundColor: colors.primary }]}
-                    onPress={handleSendResetLink}
-                    disabled={loading}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityState={{ disabled: loading, busy: loading }}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <View style={styles.resetButtonContent}>
-                        <Ionicons
-                          name="send-outline"
-                          size={20}
-                          color="#FFFFFF"
-                          style={styles.resetButtonIcon}
-                        />
-                        <Text style={[styles.resetButtonText, { color: '#FFFFFF' }]}>Send Reset Link</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.backContainer}
-                    onPress={handleBackToLogin}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="arrow-back-outline"
-                      size={18}
-                      color={colors.primary}
-                      style={styles.backIcon}
-                    />
-                    <Text style={[styles.backText, { color: colors.primary }]}>Back to Login</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            <View style={[styles.footer, { backgroundColor: colors.background }]}>
-              <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-                © {new Date().getFullYear()} {APP_NAME}
-              </Text>
-              <Text style={[styles.versionText, { color: colors.textSecondary }]}>{APP_VERSION}</Text>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+  const reset = async () => {
+    if (pending.current) return;
+    if (password.length < 8 || password.length > 128) { setError('Use a password between 8 and 128 characters.'); return; }
+    if (!password.trim()) { setError('Your password cannot contain only spaces.'); return; }
+    if (password !== confirmation) { setError('The passwords do not match.'); return; }
+    if (Date.now() >= expiresAt) { setError('Your reset session expired. Request a new code.'); return; }
+    pending.current = true; setLoading(true); setError('');
+    try {
+      const data = await service.complete(challenge, grant, password);
+      if (!mounted.current) return;
+      setGrant(''); setChallenge(''); setPassword(''); setConfirmation(''); setNotice(data.message); setStep('done');
+    } catch (e) { if (mounted.current) failed(e); }
+    finally { pending.current = false; if (mounted.current) setLoading(false); }
+  };
+  const startAgain = () => { if (loading) return; setStep('email'); setGrant(''); setChallenge(''); setOtp(''); setPassword(''); setConfirmation(''); setError(''); setNotice(''); setExpiresAt(0); };
+  const title = { email: 'Reset your password', code: 'Check your email', password: 'Choose a new password', done: 'Password updated' }[step];
+  const subtitle = { email: 'Enter your registered email to receive a six-digit reset code.', code: `Enter the code sent to your registered email. Codes expire after 10 minutes.`, password: 'Use 8–128 characters and a password different from your current one.', done: 'You can now sign in with your new password.' }[step];
+  const field = (label: string, value: string, change: (v: string) => void, kind: 'email' | 'code' | 'password', onSubmit: () => void) => <View style={styles.fieldWrapper}>
+    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>{label}</Text>
+    <View style={[styles.inputWrapper, { backgroundColor: colors.inputBackground, borderColor: colors.border }]}>
+      <Ionicons name={kind === 'email' ? 'mail-outline' : kind === 'code' ? 'keypad-outline' : 'lock-closed-outline'} size={20} color={colors.textSecondary} style={styles.inputIcon} />
+      <TextInput accessibilityLabel={label} style={[styles.input, {color: colors.textPrimary}]} placeholder={kind === 'email' ? 'you@example.com' : kind === 'code' ? '000000' : label} placeholderTextColor={colors.textTertiary} value={value} onChangeText={change} editable={!loading} autoCapitalize="none" autoCorrect={false} keyboardType={kind === 'email' ? 'email-address' : kind === 'code' ? 'number-pad' : 'default'} secureTextEntry={kind === 'password' && !visible} maxLength={kind === 'email' ? 255 : kind === 'code' ? 6 : 128} textContentType={kind === 'code' ? 'oneTimeCode' : kind === 'email' ? 'emailAddress' : 'newPassword'} autoComplete={kind === 'email' ? 'email' : kind === 'code' ? 'one-time-code' : 'new-password'} onSubmitEditing={onSubmit} returnKeyType="done" />
+      {kind === 'password' && <TouchableOpacity accessibilityLabel={visible ? 'Hide password' : 'Show password'} onPress={() => setVisible(v => !v)} style={{padding: 10}}><Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textSecondary} /></TouchableOpacity>}
     </View>
-  );
+  </View>;
+  return <View style={[styles.container, {backgroundColor: colors.background}]}>
+    <StatusBar style={isDark ? 'light' : 'dark'} />
+    <View style={[styles.navySection, {backgroundColor: '#0b0b2f'}]}><View style={styles.circleTopLeft} /><View style={styles.circleBottomRight} /></View>
+    <TouchableOpacity accessibilityLabel="Toggle theme" style={[styles.themeToggle, {backgroundColor:'rgba(255,255,255,0.12)'}]} onPress={toggleTheme}><Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={24} color="#fff" /></TouchableOpacity>
+    <SafeAreaView style={[styles.safeArea, {backgroundColor:'transparent'}]}><KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <View style={styles.headerContent}><View style={styles.logoWrapper}><AppLogo size={100} decorative variant="login" /></View><Text style={[styles.brandTitle, {color:'#fff'}]}>A<Text style={{color:'#ffc629'}}>I</Text>MS</Text><Text style={[styles.systemTitle, {color:'#fff'}]}>Academic Internship Management System</Text></View>
+      <View style={styles.cardWrapper}><View style={[styles.card, {backgroundColor: colors.card}]}>
+        <View style={styles.cardHeader}><Text style={[styles.welcomeText, {color: colors.textPrimary}]}>{title}</Text><Text style={[styles.subtitleText, {color: colors.textSecondary}]}>{subtitle}</Text></View>
+        <View style={styles.formContainer}>
+          <View style={{flexDirection:'row', gap:8, marginBottom:20}}>{['Email', 'Verify', 'Password'].map((label,index) => { const current = {email:0, code:1, password:2, done:3}[step]; return <View key={label} style={{flex:1, gap:6}}><View style={{height:4, borderRadius:4, backgroundColor:index <= current ? colors.accent : colors.border}} /><Text style={{fontSize:11, color:index <= current ? colors.textPrimary : colors.textTertiary}}>{index+1}. {label}</Text></View>; })}</View>
+          {!!notice && <View style={[styles.successContainer, {backgroundColor: colors.surfaceSecondary, borderColor: colors.border}]}><Text accessibilityRole="text" style={[styles.successText, {color:colors.textSecondary}]}>{notice}</Text></View>}
+          {step === 'email' && field('Registered email', email, v => {setEmail(v); setError('');}, 'email', () => void send())}
+          {step === 'code' && <><Text style={{color:colors.textSecondary, marginBottom:14}}>{email}</Text>{field('Verification code', otp, v => {setOtp(v.replace(/\D/g,'')); setError('');}, 'code', () => void verify())}{expired && <Text style={{color:colors.error, marginBottom:12}}>Code expired. Request a new one below.</Text>}</>}
+          {step === 'password' && <>{field('New password',password,v => {setPassword(v);setError('');},'password',() => void reset())}{field('Confirm password',confirmation,v => {setConfirmation(v);setError('');},'password',() => void reset())}{expired && <Text style={{color:colors.error, marginBottom:12}}>Your reset session expired. Start again below.</Text>}</>}
+          {!!error && <Text accessibilityRole="alert" style={[styles.errorText,{color:colors.error, marginBottom:14}]}>{error}</Text>}
+          <TouchableOpacity accessibilityRole="button" disabled={loading || (step === 'email' && seconds > 0) || ((step === 'code' || step === 'password') && expired)} accessibilityState={{disabled:loading,busy:loading}} onPress={() => {if(step==='email')void send();else if(step==='code')void verify();else if(step==='password')void reset();else backToLogin();}} style={[styles.resetButton,{backgroundColor:colors.accent,opacity:loading || ((step==='code'||step==='password')&&expired) ? .5 : 1}]}>{loading ? <ActivityIndicator color={colors.onAccent} /> : <Text style={[styles.resetButtonText,{color:colors.onAccent}]}>{step==='email' ? seconds > 0 ? `Try again in ${seconds}s` : 'Send reset code' : step==='code' ? 'Verify code' : step==='password' ? 'Save new password' : 'Sign in'}</Text>}</TouchableOpacity>
+          {step === 'code' && <TouchableOpacity disabled={loading || seconds > 0} onPress={() => void send()} style={{padding:16,alignItems:'center'}}><Text style={{color:seconds > 0 ? colors.textTertiary : colors.accent}}>{seconds > 0 ? `Resend code in ${seconds}s` : 'Resend code'}</Text></TouchableOpacity>}
+          {(step==='code'||step==='password') && <TouchableOpacity disabled={loading} onPress={startAgain} style={{padding:12,alignItems:'center'}}><Text style={{color:colors.accent}}>{step==='code' ? 'Use a different email' : 'Start again'}</Text></TouchableOpacity>}
+          {step !== 'done' && <TouchableOpacity disabled={loading} style={styles.backContainer} onPress={backToLogin}><Ionicons name="arrow-back-outline" size={18} color={colors.accent} style={styles.backIcon} /><Text style={[styles.backText,{color:colors.accent}]}>Back to login</Text></TouchableOpacity>}
+        </View>
+      </View></View>
+      <View style={[styles.footer,{backgroundColor:colors.background}]}><Text style={[styles.footerText,{color:colors.textSecondary}]}>© {new Date().getFullYear()} {APP_NAME}</Text><Text style={[styles.versionText,{color:colors.textTertiary}]}>{APP_VERSION}</Text></View>
+    </ScrollView></KeyboardAvoidingView></SafeAreaView>
+  </View>;
 }
 
 const styles = StyleSheet.create({

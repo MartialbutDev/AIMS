@@ -149,7 +149,7 @@ export default function GuideDetailScreen() {
         {/* Guide Header */}
         <View style={[styles.guideHeader, { backgroundColor: colors.card }]}>
           <View style={[styles.guideIcon, { backgroundColor: `${colors.primary}15` }]}>
-            <Ionicons name={guide.icon} size={40} color={colors.primary} />
+            <Ionicons name={guide.icon} size={40} color={colors.accent} />
           </View>
           <Text style={[styles.guideTitle, { color: colors.textPrimary }]}>{guide.title}</Text>
           <Text style={[styles.guideSubtitle, { color: colors.textSecondary }]}>
@@ -171,7 +171,7 @@ export default function GuideDetailScreen() {
           >
             <View style={styles.sectionHeader}>
               {section.icon && (
-                <Ionicons name={section.icon} size={22} color={colors.primary} />
+                <Ionicons name={section.icon} size={22} color={colors.accent} />
               )}
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
                 {section.title}

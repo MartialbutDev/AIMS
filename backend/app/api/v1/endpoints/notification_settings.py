@@ -65,7 +65,7 @@ async def update_notification_settings(
     """Update notification settings"""
     settings = get_or_create_settings(db, current_user.id)
     
-    update_data = settings_data.model_dump(exclude_unset=True)
+    update_data = settings_data.model_dump(exclude_unset=True, exclude_none=True)
     for key, value in update_data.items():
         setattr(settings, key, value)
     

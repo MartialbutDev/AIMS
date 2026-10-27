@@ -112,6 +112,20 @@ def _user_from_access_token(
             detail="Invalid authentication credentials"
         )
 
+    # Password-bound access tokens are invalid after any password change.
+    import hashlib, hmac
+    claimed_password = payload.get('pwd')
+    if claimed_password is not None:
+        if not isinstance(claimed_password, str) or not hmac.compare_digest(claimed_password, hashlib.sha256(user.hashed_password.encode()).hexdigest()):
+            raise HTTPException(401, 'Please sign in again after changing your password')
+    else:
+        # Revoke pre-upgrade tokens after an OTP reset, without blocking migration rollout.
+        from sqlalchemy import inspect
+        from app.models.password_reset import PasswordResetRevocation
+        if inspect(db.connection()).has_table('password_reset_revocations') and db.get(PasswordResetRevocation, user.id):
+            raise HTTPException(401, 'Please sign in again after resetting your password')
+
+    db.info["notification_actor_id"] = user.id
     return user
 
 

@@ -26,7 +26,7 @@ from app.api.v1.endpoints import company_monitoring as monitoring
 class CompanyMonitoringTests(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-        Base.metadata.create_all(self.engine)
+        Base.metadata.create_all(self.engine, tables=[model.__table__ for model in [User, Company, HTESupervisorCompany, InternshipDeployment, DTR, Journal]])
         self.db = Session(self.engine)
         monitoring.get_current_academic_term = lambda: ("2026-2027", "1")
         self.actor = SimpleNamespace(id="supervisor-a", role=UserRole.HTE_SUPERVISOR)

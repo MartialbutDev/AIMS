@@ -315,7 +315,7 @@ export default function DTRScreen() {
             activeOpacity={0.7}
           >
             {exporting ? (
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
             ) : (
               <Ionicons
                 name="download-outline"
@@ -328,7 +328,7 @@ export default function DTRScreen() {
             style={styles.addButton}
             onPress={() => router.push("/(student)/dtr/new" as any)}
           >
-            <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
+            <Ionicons name="add-circle-outline" size={28} color={colors.accent} />
           </TouchableOpacity>
         </View>
       </View>
@@ -336,7 +336,7 @@ export default function DTRScreen() {
       {summary && (
         <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>
+            <Text style={[styles.statValue, { color: colors.accent }]}>
               {summary.total_entries}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
@@ -399,7 +399,7 @@ export default function DTRScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={refresh}
-            tintColor={colors.primary}
+            tintColor={colors.accent}
           />
         }
         onScroll={handleScroll}
@@ -435,7 +435,7 @@ export default function DTRScreen() {
         ListFooterComponent={
           isLoading && dtrs.length > 0 ? (
             <View style={styles.loaderContainer}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
             </View>
           ) : null
         }

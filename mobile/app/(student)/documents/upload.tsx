@@ -254,7 +254,7 @@ export default function UploadDocumentScreen() {
     if (isPDF(selectedFile)) {
       return (
         <View style={[styles.pdfPreview, { backgroundColor: colors.card }]}>
-          <Ionicons name="document-text-outline" size={64} color={colors.primary} />
+          <Ionicons name="document-text-outline" size={64} color={colors.accent} />
           <Text style={[styles.pdfName, { color: colors.textPrimary }]} numberOfLines={2}>
             {selectedFile.name}
           </Text>
@@ -273,7 +273,7 @@ export default function UploadDocumentScreen() {
 
     return (
       <View style={[styles.filePreview, { backgroundColor: colors.card }]}>
-        <Ionicons name="document-outline" size={48} color={colors.primary} />
+        <Ionicons name="document-outline" size={48} color={colors.accent} />
         <Text style={[styles.fileName, { color: colors.textPrimary }]} numberOfLines={2}>
           {selectedFile.name}
         </Text>
@@ -357,7 +357,7 @@ export default function UploadDocumentScreen() {
             disabled={isSelecting}
           >
             <View style={[styles.dropdownIcon, { backgroundColor: `${colors.primary}15` }]}>
-              <Ionicons name="images-outline" size={20} color={colors.primary} />
+              <Ionicons name="images-outline" size={20} color={colors.accent} />
             </View>
             <View style={styles.dropdownTextContainer}>
               <Text style={[styles.dropdownItemText, { color: colors.textPrimary }]}>
@@ -377,7 +377,7 @@ export default function UploadDocumentScreen() {
             disabled={isSelecting}
           >
             <View style={[styles.dropdownIcon, { backgroundColor: `${colors.primary}15` }]}>
-              <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+              <Ionicons name="document-text-outline" size={20} color={colors.accent} />
             </View>
             <View style={styles.dropdownTextContainer}>
               <Text style={[styles.dropdownItemText, { color: colors.textPrimary }]}>

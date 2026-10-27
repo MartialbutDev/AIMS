@@ -1,6 +1,8 @@
 
-import React from "react";
-import { Stack } from "expo-router";
+import React, { useEffect } from "react";
+import { Stack, useSegments } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { registerPushDevice, listenForPushNavigation } from "../src/services/push.service";
 import { StatusBar } from "expo-status-bar";
 
 import {
@@ -17,7 +19,21 @@ import {
 // ============================================================
 
 function RootLayoutNav() {
-  const { isDark } = useTheme();
+  const { isDark, colors } = useTheme();
+  const area = useSegments()[0];
+  useEffect(() => {
+    if (area !== '(student)' && area !== 'onboarding') return;
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+    void (async () => {
+      if (!await SecureStore.getItemAsync('access_token') || cancelled) return;
+      try { await registerPushDevice(); } catch { /* Inbox remains available while registration is offline. */ }
+      if (cancelled) return;
+      const cleanup = await listenForPushNavigation();
+      if (cancelled) cleanup(); else stop = cleanup;
+    })().catch(() => {});
+    return () => { cancelled = true; stop?.(); };
+  }, [area]);
 
   return (
     <>
@@ -27,6 +43,7 @@ function RootLayoutNav() {
         screenOptions={{
           headerShown: false,
           animation: "slide_from_right",
+          contentStyle: { backgroundColor: colors.background },
         }}
       >
         {/* Authentication screens */}

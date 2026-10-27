@@ -116,6 +116,7 @@ export default function DocumentsScreen() {
       : sortedDocuments.filter((d) => d.verification_status === selectedFilter);
 
   const getStatusColor = (status: string) => {
+    if (isDark) return ({ verified: colors.approved, pending: colors.pending, rejected: colors.rejected } as Record<string, string>)[status] || colors.pending;
     return STATUS_COLORS[status as keyof typeof STATUS_COLORS] || "#F59E0B";
   };
 
@@ -205,7 +206,7 @@ export default function DocumentsScreen() {
             { backgroundColor: `${colors.primary}10` },
           ]}
         >
-          <Ionicons name={typeIcon} size={24} color={colors.primary} />
+          <Ionicons name={typeIcon} size={24} color={colors.accent} />
         </View>
 
         <View style={styles.documentInfo}>
@@ -237,7 +238,7 @@ export default function DocumentsScreen() {
             onPress={() => handlePreview(item)}
             activeOpacity={0.7}
           >
-            <Ionicons name="eye-outline" size={20} color={colors.primary} />
+            <Ionicons name="eye-outline" size={20} color={colors.accent} />
           </TouchableOpacity>
 
           <View
@@ -354,9 +355,15 @@ export default function DocumentsScreen() {
           style={styles.uploadButton}
           onPress={() => router.push("/(student)/documents/upload")}
         >
-          <Ionicons name="add-circle-outline" size={28} color={colors.primary} />
+          <Ionicons name="add-circle-outline" size={28} color={colors.accent} />
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity accessibilityRole="button" onPress={() => router.push("/(student)/documents/templates" as never)} style={{ marginHorizontal: 20, marginBottom: 14, padding: 16, borderRadius: 14, backgroundColor: isDark ? colors.card : "#0b0b2f", borderWidth: isDark ? 1 : 0, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <Ionicons name="download-outline" size={24} color="#ffc629" />
+        <View style={{ flex: 1 }}><Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>Approved CITC forms</Text><Text style={{ color: "#d4d4e7", fontSize: 12, marginTop: 4 }}>Templates, instructions and submission deadlines</Text></View>
+        <Ionicons name="chevron-forward" size={18} color="#ffc629" />
+      </TouchableOpacity>
 
       {/* Filter chips */}
       {documents.length > 0 && (
@@ -380,7 +387,7 @@ export default function DocumentsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary}
+            tintColor={colors.accent}
           />
         }
         onScroll={handleScroll}

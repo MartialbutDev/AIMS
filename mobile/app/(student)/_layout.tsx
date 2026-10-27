@@ -39,11 +39,10 @@ import {
   OnboardingApiError,
 } from "../../src/services/onboarding.service";
 
-import { registerPushDevice, listenForPushNavigation } from "../../src/services/push.service";
+
 
 const HIDE_TAB_BAR_PREFIXES = [
   "/pre-deployment",
-  "/completion",
   "/profile",
   "/settings",
   "/about",
@@ -73,14 +72,6 @@ export default function StudentLayout() {
 
   const [errorMessage, setErrorMessage] =
     useState("");
-
-  useEffect(() => {
-    if (accessState !== "allowed") return;
-    let cancelled = false;
-    let cleanup: (() => void) | undefined;
-    void registerPushDevice().then(() => listenForPushNavigation()).then(stop => { if (cancelled) stop(); else cleanup = stop; }).catch(() => {});
-    return () => { cancelled = true; cleanup?.(); };
-  }, [accessState]);
 
   const requestIdRef = useRef(0);
   const focusedRef = useRef(false);
@@ -201,7 +192,7 @@ export default function StudentLayout() {
       >
         <ActivityIndicator
           size="large"
-          color={colors.primary}
+          color={colors.accent}
         />
 
         <Text

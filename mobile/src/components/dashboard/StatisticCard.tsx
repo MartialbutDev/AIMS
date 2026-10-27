@@ -1,3 +1,4 @@
+import { readableAccent } from "../../theme/readableAccent";
 // src/components/dashboard/StatisticCard.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { MotiView } from "moti";
@@ -24,15 +25,7 @@ export default function StatisticCard({
 }: StatisticCardProps) {
   const { colors, isDark } = useTheme();
 
-  // ✅ Only Applications icon turns white in dark mode
-  const getIconColor = () => {
-    // Applications icon (briefcase-outline) turns white in dark mode
-    if (icon === "briefcase-outline" && isDark) {
-      return "#FFFFFF";
-    }
-    // All other icons keep their original color
-    return color;
-  };
+  const iconColor = isDark ? readableAccent(color, colors.card) : color;
 
   return (
     <MotiView
@@ -46,7 +39,7 @@ export default function StatisticCard({
           styles.card,
           {
             backgroundColor: colors.card,
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            borderColor: isDark ? colors.border : 'rgba(0,0,0,0.06)',
           }
         ]}
         onPress={onPress}
@@ -55,17 +48,17 @@ export default function StatisticCard({
         <View style={[
           styles.iconContainer,
           {
-            backgroundColor: `${color}15`,
-            borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+            backgroundColor: `${iconColor}18`,
+            borderColor: isDark ? colors.borderLight : 'rgba(0,0,0,0.08)',
             borderWidth: 1,
           }
         ]}>
-          <Ionicons name={icon} size={20} color={getIconColor()} />
+          <Ionicons name={icon} size={20} color={iconColor} />
         </View>
         <Text style={[styles.value, { color: colors.textPrimary }]}>{value}</Text>
         <Text style={[styles.label, { color: colors.textSecondary }]}>{label}</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
-        <View style={[styles.accentBar, { backgroundColor: color }]} />
+        <Text style={[styles.subtitle, { color: colors.textSecondary, opacity: isDark ? 1 : 0.5 }]}>{subtitle}</Text>
+        <View style={[styles.accentBar, { backgroundColor: iconColor }]} />
       </TouchableOpacity>
     </MotiView>
   );

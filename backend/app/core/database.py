@@ -12,7 +12,7 @@ engine = create_engine(
     max_overflow=20,
 )
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, info={"workflow_notifications": True})
 
 Base = declarative_base()
 
@@ -24,3 +24,9 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+# Register lazily: model imports require Base to exist first.
+from sqlalchemy import event
+@event.listens_for(Session, 'before_flush')
+def _workflow_notifications(db, flush_context, instances):
+    from app.services.workflow_notifications import capture
+    capture(db, flush_context, instances)

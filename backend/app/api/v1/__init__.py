@@ -286,5 +286,14 @@ router.include_router(coordinator_reminders.router, prefix="/coordinator", tags=
 from app.api.v1.endpoints import push
 router.include_router(push.router, prefix="/push", tags=["Device notifications"])
 
-from app.api.v1.endpoints import completion
-router.include_router(completion.router, prefix="/completion", tags=["Internship completion"])
+from app.api.v1.endpoints import document_templates
+router.include_router(document_templates.router, prefix='/document-templates', tags=['Approved document templates'])
+
+from app.api.v1.endpoints import direct_placements
+router.include_router(direct_placements.router, prefix='/direct-placements', tags=['Direct company placements'])
+
+from app.api.v1.endpoints import notification_delivery
+router.include_router(notification_delivery.router, prefix='/notification-delivery', tags=['Notification delivery'])
+
+from app.api.v1.endpoints import password_reset
+router.include_router(password_reset.router, prefix='/auth/password-reset/otp', tags=['Password reset OTP'])

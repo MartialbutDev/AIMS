@@ -163,7 +163,7 @@ export default function NewJournalScreen() {
                 <Ionicons
                   name="cloud-upload-outline"
                   size={32}
-                  color={colors.primary}
+                  color={colors.accent}
                 />
               </View>
               <Text style={[styles.uploadTitle, { color: colors.textPrimary }]}>

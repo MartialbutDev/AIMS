@@ -29,7 +29,7 @@ function displayDate(value: string): string {
 export default function PreDeploymentScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const accent = isDark ? "#FCBA04" : colors.primary;
+  const accent = isDark ? colors.accent : colors.primary;
   const [deployment, setDeployment] = useState<InternshipDeployment | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,7 +88,7 @@ export default function PreDeploymentScreen() {
       activeOpacity={0.8}
       style={[styles.button, { backgroundColor: primary ? accent : colors.surfaceSecondary }]}
     >
-      <Text style={[styles.buttonText, { color: primary ? (isDark ? "#0F172A" : "#FFFFFF") : colors.textPrimary }]}>
+      <Text style={[styles.buttonText, { color: primary ? (isDark ? colors.background : "#FFFFFF") : colors.textPrimary }]}>
         {label}
       </Text>
     </TouchableOpacity>

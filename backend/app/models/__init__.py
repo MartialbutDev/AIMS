@@ -65,4 +65,10 @@ from app.models.student_onboarding import (
 
 from app.models.push import PushDevice, PushDelivery
 
-from app.models.completion import CompletionPlan, ClearanceItem, CompanyFinalEvaluation, InternshipCompletion, CompletionEvent
+from app.models.document_template import DocumentTemplateSeries, DocumentTemplateRevision
+
+from app.models.direct_placement import DirectPlacement, DirectPlacementEvent
+
+from app.models.notification_delivery import NotificationDeliveryPreference, NotificationEmailDelivery
+
+from app.models.password_reset import PasswordResetChallenge, PasswordResetLimit, PasswordResetRevocation

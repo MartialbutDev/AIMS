@@ -515,7 +515,7 @@ export default function SignUpScreen() {
                       style={[
                         styles.inputWrapper,
                         { backgroundColor: colors.background, borderColor: colors.border },
-                        isFirstNameFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        isFirstNameFocused && [styles.inputWrapperFocused, { borderColor: colors.accent }],
                         firstNameError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
                       ]}
                     >
@@ -553,7 +553,7 @@ export default function SignUpScreen() {
                       style={[
                         styles.inputWrapper,
                         { backgroundColor: colors.background, borderColor: colors.border },
-                        isMiddleNameFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        isMiddleNameFocused && [styles.inputWrapperFocused, { borderColor: colors.accent }],
                       ]}
                     >
                       <Ionicons
@@ -587,7 +587,7 @@ export default function SignUpScreen() {
                       style={[
                         styles.inputWrapper,
                         { backgroundColor: colors.background, borderColor: colors.border },
-                        isLastNameFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        isLastNameFocused && [styles.inputWrapperFocused, { borderColor: colors.accent }],
                         lastNameError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
                       ]}
                     >
@@ -632,7 +632,7 @@ export default function SignUpScreen() {
 
                         { backgroundColor: colors.background, borderColor: colors.border },
 
-                        isStudentIdFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        isStudentIdFocused && [styles.inputWrapperFocused, { borderColor: colors.accent }],
 
                         studentIdError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
 
@@ -776,7 +776,7 @@ export default function SignUpScreen() {
 
                         { backgroundColor: colors.background, borderColor: colors.border },
 
-                        isEmailFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        isEmailFocused && [styles.inputWrapperFocused, { borderColor: colors.accent }],
 
                         emailError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
 
@@ -854,7 +854,7 @@ export default function SignUpScreen() {
 
                         { backgroundColor: colors.background, borderColor: colors.border },
 
-                        isPasswordFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        isPasswordFocused && [styles.inputWrapperFocused, { borderColor: colors.accent }],
 
                         passwordError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
 
@@ -960,7 +960,7 @@ export default function SignUpScreen() {
 
                         { backgroundColor: colors.background, borderColor: colors.border },
 
-                        isConfirmPasswordFocused && [styles.inputWrapperFocused, { borderColor: colors.primary }],
+                        isConfirmPasswordFocused && [styles.inputWrapperFocused, { borderColor: colors.accent }],
 
                         confirmPasswordError ? [styles.inputWrapperError, { borderColor: colors.error }] : null,
 
@@ -1112,7 +1112,7 @@ export default function SignUpScreen() {
 
                     >
 
-                      <Text style={[styles.loginLink, { color: colors.primary }]}> Login</Text>
+                      <Text style={[styles.loginLink, { color: colors.accent }]}> Login</Text>
 
                     </TouchableOpacity>
 

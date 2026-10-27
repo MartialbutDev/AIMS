@@ -16,7 +16,7 @@ export default function SectionHeader({ title, onSeeAll }: SectionHeaderProps) {
       <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
       {onSeeAll && (
         <TouchableOpacity onPress={onSeeAll} activeOpacity={0.7}>
-          <Text style={[styles.seeAll, { color: colors.primary }]}>See All</Text>
+          <Text style={[styles.seeAll, { color: colors.accent }]}>See All</Text>
         </TouchableOpacity>
       )}
     </View>

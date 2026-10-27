@@ -1,9 +1,13 @@
 // src/services/notification.service.ts
 import api from './api';
+const listeners = new Set<() => void>();
+export const notificationsChanged = () => listeners.forEach(fn => fn());
+export const onNotificationsChanged = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
+
 
 export interface Notification {
   id: string;
-  type: 'application' | 'dtr' | 'journal' | 'document' | 'system';
+  type: 'application' | 'dtr' | 'journal' | 'document' | 'system' | 'announcement';
   title: string;
   message: string;
   data?: any;
@@ -55,6 +59,7 @@ export const notificationService = {
   async markAsRead(notificationId: string): Promise<Notification> {
     try {
       const response = await api.put(`/notifications/${notificationId}/read`);
+      notificationsChanged();
       return response.data;
     } catch (error: any) {
       console.error('❌ Mark as read error:', error.response?.data || error.message);
@@ -66,6 +71,7 @@ export const notificationService = {
   async markAllAsRead(): Promise<void> {
     try {
       await api.put('/notifications/read-all');
+      notificationsChanged();
     } catch (error: any) {
       console.error('❌ Mark all as read error:', error.response?.data || error.message);
       throw error;
@@ -76,6 +82,7 @@ export const notificationService = {
   async deleteNotification(notificationId: string): Promise<void> {
     try {
       await api.delete(`/notifications/${notificationId}`);
+      notificationsChanged();
     } catch (error: any) {
       console.error('❌ Delete notification error:', error.response?.data || error.message);
       throw error;

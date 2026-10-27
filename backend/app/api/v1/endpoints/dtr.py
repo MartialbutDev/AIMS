@@ -1,4 +1,3 @@
-from app.core.record_lock import lock_student_term
 
 from fastapi import (
     APIRouter,
@@ -472,7 +471,6 @@ async def record_time_out(
         )
 
     _require_current_record_term(dtr)
-    lock_student_term(db, dtr.student_id, dtr.academic_year, dtr.semester)
     deployment = DeploymentService.require_active_deployment(db, current_user.id)
     # DTR.date is DateTime; deployment_date is Date. Compare calendar dates.
     if dtr.date.date() < deployment.deployment_date:
@@ -739,8 +737,7 @@ async def get_dtr_summary(
             else None
         )
 
-    from app.core.completion_hours import required_hours_for_student
-    required_hours = required_hours_for_student(db, current_user.id, academic_year, semester)
+    required_hours = settings.REQUIRED_INTERNSHIP_HOURS
 
     total_hours = round(
         float(row.total_hours or 0),
@@ -889,7 +886,6 @@ async def update_dtr_status(
         )
 
     _require_current_record_term(dtr)
-    lock_student_term(db, dtr.student_id, dtr.academic_year, dtr.semester)
 
     updates = update_data.model_dump(
         exclude_unset=True
