@@ -46,6 +46,7 @@ function RootLayoutNav() {
           contentStyle: { backgroundColor: colors.background },
         }}
       >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         {/* Authentication screens */}
         <Stack.Screen
           name="(auth)/login"

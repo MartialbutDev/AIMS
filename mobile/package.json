@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "check:launch": "node scripts/check-launch.cjs",
     "start": "expo start --lan",
     "start:clear": "expo start --lan --clear",
     "start:tunnel": "expo start --tunnel",
