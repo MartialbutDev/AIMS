@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: process.env.AIMS_API_PROXY_TARGET ?? 'http://127.0.0.1:8000',
+        target: process.env.AIMS_API_PROXY_TARGET ?? 'http://3.25.132.153:8000',
         changeOrigin: true,
       },
     },
