@@ -1,9 +1,9 @@
 
 """
-AIMS — Dean Coordinator Designation API
+AIMS — Admin Coordinator Designation API
 
 Features:
-- Dean-only faculty coordinator management
+- Admin-only faculty coordinator management
 - Academic-year and semester designations
 - List eligible faculty coordinator accounts
 - Create or reactivate coordinator designations
@@ -13,7 +13,7 @@ Features:
 
 Important:
 - COR matching is based on the practicum instructor.
-- The faculty must have an active Dean designation.
+- The faculty must have an active administrator-approved designation.
 - Existing student assignments are never silently replaced.
 - OCR content validation does not authenticate a document.
 """
@@ -53,8 +53,8 @@ from app.services.cor_faculty_extraction import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/dean/coordinators",
-    tags=["Dean Coordinator Designations"],
+    prefix="/admin/coordinators",
+    tags=["Admin Coordinator Designations"],
 )
 
 
@@ -62,14 +62,14 @@ router = APIRouter(
 # AUTHORIZATION
 # ============================================================
 
-def _require_dean(user: User) -> None:
-    """Allow only active Dean accounts."""
+def _require_admin(user: User) -> None:
+    """Allow only active administrator accounts."""
 
-    if user.role != UserRole.DEAN:
+    if user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=403,
             detail=(
-                "Only the Dean may manage "
+                "Only an administrator may manage "
                 "semester coordinator designations"
             ),
         )
@@ -77,7 +77,7 @@ def _require_dean(user: User) -> None:
     if not user.is_active:
         raise HTTPException(
             status_code=403,
-            detail="Dean account is inactive",
+            detail="Administrator account is inactive",
         )
 
 
@@ -252,7 +252,7 @@ def _backfill_verified_students(
     - Active student account
     - Matching academic year and semester
     - Extracted IT421 faculty name
-    - Exactly one matching active Dean designation
+    - Exactly one matching active administrator-approved designation
 
     Existing assignments remain unchanged.
     """
@@ -357,11 +357,11 @@ def list_eligible_faculty(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Return active coordinator accounts that the Dean
+    Return active coordinator accounts that the administrator
     may select when creating a designation.
     """
 
-    _require_dean(current_user)
+    _require_admin(current_user)
 
     faculty = (
         db.query(User)
@@ -397,9 +397,9 @@ def list_designations(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List coordinator designations for the Dean."""
+    """List coordinator designations for administrators."""
 
-    _require_dean(current_user)
+    _require_admin(current_user)
 
     rows = (
         db.query(
@@ -442,7 +442,7 @@ def designate_coordinator(
     Eligible students are matched automatically.
     """
 
-    _require_dean(current_user)
+    _require_admin(current_user)
 
     faculty = db.query(User).filter(
         User.id == payload.coordinator_id
@@ -544,7 +544,7 @@ def designate_coordinator(
         db.rollback()
 
         logger.exception(
-            "Failed to save Dean coordinator designation"
+            "Failed to save administrator coordinator designation"
         )
 
         raise
@@ -566,7 +566,7 @@ def deactivate_designation(
     Existing student assignments remain unchanged.
     """
 
-    _require_dean(current_user)
+    _require_admin(current_user)
 
     designation = (
         db.query(DeanCoordinatorDesignation)
@@ -617,3 +617,11 @@ def deactivate_designation(
         )
 
         raise
+
+
+# Compatibility aliases enforce the same admin-only policy.
+legacy_router = APIRouter(prefix="/dean/coordinators", include_in_schema=False)
+legacy_router.add_api_route("/faculty", list_eligible_faculty, methods=["GET"])
+legacy_router.add_api_route("", list_designations, methods=["GET"])
+legacy_router.add_api_route("", designate_coordinator, methods=["POST"])
+legacy_router.add_api_route("/{designation_id}/deactivate", deactivate_designation, methods=["PATCH"])

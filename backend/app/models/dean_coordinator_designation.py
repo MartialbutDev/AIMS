@@ -1,5 +1,5 @@
 
-"""Dean-authorized designation of a coordinator for a specific semester."""
+"""Administrator-authorized designation of a coordinator for a specific semester."""
 
 import uuid
 
@@ -45,6 +45,7 @@ class DeanCoordinatorDesignation(Base):
         index=True,
     )
 
+    # Legacy column name: records the authorizing user, including administrators.
     assigned_by_dean_id = Column(
         String(36),
         ForeignKey("users.id"),

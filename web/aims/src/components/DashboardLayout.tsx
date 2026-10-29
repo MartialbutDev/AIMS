@@ -29,6 +29,7 @@ const NAV_BY_ROLE = {
   admin: [
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Users', slug: 'users', icon: 'users' },
+    { label: 'Coordinator designations', slug: 'coordinators', icon: 'users' },
     { label: 'Onboarding review', slug: 'document-verification', icon: 'check' },
     { label: 'Assignments', slug: 'assignments', icon: 'file' },
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
@@ -52,7 +53,6 @@ const NAV_BY_ROLE = {
 
   dean: [
     { label: 'Program overview', slug: 'dashboard', icon: 'grid' },
-    { label: 'Coordinators', slug: 'coordinators', icon: 'users' },
     { label: 'Notifications', slug: 'notifications', icon: 'bell' },
     { label: 'Direct placements', slug: 'direct-placements', icon: 'briefcase' },
   ],

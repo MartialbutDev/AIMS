@@ -32,6 +32,7 @@ import { HelpCenterPage } from '../shared/UtilityPages'
 import { AdminDashboardPage } from './AdminDashboardPage'
 import { UsersPage } from './UsersPage'
 import { AssignmentsPage } from './AssignmentsPage'
+import { CoordinatorManagement } from './CoordinatorManagement'
 import { NotificationsPage } from './NotificationsPage'
 import { DeveloperInfoPage } from './DeveloperInfoPage'
 import { SettingsPage } from './SettingsPage'
@@ -280,6 +281,10 @@ export function AdminPages({
     // ========================================
     // COORDINATOR ASSIGNMENTS
     // ========================================
+
+    case 'coordinators':
+      content = <CoordinatorManagement />
+      break
 
     case 'assignments':
       content = <AssignmentsPage />

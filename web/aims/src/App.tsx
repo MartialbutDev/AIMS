@@ -30,6 +30,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
   admin: [
     'dashboard',
     'users',
+    'coordinators',
     'assignments',
     'document-verification',
     'notifications',
@@ -53,7 +54,6 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
 
   dean: [
     'dashboard',
-    'coordinators',
     'notifications',
     'settings',
     'help-center',

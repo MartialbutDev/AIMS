@@ -293,8 +293,8 @@ export function DeanDashboardPage() {
       )}
 
       <section className="stake-dean-brief" aria-label="Program leadership brief">
-        <div><span className="stake-kicker">DEAN'S BRIEF</span><h2>From student coverage<br />to program completion.</h2><p>Use aggregate outcomes to guide coordinator coverage and academic support.</p><button type="button" className="stake-yellow-button" onClick={() => navigate('/dean/coordinators')}>Manage coordinator designations <span aria-hidden="true">→</span></button></div>
-        <div className="stake-dean-coverage"><span>Coordinator coverage</span><strong>{analytics.assigned_student_count}<small> students assigned</small></strong><div className="stake-coverage-note"><span className="stake-yellow-dot" />{analytics.unassigned_student_count} students not yet assigned</div><p>Review designations to support the current internship cohort.</p></div>
+        <div><span className="stake-kicker">DEAN'S BRIEF</span><h2>From student coverage<br />to program completion.</h2><p>Use aggregate outcomes to guide coordinator coverage and academic support.</p><button type="button" className="stake-yellow-button" onClick={() => navigate('/dean/direct-placements')}>Review direct placements <span aria-hidden="true">→</span></button></div>
+        <div className="stake-dean-coverage"><span>Coordinator coverage</span><strong>{analytics.assigned_student_count}<small> students assigned</small></strong><div className="stake-coverage-note"><span className="stake-yellow-dot" />{analytics.unassigned_student_count} students not yet assigned</div><p>Administrators manage coordinator designations for the current internship cohort.</p></div>
       </section>
 
       {/* ========================================

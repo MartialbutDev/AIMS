@@ -7,8 +7,8 @@ export const communications = {
 export function notificationDestination(data: Record<string, unknown> | null | undefined, kind: string, root: string): string | null {
   const allowed: Record<string, string[]> = {
     coordinator: ['notifications', 'applications', 'students', 'document-verification', 'document-templates', 'direct-placements'],
-    dean: ['notifications', 'coordinators', 'direct-placements'], 'career-center': ['notifications', 'applications', 'companies', 'direct-placements'],
-    company: ['notifications', 'applications', 'interns'], admin: ['notifications', 'document-verification', 'assignments'],
+    dean: ['notifications', 'direct-placements'], 'career-center': ['notifications', 'applications', 'companies', 'direct-placements'],
+    company: ['notifications', 'applications', 'interns'], admin: ['notifications', 'document-verification', 'assignments', 'coordinators'],
   }
   const path = data?.web_path
   if (typeof path === 'string' && (allowed[root] ?? []).some(page => path === `/${root}/${page}`)) return path

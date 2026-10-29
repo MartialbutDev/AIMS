@@ -1,7 +1,7 @@
 """Current-term recipient relationships for internship workflow alerts."""
 from collections import defaultdict
 from app.core.config import settings
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.coordinator_assignment import CoordinatorStudentAssignment
 from app.models.dean_coordinator_designation import DeanCoordinatorDesignation
 from app.models.hte_supervisor_company import HTESupervisorCompany
@@ -26,13 +26,20 @@ class NotificationScope:
         designations = db.query(DeanCoordinatorDesignation).filter_by(
             academic_year=year, semester=semester, is_active=True).all()
         by_coordinator = defaultdict(set)
+        oversight = defaultdict(set)
+        # Include inactive authors when identifying an admin-created designation.
+        admins = {u.id for u in db.query(User).filter(User.role == UserRole.ADMIN)}
         for d in designations:
             by_coordinator[d.coordinator_id].add(d.assigned_by_dean_id)
+            if d.assigned_by_dean_id in admins:
+                oversight[d.coordinator_id].update(self.roles['dean'])
+            elif d.assigned_by_dean_id in self.roles['dean']:
+                oversight[d.coordinator_id].add(d.assigned_by_dean_id)
         self.designations = by_coordinator
         for a in db.query(CoordinatorStudentAssignment).filter_by(academic_year=year, semester=semester):
             if by_coordinator[a.coordinator_id]:
                 self.coordinators[a.student_id].add(a.coordinator_id)
-                self.deans[a.student_id].update(by_coordinator[a.coordinator_id])
+                self.deans[a.student_id].update(oversight[a.coordinator_id])
         for a in db.query(HTESupervisorCompany).filter_by(is_active=True):
             self.supervisors[a.company_id].add(a.supervisor_id)
         self.deployments = defaultdict(list)

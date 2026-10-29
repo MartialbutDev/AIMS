@@ -2,7 +2,7 @@
 """AIMS onboarding with OCR validation and coordinator matching.
 
 OCR content matches do not independently authenticate university
-documents. Coordinator assignment requires a Dean-approved designation.
+documents. Coordinator assignment requires a administrator-approved designation.
 """
 
 import asyncio
@@ -123,7 +123,7 @@ def _require_reviewer(
     """Authorize administrator or current-term assigned coordinator.
 
     Student-specific coordinator access requires a current-term assignment.
-    Writes additionally require an active current-term Dean designation.
+    Writes additionally require an active current-term administrator-approved designation.
     """
     if user.role == UserRole.ADMIN:
         return

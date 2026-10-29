@@ -48,7 +48,7 @@ class ReminderHistory(BaseModel):
 
 def authorize(db, actor, student_id, mode):
     # The shared helper explicitly enforces coordinator role, current-term
-    # assignment, and an active Dean designation for writes (no admin override).
+    # assignment, and an active administrator-approved designation for writes (no admin override).
     assignment = get_coordinator_student_assignment(db, actor, student_id, mode=mode)
     student = db.query(User).filter(User.id == student_id, User.role == UserRole.STUDENT, User.is_active.is_(True)).first()
     if student is None:

@@ -1,5 +1,5 @@
 
-"""Assign students to Dean-authorized coordinators by academic term."""
+"""Assign students to administrator-authorized coordinators by academic term."""
 
 from __future__ import annotations
 
@@ -131,7 +131,7 @@ def try_assign_coordinator(
         return {
             "status": "pending_assignment",
             "reason": (
-                "No unique Dean-designated coordinator "
+                "No unique administrator-designated coordinator "
                 "matches the COR faculty name"
             ),
         }

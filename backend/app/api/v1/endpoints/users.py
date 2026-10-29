@@ -291,7 +291,7 @@ async def create_coordinator_assignment(
     if coordinator is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active coordinator not found")
 
-    # Admins may link students only to a Dean-designated coordinator.
+    # Admins may link students only to a administrator-designated coordinator.
     # This is an interim safeguard; assignments still need an academic-term
     # migration before semester-specific authorization is possible.
     dean_designation = db.query(DeanCoordinatorDesignation.id).filter(
@@ -301,7 +301,7 @@ async def create_coordinator_assignment(
     if dean_designation is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Coordinator has no active Dean-authorized designation",
+            detail="Coordinator has no active administrator-authorized designation",
         )
 
     student = db.query(User).filter(

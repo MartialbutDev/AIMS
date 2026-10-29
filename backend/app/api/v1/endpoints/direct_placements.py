@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.designation_scope import dean_designation_scope
 from app.core.assignment_access import get_current_academic_term
 from app.models.user import User, UserRole
 from app.models.company import Company
@@ -74,7 +75,7 @@ def scoped_query(db, actor):
     elif actor.role == UserRole.DEAN:
         students = students.join(Designation, Designation.coordinator_id == Assignment.coordinator_id).filter(
             Designation.academic_year == year, Designation.semester == semester, Designation.is_active.is_(True),
-            Designation.assigned_by_dean_id == actor.id)
+            dean_designation_scope(actor.id))
     else:
         raise HTTPException(403, 'Direct placement access denied')
     return query.filter(Placement.student_id.in_(students))
@@ -111,7 +112,7 @@ def options(student_search: str = Query('', max_length=100), company_search: str
             User.is_active.is_(True), Assignment.academic_year == year, Assignment.semester == semester)
         if actor.role == UserRole.COORDINATOR: query = query.filter(Assignment.coordinator_id == actor.id)
         else: query = query.join(Designation, Designation.coordinator_id == Assignment.coordinator_id).filter(
-            Designation.academic_year == year, Designation.semester == semester, Designation.is_active.is_(True), Designation.assigned_by_dean_id == actor.id)
+            Designation.academic_year == year, Designation.semester == semester, Designation.is_active.is_(True), dean_designation_scope(actor.id))
         if student_search.strip():
             term = '%'+student_search.strip()+'%'
             query = query.filter(or_(User.first_name.ilike(term),User.last_name.ilike(term),User.student_id.ilike(term)))

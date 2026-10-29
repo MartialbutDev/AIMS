@@ -90,13 +90,13 @@ router.include_router(
 # DEAN COORDINATOR DESIGNATIONS
 # ============================================================
 
-# The dean_coordinators router already defines:
-# prefix="/dean/coordinators"
+# The coordinator designation router already defines:
+# prefix="/admin/coordinators"
 #
 # Final endpoints:
-# GET   /api/v1/dean/coordinators
-# POST  /api/v1/dean/coordinators
-# PATCH /api/v1/dean/coordinators/{id}/deactivate
+# GET   /api/v1/admin/coordinators
+# POST  /api/v1/admin/coordinators
+# PATCH /api/v1/admin/coordinators/{id}/deactivate
 #
 # Do not add another prefix here.
 
@@ -297,3 +297,5 @@ router.include_router(notification_delivery.router, prefix='/notification-delive
 
 from app.api.v1.endpoints import password_reset
 router.include_router(password_reset.router, prefix='/auth/password-reset/otp', tags=['Password reset OTP'])
+
+router.include_router(dean_coordinators.legacy_router)

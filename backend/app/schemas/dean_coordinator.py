@@ -1,5 +1,5 @@
 
-"""Schemas for Dean-controlled semester coordinator designations."""
+"""Schemas for administrator-controlled semester coordinator designations."""
 
 from pydantic import BaseModel, Field
 

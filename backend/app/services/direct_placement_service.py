@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from sqlalchemy import inspect
+from app.core.designation_scope import dean_designation_scope
 from app.core.assignment_access import get_current_academic_term, get_coordinator_student_assignment, has_active_dean_designation
 from app.models.application import Application, ApplicationStatus
 from app.models.company import Company
@@ -45,7 +46,7 @@ def assignment_for(db, actor, student_id, write=False):
     assignment = db.query(Assignment).join(Designation, Designation.coordinator_id == Assignment.coordinator_id).filter(
         Assignment.student_id == student_id, Assignment.academic_year == year, Assignment.semester == semester,
         Designation.academic_year == year, Designation.semester == semester, Designation.is_active.is_(True),
-        Designation.assigned_by_dean_id == actor.id).first()
+        dean_designation_scope(actor.id)).first()
     if not assignment:
         raise HTTPException(404, 'Student is outside your current Dean designation scope')
     return assignment

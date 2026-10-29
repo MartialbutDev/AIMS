@@ -143,7 +143,7 @@ def get_coordinator_student_assignment(
             raise HTTPException(
                 status_code=403,
                 detail=(
-                    "An active Dean designation is required "
+                    "An active administrator-approved designation is required "
                     "to modify current-semester records"
                 ),
             )

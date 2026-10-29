@@ -118,7 +118,7 @@ def require_assigned_student(
             raise HTTPException(403, "Historical assignments are read-only")
         raise HTTPException(404, "No current-term assignment for this student")
     if mode == "write" and not _has_active_designation(db, actor):
-        raise HTTPException(403, "Active Dean designation required for this term")
+        raise HTTPException(403, "Active administrator-approved designation required for this term")
     return student
 
 

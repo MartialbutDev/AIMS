@@ -66,7 +66,7 @@ def publisher(db, actor, *, write=False):
         # Serialize publication, replacement and withdrawal, including initial series creation.
         db.query(User).filter(User.id == actor.id).with_for_update().one()
         if not has_active_dean_designation(db, actor.id, year, semester):
-            raise HTTPException(403, 'An active Dean designation is required to publish or withdraw forms')
+            raise HTTPException(403, 'An active administrator-approved designation is required to publish or withdraw forms')
     return year, semester
 
 
