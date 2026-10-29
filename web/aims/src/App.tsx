@@ -29,6 +29,7 @@ const ROLE_PATHS: Record<UserRole, string> = {
 const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
   admin: [
     'dashboard',
+    'completion',
     'users',
     'coordinators',
     'assignments',
@@ -41,6 +42,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
 
   coordinator: [
     'dashboard',
+    'completion',
     'students',
     'historical-students',
     'document-templates',
@@ -54,6 +56,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
 
   dean: [
     'dashboard',
+    'completion',
     'notifications',
     'settings',
     'help-center',
@@ -62,6 +65,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
 
   career_center: [
     'dashboard',
+    'completion',
     'companies',
     'applications',
     'notifications',
@@ -73,6 +77,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
 
   company: [
     'dashboard',
+    'completion',
     'interns',
     'applications',
     'notifications',

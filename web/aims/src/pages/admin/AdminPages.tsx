@@ -31,6 +31,7 @@ import { HelpCenterPage } from '../shared/UtilityPages'
 
 import { AdminDashboardPage } from './AdminDashboardPage'
 import { UsersPage } from './UsersPage'
+import { CompletionPage } from '../shared/CompletionPage'
 import { AssignmentsPage } from './AssignmentsPage'
 import { CoordinatorManagement } from './CoordinatorManagement'
 import { NotificationsPage } from './NotificationsPage'
@@ -245,6 +246,10 @@ export function AdminPages({
   let content
 
   switch (section) {
+    case 'completion':
+      content = <CompletionPage role="admin" />
+      break
+
     // ========================================
     // DASHBOARD
     // ========================================

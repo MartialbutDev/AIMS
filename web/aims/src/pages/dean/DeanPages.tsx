@@ -1,3 +1,4 @@
+import { CompletionPage } from '../shared/CompletionPage'
 import { DirectPlacementsPage } from '../shared/DirectPlacementsPage'
 
 import type { UserSession } from '../../types/auth'
@@ -30,6 +31,9 @@ export function DeanPages({
   onLogout,
 }: DeanPagesProps) {
   switch (section) {
+    case 'completion':
+      return <CompletionPage role="dean" />
+
     case 'direct-placements':
       return <DirectPlacementsPage role="dean" />
 

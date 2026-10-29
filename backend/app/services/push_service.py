@@ -11,7 +11,7 @@ from app.models.notification_settings import NotificationSettings
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
-ROUTES = {'/(student)/documents','/(student)/dtr','/(student)/journals','/(student)/applications','/(student)/applications/direct-placements','/(student)/notifications','/(student)/documents/templates','/(student)/pre-deployment','/onboarding'}
+ROUTES = {'/(student)/completion','/(student)/documents','/(student)/dtr','/(student)/journals','/(student)/applications','/(student)/applications/direct-placements','/(student)/notifications','/(student)/documents/templates','/(student)/pre-deployment','/onboarding'}
 
 def expo_request(path, payload):
     headers = {'Content-Type':'application/json', 'Accept':'application/json'}

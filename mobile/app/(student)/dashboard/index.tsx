@@ -716,6 +716,15 @@ export default function DashboardScreen() {
         {/* INTERNSHIP PROGRESS */}
         {/* ============================================= */}
 
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={() => router.push('/(student)/completion')}
+          style={[styles.deploymentLink, { backgroundColor: colors.card }]}
+        >
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}>Completion &amp; archive</Text>
+          <Text style={{ color: colors.textSecondary, marginTop: 4 }}>Check eligibility, request completion, and view your released final grade.</Text>
+        </TouchableOpacity>
+
         <InternshipProgressCard
           progress={progress.progress}
           hoursRendered={

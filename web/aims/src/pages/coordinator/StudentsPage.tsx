@@ -61,9 +61,9 @@ function EvaluationPanel({
 
   return (
     <form className="panel coordinator-evaluation" onSubmit={submit}>
-      <div className="panel-heading"><div><h2>Coordinator summary & grade</h2><p>Grade scale: 1.00 is highest; 5.00 is lowest.</p></div></div>
+      <div className="panel-heading"><div><h2>Coordinator assessment</h2><p>Internal assessment: 1.00 is highest; 5.00 is lowest. Use Completion & archive to release the official final grade.</p></div></div>
       <div className="evaluation-fields">
-        <label>Final grade
+        <label>Assessment grade
           <input aria-label="Final grade" type="number" min="1" max="5" step="0.01" required value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="e.g. 1.25" />
         </label>
         <label>Evaluation notes

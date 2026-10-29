@@ -28,5 +28,7 @@ def get_db() -> Generator[Session, None, None]:
 from sqlalchemy import event
 @event.listens_for(Session, 'before_flush')
 def _workflow_notifications(db, flush_context, instances):
+    from app.core.completion_archive import protect_archive
+    protect_archive(db)
     from app.services.workflow_notifications import capture
     capture(db, flush_context, instances)

@@ -19,6 +19,7 @@ Includes:
 # ============================================================
 
 from app.models.user import User
+from app.models.internship_completion import InternshipCompletionCase, InternshipCompletionEvent
 from app.models.company import Company
 from app.models.application import Application
 from app.models.document import Document

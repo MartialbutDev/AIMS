@@ -1,4 +1,6 @@
 
+import { CompletionPage } from '../shared/CompletionPage'
+
 import type { DashboardData } from '../../types/dashboard'
 import type { UserSession } from '../../types/auth'
 
@@ -29,6 +31,9 @@ export function CompanyPages({
   onNavigate,
 }: CompanyPagesProps) {
   switch (section) {
+    case 'completion':
+      return <CompletionPage role="company" />
+
     // COMPANY DASHBOARD
 
     case 'dashboard':

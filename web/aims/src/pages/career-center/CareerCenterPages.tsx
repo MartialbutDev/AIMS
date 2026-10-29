@@ -1,3 +1,4 @@
+import { CompletionPage } from '../shared/CompletionPage'
 import { DirectPlacementsPage } from '../shared/DirectPlacementsPage'
 
 import type { DashboardData } from '../../types/dashboard'
@@ -38,6 +39,9 @@ export function CareerCenterPages({
   onNavigate,
 }: CareerCenterPagesProps) {
   switch (section) {
+    case 'completion':
+      return <CompletionPage role="career_center" />
+
     case 'direct-placements':
       return <DirectPlacementsPage role="career_center" />
 

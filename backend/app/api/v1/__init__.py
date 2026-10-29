@@ -51,6 +51,8 @@ from app.routers.documents import documents_router
 # ============================================================
 
 router = APIRouter()
+from app.api.v1.endpoints import internship_completion
+router.include_router(internship_completion.router)
 
 
 # ============================================================

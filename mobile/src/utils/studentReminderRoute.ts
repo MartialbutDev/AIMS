@@ -1,4 +1,5 @@
 const REMINDER_ROUTES = [
+  '/(student)/completion',
   '/(student)/applications/direct-placements',
   '/(student)/documents',
   '/(student)/documents/templates',

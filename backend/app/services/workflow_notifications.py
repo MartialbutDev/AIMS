@@ -79,6 +79,7 @@ def capture(db, flush_context, instances):
             emit({sid} | staff | scope.roles['admin'], 'document', f'Onboarding: {status.replace("_", " ")}',
                  'An onboarding submission needs attention or has a review decision.', source='onboarding', status=status, student_id=sid)
         elif name == 'InternshipDeployment':
+            if getattr(obj, '_completion_workflow', False): continue
             if not changed('status'): continue
             status = value(obj.status) or 'pre_deployment'
             if status == 'pre_deployment': continue  # Application acceptance already supplies this alert.

@@ -42,6 +42,7 @@ import {
 
 
 const HIDE_TAB_BAR_PREFIXES = [
+  "/completion",
   "/pre-deployment",
   "/profile",
   "/settings",

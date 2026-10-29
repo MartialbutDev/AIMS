@@ -1,3 +1,4 @@
+import { CompletionPage } from '../shared/CompletionPage'
 import { DirectPlacementsPage } from '../shared/DirectPlacementsPage'
 import { DocumentTemplatesPage } from './DocumentTemplatesPage'
 
@@ -32,6 +33,9 @@ export function CoordinatorPages({
   onNavigate,
 }: CoordinatorPagesProps) {
   switch (section) {
+    case 'completion':
+      return <CompletionPage role="coordinator" />
+
     case 'direct-placements':
       return <DirectPlacementsPage role="coordinator" />
 

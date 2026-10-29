@@ -64,11 +64,13 @@ def destinations(role, kind, source='workflow'):
     if role == 'student':
         route = {'application': 'applications', 'dtr': 'dtr', 'journal': 'journals', 'document': 'documents'}.get(kind, 'notifications')
         route = {'direct_placement': 'applications/direct-placements',
+                 'completion': 'completion',
                  'document_template': 'documents/templates', 'deployment': 'pre-deployment',
                  'onboarding': 'onboarding'}.get(source, route)
         return {'route': '/onboarding' if source == 'onboarding' else f'/(student)/{route}'}
     root = WEB_ROOT.get(role, role)
     page = 'notifications'
+    if source == 'completion': return {'web_path': f'/{root}/completion'}
     if source == 'direct_placement' and role in {'coordinator', 'dean', 'career_center'}: page = 'direct-placements'
     elif source == 'document_template' and role == 'coordinator': page = 'document-templates'
     elif source == 'onboarding' and role in {'coordinator', 'admin'}: page = 'document-verification'

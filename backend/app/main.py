@@ -27,7 +27,8 @@ def ensure_database_schema() -> None:
     from app.models.direct_placement import DIRECT_PLACEMENT_TABLES
     from app.models.notification_delivery import DELIVERY_TABLES
     from app.models.password_reset import PASSWORD_RESET_TABLES
-    Base.metadata.create_all(bind=engine, tables=[t for t in Base.metadata.sorted_tables if t.name not in (TEMPLATE_TABLES | DIRECT_PLACEMENT_TABLES | DELIVERY_TABLES | PASSWORD_RESET_TABLES)])
+    from app.models.internship_completion import COMPLETION_TABLES
+    Base.metadata.create_all(bind=engine, tables=[t for t in Base.metadata.sorted_tables if t.name not in (TEMPLATE_TABLES | DIRECT_PLACEMENT_TABLES | DELIVERY_TABLES | PASSWORD_RESET_TABLES | COMPLETION_TABLES)])
 
     inspector = inspect(engine)
 
