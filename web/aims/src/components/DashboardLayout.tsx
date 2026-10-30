@@ -123,6 +123,8 @@ export function DashboardLayout({
   const section =
     location.pathname.split('/')[2] || 'dashboard'
 
+  useEffect(() => { window.scrollTo(0, 0) }, [location.pathname])
+
   const navItems = NAV_BY_ROLE[session.role]
 
   const sectionLabels: Record<string, string> = {
