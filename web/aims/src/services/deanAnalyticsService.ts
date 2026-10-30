@@ -1,37 +1,31 @@
 import { apiRequest } from './apiClient'
 
-export interface CoordinatorAnalytics {
-  coordinator_id: string
-  coordinator_name: string
-  student_count: number
-  average_document_completion_percent: number
-  average_ojt_completion_percent: number
-  fully_complete_students: number
-  fully_complete_percent: number
+export interface AcademicTerm { academic_year: string; semester: string }
+export type AttentionCategory = 'missing_requirements' | 'returned_completion' | 'company_confirmation' | 'coordinator_approval' | 'pending_reviews' | 'record_conflict'
+export interface Workload {
+  coordinator_id: string; coordinator_name: string; assigned_students: number; active_interns: number
+  document_reviews: number; dtr_reviews: number; journal_reviews: number; completion_reviews: number; total_reviews: number
 }
-
-export interface DeanAnalytics {
-  academic_year: string
-  semester: string
-  unassigned_students_available: boolean
-  completion: { deployed: number; completed: number; grade_released: number; completed_legacy: number }
-  enrolled_student_count: number
-  gender_distribution: {
-    male: number
-    female: number
-    other: number
-    prefer_not_to_say: number
-    not_provided: number
-  }
-  assigned_student_count: number
-  unassigned_student_count: number | null
-  average_document_completion_percent: number
-  average_ojt_completion_percent: number
-  fully_complete_students: number
-  fully_complete_percent: number
-  coordinators: CoordinatorAnalytics[]
+export interface DeanAnalytics extends AcademicTerm {
+  generated_at: string
+  overview: Record<'students_in_oversight' | 'awaiting_deployment' | 'active_interns' | 'pending_completion' | 'approved_completion' | 'grades_released', number>
+  stages: { key: string; label: string; count: number }[]
+  workloads: Workload[]
+  attention: { key: AttentionCategory; label: string; student_count: number }[]
 }
-
-export function getDeanAnalytics(): Promise<DeanAnalytics> {
-  return apiRequest<DeanAnalytics>('/api/v1/analytics/dean')
+export interface AttentionDetails extends AcademicTerm {
+  total: number; page: number; limit: number
+  items: { student_id: string; student_number: string | null; student_name: string; coordinator_name: string; company_name: string | null; stage: string; details: string[]; review_items: number }[]
+}
+export const termLabel = (term: AcademicTerm) => `AY ${term.academic_year} · Semester ${term.semester}`
+export function getDeanTerms(signal?: AbortSignal) {
+  return apiRequest<{ current: AcademicTerm; items: AcademicTerm[] }>('/api/v1/analytics/dean/terms', { signal })
+}
+export function getDeanAnalytics(term: AcademicTerm, signal?: AbortSignal) {
+  return apiRequest<DeanAnalytics>(`/api/v1/analytics/dean?${new URLSearchParams({ ...term })}`, { signal })
+}
+export function getDeanAttention(term: AcademicTerm, category: AttentionCategory, page: number, coordinator: string, signal?: AbortSignal) {
+  const params = new URLSearchParams({ ...term, category, page: String(page), limit: '20' })
+  if (coordinator) params.set('coordinator_id', coordinator)
+  return apiRequest<AttentionDetails>(`/api/v1/analytics/dean/attention?${params}`, { signal })
 }

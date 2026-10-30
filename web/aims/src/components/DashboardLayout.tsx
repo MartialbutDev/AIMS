@@ -395,7 +395,7 @@ export function DashboardLayout({
         </header>
 
         <div className="dashboard-content">
-          {section === 'dashboard' && data.academic_year && <section className="panel" aria-label="Reporting term" style={{ marginBottom: 18 }}><strong>AY {data.academic_year} · Semester {data.semester}</strong>{data.completion && <p>Active internships: {data.completion.deployed} · Coordinator approved: {data.completion.completed} · Grades released: {data.completion.grade_released}{data.completion.completed_legacy > 0 ? ` · Historical completed records: ${data.completion.completed_legacy}` : ''}</p>}<small>Internship activity uses this term and your access scope. Registered-account and partner inventories are labelled separately.</small></section>}
+          {section === 'dashboard' && session.role !== 'dean' && data.academic_year && <section className="panel" aria-label="Reporting term" style={{ marginBottom: 18 }}><strong>AY {data.academic_year} · Semester {data.semester}</strong>{data.completion && <p>Active internships: {data.completion.deployed} · Coordinator approved: {data.completion.completed} · Grades released: {data.completion.grade_released}{data.completion.completed_legacy > 0 ? ` · Historical completed records: ${data.completion.completed_legacy}` : ''}</p>}<small>Internship activity uses this term and your access scope. Registered-account and partner inventories are labelled separately.</small></section>}
           {content}
         </div>
       </main>

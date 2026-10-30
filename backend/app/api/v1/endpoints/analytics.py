@@ -3,7 +3,7 @@
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -17,6 +17,7 @@ from app.models.document import Document, DocumentType
 from app.models.dtr import DTR, DTRStatus
 from app.models.user import User, UserRole
 from app.services import reporting_scope as reporting
+from app.services import dean_analytics_service as dean_analytics
 from app.models.internship_deployment import InternshipDeployment, DeploymentStatus
 from app.models.internship_completion import InternshipCompletionCase
 from app.services.deployment_service import DeploymentService
@@ -83,8 +84,10 @@ def _next_month(month: datetime) -> datetime:
 async def get_dean_analytics(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("dean")),
+    academic_year: str | None = None,
+    semester: str | None = None,
 ):
-    year, semester = reporting.get_current_academic_term()
+    year, semester = dean_analytics.resolve_term(academic_year, semester)
     ids = reporting.student_ids(db,current_user,year,semester)
     coordinator_ids = reporting.dean_coordinator_ids(db,current_user,year,semester)
     coordinators = db.query(User).filter(User.id.in_(coordinator_ids),User.role==UserRole.COORDINATOR).order_by(User.last_name,User.first_name).all()
@@ -118,13 +121,31 @@ async def get_dean_analytics(
         return {'average_document_completion_percent':round(docs/count) if count else 0,
                 'average_ojt_completion_percent':round(progress/count) if count else 0,
                 'fully_complete_students':complete,'fully_complete_percent':round(complete/count*100) if count else 0}
-    return {**reporting.term_metadata(year,semester),'enrolled_student_count':len(ids),
+    overview = dean_analytics.snapshot(db, current_user, year, semester)
+    overview.pop('_details')
+    return {**overview,'enrolled_student_count':len(ids),
         'gender_distribution':genders,'assigned_student_count':len(assigned_ids),
         'unassigned_student_count':len(ids-assigned_ids) if current_user.role==UserRole.ADMIN else None,
         'unassigned_students_available':current_user.role==UserRole.ADMIN,
         'completion':reporting.completion_counts(db,deps), **summary(assigned_ids),
         'coordinators':[{'coordinator_id':c.id,'coordinator_name':f'{c.first_name} {c.last_name}',
             'student_count':len(by_coordinator[c.id]),**summary(by_coordinator[c.id])} for c in coordinators]}
+
+
+@router.get("/dean/terms")
+def get_dean_terms(db: Session = Depends(get_db), current_user: User = Depends(require_role("dean"))):
+    return dean_analytics.available_terms(db, current_user)
+
+
+@router.get("/dean/attention")
+def get_dean_attention(
+    academic_year: str, semester: str, category: str,
+    coordinator_id: str | None = None,
+    page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db), current_user: User = Depends(require_role("dean")),
+):
+    year, semester = dean_analytics.resolve_term(academic_year, semester)
+    return dean_analytics.attention_details(db, current_user, year, semester, category, coordinator_id, page, limit)
 
 
 @router.get("/dashboard")

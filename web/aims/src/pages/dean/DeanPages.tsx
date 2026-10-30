@@ -46,13 +46,6 @@ export function DeanPages({
       return <DeanDashboardPage />
 
     // ========================================
-    // COORDINATOR MANAGEMENT
-    // ========================================
-
-    case 'coordinators':
-      return <DeanDashboardPage />
-
-    // ========================================
     // NOTIFICATIONS
     // ========================================
 
