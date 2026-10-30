@@ -1,7 +1,7 @@
 import { NotificationCenter } from './NotificationCenter'
 import { WorkspaceSettings } from '../pages/shared/WorkspaceSettings'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import '../pages/coordinator/citc-workspace.css'
@@ -95,6 +95,10 @@ export function DashboardLayout({
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const changeNotificationsOpen = useCallback((value: boolean) => {
+    setNotificationsOpen(value)
+    if (value) setMobileNavOpen(false)
+  }, [])
   const [narrowViewport, setNarrowCoordinator] = useState(() => window.matchMedia('(max-width: 1000px)').matches)
 
   useEffect(() => {
@@ -393,7 +397,7 @@ export function DashboardLayout({
 
           <div className="topbar-actions">
             <span className="citc-topbar-campus">CITC / USTP Cagayan de Oro</span>
-            <NotificationCenter key={session.accessToken} session={session} open={notificationsOpen} onOpenChange={setNotificationsOpen} onSettings={() => navigate(`/${WORKSPACE_SLUGS[session.role]}/settings`, { state: { settingsTab: 'notifications' } })} />
+            <NotificationCenter key={session.accessToken} session={session} open={notificationsOpen} onOpenChange={changeNotificationsOpen} onSettings={() => navigate(`/${WORKSPACE_SLUGS[session.role]}/settings`, { state: { settingsTab: 'notifications' } })} />
             <span className="today-label">
               <Icon name="clock" size={15} />
               Today
