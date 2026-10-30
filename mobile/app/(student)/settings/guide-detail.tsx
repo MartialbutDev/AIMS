@@ -26,17 +26,17 @@ const guideContents: Record<string, GuideContent> = {
       {
         title: "Create Your Account",
         icon: "person-add-outline",
-        content: "1. Download the AIMS app from the Play Store\n2. Tap 'Sign Up' on the welcome screen\n3. Enter your full name, student ID, email, and password\n4. Verify your email address\n5. Complete your profile with your contact information",
+        content: "1. Install the AIMS APK provided through your school’s approved distribution channel.\n2. Create your student account with accurate name, student ID and contact details.\n3. Submit the account-verification documents requested by AIMS.\n4. Wait for the school reviewer to verify your account.\n5. Sign in and follow the next step shown on your dashboard.",
       },
       {
         title: "Complete Your Profile",
         icon: "person-outline",
-        content: "1. Go to Settings > Edit Profile\n2. Add your profile picture\n3. Update your phone number\n4. Make sure all information is accurate\n5. Your profile helps coordinators identify you",
+        content: "Open Profile to review your details and photo. Use the edit controls for the fields available to you. Ask your coordinator to correct your student ID or other school-controlled information.",
       },
       {
         title: "Understand the Dashboard",
         icon: "grid-outline",
-        content: "The dashboard shows:\n• Your internship progress (hours completed)\n• Quick stats (applications, documents, DTR, journals)\n• Quick action buttons for common tasks\n• Recent activity feed\n• Upcoming deadlines",
+        content: "Your dashboard shows the configured academic term, school-approved hours and deployment progress. Use Pre-deployment before starting the internship, and Completion & archive when you are ready for the final review. Read updates in Notifications.",
       },
     ],
   },
@@ -46,19 +46,19 @@ const guideContents: Record<string, GuideContent> = {
     icon: "briefcase-outline",
     sections: [
       {
-        title: "Find Companies",
+        title: "Prepare your application",
         icon: "search-outline",
-        content: "1. Go to the Applications tab\n2. Browse the list of available companies\n3. Each company shows their industry and MOA status\n4. Tap on a company to see more details\n5. Check if they have active internship positions",
+        content: "1. Upload your resume/CV and application letter in Documents.\n2. Wait for verification of both files.\n3. Open Applications and choose an available partner company.\n4. Check the company details and follow your coordinator’s placement instructions.",
       },
       {
         title: "Submit Application",
         icon: "send-outline",
-        content: "1. Tap 'New Application'\n2. Select a company from the list\n3. Enter the position you're applying for\n4. Write a cover letter (optional but recommended)\n5. Review your application\n6. Tap 'Submit Application'",
+        content: "1. Create a new application.\n2. Select the company and position.\n3. Select your verified resume/CV and application letter.\n4. Add the requested application details and submit.\n5. Your coordinator reviews the application before company review.\n6. For a school-arranged placement, open the proposal, review it and acknowledge or decline it with a reason.",
       },
       {
         title: "Track Application Status",
         icon: "time-outline",
-        content: "Your application will go through these stages:\n• Pending - Awaiting review\n• Reviewing - Under evaluation\n• Interview - You've been shortlisted\n• Accepted - Congratulations! You got the position\n• Rejected - Don't give up, try other companies",
+        content: "Check the status and feedback in Applications. Company acceptance does not authorize attendance recording by itself. Complete the Pre-deployment checklist and wait for your coordinator to confirm deployment before recording DTR or submitting journals.",
       },
     ],
   },
@@ -70,17 +70,17 @@ const guideContents: Record<string, GuideContent> = {
       {
         title: "Recording Time-In",
         icon: "log-in-outline",
-        content: "1. Go to the DTR tab\n2. Tap the '+' button\n3. Select the current date\n4. Set your time-in (or use 'Now')\n5. Take a clear photo of yourself at your workstation\n6. Allow location access for verification\n7. Tap 'Clock In'",
+        content: "1. Confirm that your deployment is active.\n2. Open DTR and create your time-in entry.\n3. Use a date on or after your official deployment date.\n4. Take a time-in photo and allow the requested location access.\n5. Review your entry before saving.",
       },
       {
         title: "Recording Time-Out",
         icon: "log-out-outline",
-        content: "1. Go to the DTR tab\n2. Find your pending DTR entry\n3. Tap 'Record Time-Out'\n4. Take a time-out photo\n5. Allow location verification\n6. Tap 'Clock Out'\n7. Your hours will be automatically calculated",
+        content: "1. Open the pending DTR entry.\n2. Record a time-out later than the time-in.\n3. Provide the required time-out photo and location details.\n4. Submit the time-out. The complete entry goes to coordinator review.\n5. Only valid, school-approved hours contribute to completion progress.",
       },
       {
         title: "DTR Status",
         icon: "checkmark-circle-outline",
-        content: "Your DTR entries have these statuses:\n• Pending - Time-in recorded, waiting for time-out\n• Submitted - Complete and awaiting approval\n• Approved - Validated by your coordinator\n• Rejected - Needs correction (check feedback)",
+        content: "Pending: time-in recorded, time-out still required.\nSubmitted: awaiting coordinator review.\nApproved: reviewed by the coordinator.\nRejected: read the feedback and ask your coordinator for correction instructions.\nArchived records require the coordinator to reopen completion before corrections.",
       },
     ],
   },
@@ -92,17 +92,17 @@ const guideContents: Record<string, GuideContent> = {
       {
         title: "What to Write",
         icon: "create-outline",
-        content: "Your weekly journal should include:\n• Technical skills you learned\n• Tasks you completed\n• Challenges you faced\n• How you overcame obstacles\n• Goals for next week\n• Key takeaways from the week",
+        content: "Follow the journal format published or required by your coordinator. Describe the tasks completed, skills practised, challenges and what you learned. Prepare your report as a readable PDF before uploading it.",
       },
       {
         title: "How to Submit",
         icon: "send-outline",
-        content: "1. Go to the Journals tab\n2. Tap 'New Journal'\n3. Enter the week number\n4. Write a title for your journal\n5. Write a brief summary\n6. Add detailed content (optional)\n7. Tap 'Submit Journal'",
+        content: "1. Confirm that your deployment is active.\n2. Open Journals and create a journal.\n3. Enter the week number (1–52), title and optional summary.\n4. Select the journal PDF.\n5. Submit it for coordinator review.\n6. Read any feedback in the journal details.",
       },
       {
         title: "Journal Status",
         icon: "time-outline",
-        content: "Your journals go through these statuses:\n• Draft - Saved but not submitted\n• Submitted - Awaiting review\n• Reviewing - Being evaluated\n• Approved - Accepted by coordinator\n• Rejected - Needs revision (check feedback)",
+        content: "Draft: not yet submitted.\nSubmitted or reviewing: awaiting a decision.\nApproved: accepted by your coordinator.\nRejected: read the feedback and follow your coordinator’s correction instructions.\nCompleting the journal requirements does not automatically approve internship completion.",
       },
     ],
   },

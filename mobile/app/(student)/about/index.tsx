@@ -32,10 +32,6 @@ const teamMembers: TeamMember[] = [
     role: "Capstone Adviser",
     description: "Provides guidance, mentorship, and oversight throughout the project lifecycle. Ensures the project meets academic standards and industry best practices.",
     image: require("../../../assets/images/team/ampolitod.jpg"),
-    social: {
-      linkedin: "https://linkedin.com/in/kenneth",
-      email: "kenneth.ampolitod@ustp.edu.ph",
-    },
   },
   {
     id: "1",
@@ -43,10 +39,6 @@ const teamMembers: TeamMember[] = [
     role: "System Analyst",
     description: "Analyzes system requirements, designs architecture, and ensures the system meets all functional and non-functional requirements.",
     image: require("../../../assets/images/team/lopez.jpg"),
-    social: {
-      github: "https://github.com/maikent",
-      linkedin: "https://linkedin.com/in/maikent",
-    },
   },
   {
     id: "2",
@@ -54,10 +46,6 @@ const teamMembers: TeamMember[] = [
     role: "Database Administrator",
     description: "Manages database design, optimization, and maintenance. Ensures data integrity, security, and efficient data retrieval.",
     image: require("../../../assets/images/team/pajo.jpg"),
-    social: {
-      github: "https://github.com/henna",
-      linkedin: "https://linkedin.com/in/henna",
-    },
   },
   {
     id: "3",
@@ -65,10 +53,6 @@ const teamMembers: TeamMember[] = [
     role: "Technical Writer",
     description: "Documents system architecture, creates user manuals, and prepares technical documentation for the project.",
     image: require("../../../assets/images/team/fernandez.jpg"),
-    social: {
-      github: "https://github.com/harry",
-      linkedin: "https://linkedin.com/in/harry",
-    },
   },
   {
     id: "4",
@@ -76,10 +60,6 @@ const teamMembers: TeamMember[] = [
     role: "Front End Developer",
     description: "Develops the user interface and experience of the mobile application. Ensures the app is responsive, intuitive, and visually appealing.",
     image: require("../../../assets/images/team/faisal.jpg"),
-    social: {
-      github: "https://github.com/faisal",
-      linkedin: "https://linkedin.com/in/faisal",
-    },
   },
   {
     id: "5",
@@ -87,10 +67,6 @@ const teamMembers: TeamMember[] = [
     role: "Backend Developer",
     description: "Develops server-side logic, API endpoints, and database integration. Ensures the system is scalable, secure, and performs efficiently.",
     image: require("../../../assets/images/team/naive.jpg"),
-    social: {
-      github: "https://github.com/varren",
-      linkedin: "https://linkedin.com/in/varren",
-    },
   },
 ];
 
@@ -263,7 +239,7 @@ export default function AboutScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>About AIMS</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>Version {APP_VERSION}</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>{APP_VERSION}</Text>
         </View>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn} accessibilityLabel="Close">
           <Ionicons name="close-outline" size={24} color={colors.textPrimary} />

@@ -2,7 +2,7 @@
   "expo": {
     "name": "AIMS",
     "slug": "aims",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/aims-app-icon.png",
     "scheme": "aims",
@@ -12,7 +12,7 @@
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#080078",
         "foregroundImage": "./assets/images/aims-app-icon.png"

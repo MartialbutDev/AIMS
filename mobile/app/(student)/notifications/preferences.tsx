@@ -21,6 +21,7 @@ import {
   NotificationSettings,
 } from "../../../src/services/notification-settings.service";
 
+import type { UpdateNotificationSettingsData } from "../../../src/services/notification-settings.service";
 import { registerPushDevice, unregisterPushDevice } from "../../../src/services/push.service";
 
 interface SettingSection {
@@ -117,11 +118,6 @@ const SETTINGS_SECTIONS: SettingSection[] = [
         label: "System Announcements",
         description: "Important system announcements and updates",
       },
-      {
-        key: "weekly_summaries",
-        label: "Weekly Summaries",
-        description: "Weekly summary of your internship progress",
-      },
     ],
   },
 ];
@@ -182,42 +178,21 @@ export default function NotificationPreferencesScreen() {
     }
   };
 
-  const handleReset = () => {
-    Alert.alert(
-      "Reset Settings",
-      "Are you sure you want to reset all notification settings to defaults?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reset",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await notificationSettingsService.resetSettings();
-              await loadSettings();
-              Alert.alert("Success", "Settings reset to defaults");
-            } catch (error) {
-              Alert.alert("Error", "Failed to reset settings");
-            }
-          },
-        },
-      ]
-    );
-  };
+  const handleReset = () => handleToggleAll(true);
 
   const handleToggleAll = (enabled: boolean) => {
     if (!settings) return;
 
-    const updates: any = {};
+    const updates: UpdateNotificationSettingsData = {};
     SETTINGS_SECTIONS.forEach((section) => {
       section.settings.forEach((setting) => {
-        updates[setting.key] = enabled;
+        updates[setting.key as keyof UpdateNotificationSettingsData] = enabled;
       });
     });
 
     Alert.alert(
-      enabled ? "Enable All Notifications" : "Disable All Notifications",
-      `Are you sure you want to ${enabled ? "enable" : "disable"} all notifications?`,
+      enabled ? "Enable alert categories" : "Mute alert categories",
+      `Apply this to all alert categories? Your in-app inbox, phone registration and email delivery choice are unchanged.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -227,7 +202,7 @@ export default function NotificationPreferencesScreen() {
             try {
               const updated = await notificationSettingsService.updateSettings(updates);
               setSettings(updated);
-              Alert.alert("Success", `All notifications ${enabled ? "enabled" : "disabled"}`);
+              Alert.alert("Success", `Alert categories ${enabled ? "enabled" : "muted"}`);
             } catch (error) {
               Alert.alert("Error", "Failed to update settings");
               await loadSettings();
@@ -342,15 +317,15 @@ export default function NotificationPreferencesScreen() {
         <View style={{backgroundColor: colors.card, padding: 20, borderRadius: 18, marginBottom: 18, gap: 12}}>
           <Text style={{color: colors.textPrimary, fontSize: 18, fontWeight: '700'}}>Delivery status</Text>
           <Text style={{color: colors.textSecondary, lineHeight: 22}}>Your activity inbox remains available. These settings control optional email and phone alerts.</Text>
-          <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.push_delivery_enabled ? 'Expo delivery enabled.' : 'Phone push awaits Expo setup.'} {delivery?.registered_devices ?? 0} registered devices.</Text>
+          <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.push_delivery_enabled ? 'Phone alerts are enabled.' : 'Phone alerts are not available yet.'} {delivery?.registered_devices ?? 0} registered devices.</Text>
           <TouchableOpacity accessibilityRole="button" disabled={saving || !settings?.push_enabled} onPress={async () => {
             setSaving(true);
             try { Alert.alert('Phone notifications', await registerPushDevice()); setDelivery(await communicationService.delivery()); }
             catch (error) { Alert.alert('Unable to connect phone', phoneRegistrationError(error)); }
             finally { setSaving(false); }
           }} style={{paddingVertical: 12, opacity: saving || !settings?.push_enabled ? .45 : 1}}><Text style={{color: colors.accent, fontWeight: '700'}}>Connect / reconnect this phone</Text></TouchableOpacity>
-          <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.email_configured && delivery.email_delivery_enabled ? 'Email delivery enabled.' : 'Email awaits SMTP setup.'} {delivery?.email_verified ? 'Email verified.' : 'Verify your email before receiving email alerts.'}</Text>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}><Text style={{color: colors.textPrimary}}>Send email updates</Text><Switch disabled={saving || !delivery} value={delivery?.email_enabled ?? false} onValueChange={async value => { setSaving(true); try { await communicationService.email(value); setDelivery(await communicationService.delivery()); } catch { Alert.alert('Unable to save', 'Please retry your email preference.'); } finally { setSaving(false); } }} trackColor={{false: colors.border, true: colors.accent}} thumbColor="#ffffff" /></View>
+          <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.email_configured && delivery.email_delivery_enabled ? 'Email delivery enabled.' : 'Email alerts are not available yet.'} {delivery?.email_verified ? 'Email verified.' : 'Verify your email before receiving email alerts.'}</Text>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}><Text style={{color: colors.textPrimary}}>Send email updates</Text><Switch disabled={saving || !delivery || (!delivery.email_enabled && !(delivery.email_configured && delivery.email_delivery_enabled && delivery.email_verified))} value={delivery?.email_enabled ?? false} onValueChange={async value => { setSaving(true); try { await communicationService.email(value); setDelivery(await communicationService.delivery()); } catch { Alert.alert('Unable to save', 'Please retry your email preference.'); } finally { setSaving(false); } }} trackColor={{false: colors.border, true: colors.accent}} thumbColor="#ffffff" /></View>
           <Text style={{color: colors.textTertiary, fontSize: 12}}>{delivery?.email.queued ?? 0} queued · {delivery?.email.smtp_accepted ?? 0} accepted by mail server · {delivery?.email.failed ?? 0} failed</Text>
         </View>
         <View style={[styles.pushSection, { backgroundColor: colors.card }]}>
@@ -385,7 +360,7 @@ export default function NotificationPreferencesScreen() {
           >
             <Ionicons name="checkmark-circle-outline" size={20} color="#10B981" />
             <Text style={[styles.quickActionText, { color: colors.textPrimary }]}>
-              Enable All
+              Enable categories
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -395,7 +370,7 @@ export default function NotificationPreferencesScreen() {
           >
             <Ionicons name="ban-outline" size={20} color="#EF4444" />
             <Text style={[styles.quickActionText, { color: colors.textPrimary }]}>
-              Disable All
+              Mute categories
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -405,7 +380,7 @@ export default function NotificationPreferencesScreen() {
           >
             <Ionicons name="refresh-outline" size={20} color={colors.accent} />
             <Text style={[styles.quickActionText, { color: colors.textPrimary }]}>
-              Reset
+              Reset categories
             </Text>
           </TouchableOpacity>
         </View>

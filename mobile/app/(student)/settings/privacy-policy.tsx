@@ -141,9 +141,7 @@ export default function PrivacyPolicyScreen() {
             Contact Us
           </Text>
           <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-            If you have any questions, concerns, or requests regarding this Privacy Policy, please contact us:
-            {'\n'}Email: privacy@aims.ustp.edu.ph
-            {'\n'}Phone: (088) 123-4567
+            If you have any questions, concerns, or requests regarding this Privacy Policy, contact your assigned coordinator or school administrator through your school’s official channels.
             {'\n'}Address: USTP-CDO, Lapasan, Cagayan de Oro City, 9000
           </Text>
 

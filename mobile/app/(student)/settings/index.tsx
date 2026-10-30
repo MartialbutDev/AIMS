@@ -6,6 +6,7 @@ import { StyleSheet, ScrollView, Text, TouchableOpacity, View, Alert } from "rea
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import ThemeToggle from "../../../src/components/settings/ThemeToggle";
+import { APP_VERSION } from "../../../src/constants/app";
 import { authService } from "../../../src/services/auth.service";
 
 interface SettingItem {
@@ -141,7 +142,7 @@ export default function SettingsScreen() {
           <Text style={[styles.logoutButtonText, { color: colors.error }]}>Logout</Text>
         </TouchableOpacity>
 
-        <Text style={[styles.versionText, { color: colors.textSecondary }]}>Version 1.0.0</Text>
+        <Text style={[styles.versionText, { color: colors.textSecondary }]}>{APP_VERSION}</Text>
       </ScrollView>
     </View>
   );

@@ -118,9 +118,7 @@ export default function TermsScreen() {
             11. Contact Us
           </Text>
           <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-            If you have any questions about these Terms, please contact us at:
-            {'\n'}Email: support@aims.ustp.edu.ph
-            {'\n'}Phone: (088) 123-4567
+            If you have any questions about these Terms, contact your assigned coordinator or school administrator through your school’s official channels.
           </Text>
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
