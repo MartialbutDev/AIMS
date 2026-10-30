@@ -1,10 +1,12 @@
-import { useNotificationCount } from '../hooks/useNotificationCount'
+import { NotificationCenter } from './NotificationCenter'
+import { WorkspaceSettings } from '../pages/shared/WorkspaceSettings'
 
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import '../pages/coordinator/citc-workspace.css'
 import '../pages/shared/stakeholder-workspaces.css'
+import './workspace-layout.css'
 import { Brand } from './Brand'
 import { Icon } from './Icons'
 
@@ -33,7 +35,7 @@ const NAV_BY_ROLE = {
     { label: 'Onboarding review', slug: 'document-verification', icon: 'check' },
     { label: 'Assignments', slug: 'assignments', icon: 'file' },
     { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Notifications', slug: 'notifications', icon: 'bell' },
+    { label: 'Announcements', slug: 'announcements', icon: 'bell' },
     { label: 'Developer info', slug: 'developer-info', icon: 'file' },
   ],
 
@@ -49,14 +51,12 @@ const NAV_BY_ROLE = {
     },
     { label: 'Applications', slug: 'applications', icon: 'file' },
     { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Notifications', slug: 'notifications', icon: 'bell' },
     { label: 'Direct placements', slug: 'direct-placements', icon: 'briefcase' },
   ],
 
   dean: [
     { label: 'Program overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Notifications', slug: 'notifications', icon: 'bell' },
     { label: 'Direct placements', slug: 'direct-placements', icon: 'briefcase' },
   ],
 
@@ -65,7 +65,6 @@ const NAV_BY_ROLE = {
     { label: 'Companies', slug: 'companies', icon: 'briefcase' },
     { label: 'Applications', slug: 'applications', icon: 'file' },
     { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Notifications', slug: 'notifications', icon: 'bell' },
     { label: 'Developer info', slug: 'developer-info', icon: 'file' },
     { label: 'Partnership review', slug: 'direct-placements', icon: 'briefcase' },
   ],
@@ -75,7 +74,6 @@ const NAV_BY_ROLE = {
     { label: 'Intern monitoring', slug: 'interns', icon: 'briefcase' },
     { label: 'Applications', slug: 'applications', icon: 'users' },
     { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Notifications', slug: 'notifications', icon: 'bell' },
     { label: 'Developer info', slug: 'developer-info', icon: 'file' },
   ],
 } as const
@@ -93,10 +91,10 @@ export function DashboardLayout({
   data,
   onLogout,
 }: DashboardLayoutProps) {
-  const unreadNotifications = useNotificationCount(session.accessToken)
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [narrowViewport, setNarrowCoordinator] = useState(() => window.matchMedia('(max-width: 1000px)').matches)
 
   useEffect(() => {
@@ -134,6 +132,7 @@ export function DashboardLayout({
     companies: 'Companies',
     applications: 'Applications',
     notifications: 'Notifications',
+    announcements: 'Announcements',
     'developer-info': 'Developer info',
     'document-verification': session.role === 'admin' ? 'Onboarding review' : 'Document review',
     coordinators: 'Coordinator designations',
@@ -147,6 +146,7 @@ export function DashboardLayout({
   const firstName = session.name || 'User'
 
   function goTo(nextSection: string) {
+    if (nextSection === 'notifications') { setNotificationsOpen(true); setMobileNavOpen(false); return }
     navigate(
       `/${WORKSPACE_SLUGS[session.role]}/${nextSection}`,
     )
@@ -154,13 +154,28 @@ export function DashboardLayout({
     setMobileNavOpen(false)
   }
 
+  useEffect(() => {
+    if (!mobileNavOpen || !narrowViewport) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.querySelector<HTMLButtonElement>('#workspace-navigation .mobile-close')?.focus()
+    return () => { document.body.style.overflow = previous }
+  }, [mobileNavOpen, narrowViewport])
+  useEffect(() => { setNotificationsOpen(false); setMobileNavOpen(false) }, [session.accessToken])
+  useEffect(() => {
+    if (section === 'notifications') {
+      setNotificationsOpen(true)
+      navigate(`/${WORKSPACE_SLUGS[session.role]}/dashboard`, { replace: true })
+    }
+  }, [section, navigate, session.role])
+
   let content
 
   switch (session.role) {
     case 'admin':
       content = (
         <AdminPages
-          section={section}
+          section={section === 'notifications' ? 'dashboard' : section}
           session={session}
           data={data}
           onLogout={onLogout}
@@ -172,7 +187,7 @@ export function DashboardLayout({
     case 'coordinator':
       content = (
         <CoordinatorPages
-          section={section}
+          section={section === 'notifications' ? 'dashboard' : section}
           session={session}
           data={data}
           onLogout={onLogout}
@@ -184,7 +199,7 @@ export function DashboardLayout({
     case 'dean':
       content = (
         <DeanPages
-          section={section}
+          section={section === 'notifications' ? 'dashboard' : section}
           session={session}
           onLogout={onLogout}
         />
@@ -194,7 +209,7 @@ export function DashboardLayout({
     case 'career_center':
       content = (
         <CareerCenterPages
-          section={section}
+          section={section === 'notifications' ? 'dashboard' : section}
           session={session}
           data={data}
           onLogout={onLogout}
@@ -206,7 +221,7 @@ export function DashboardLayout({
     case 'company':
       content = (
         <CompanyPages
-          section={section}
+          section={section === 'notifications' ? 'dashboard' : section}
           session={session}
           data={data}
           onLogout={onLogout}
@@ -357,7 +372,7 @@ export function DashboardLayout({
         />
       )}
 
-      <main className="dashboard-main">
+      <main className="dashboard-main" inert={narrowViewport && mobileNavOpen ? true : undefined}>
         <header className="topbar">
           <button
             type="button"
@@ -377,7 +392,8 @@ export function DashboardLayout({
           </div>
 
           <div className="topbar-actions">
-            {<><span className="citc-topbar-campus">CITC / USTP Cagayan de Oro</span><button type="button" className="citc-topbar-button" aria-label={`Open notifications (${unreadNotifications} unread)`} onClick={() => goTo('notifications')}><Icon name="bell" size={17} />{unreadNotifications > 0 && <span className="aims-bell-count">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}</button></>}
+            <span className="citc-topbar-campus">CITC / USTP Cagayan de Oro</span>
+            <NotificationCenter key={session.accessToken} session={session} open={notificationsOpen} onOpenChange={setNotificationsOpen} onSettings={() => navigate(`/${WORKSPACE_SLUGS[session.role]}/settings`, { state: { settingsTab: 'notifications' } })} />
             <span className="today-label">
               <Icon name="clock" size={15} />
               Today
@@ -395,8 +411,8 @@ export function DashboardLayout({
         </header>
 
         <div className="dashboard-content">
-          {section === 'dashboard' && session.role !== 'dean' && data.academic_year && <section className="panel" aria-label="Reporting term" style={{ marginBottom: 18 }}><strong>AY {data.academic_year} · Semester {data.semester}</strong>{data.completion && <p>Active internships: {data.completion.deployed} · Coordinator approved: {data.completion.completed} · Grades released: {data.completion.grade_released}{data.completion.completed_legacy > 0 ? ` · Historical completed records: ${data.completion.completed_legacy}` : ''}</p>}<small>Internship activity uses this term and your access scope. Registered-account and partner inventories are labelled separately.</small></section>}
-          {content}
+          {section === 'dashboard' && session.role !== 'dean' && data.academic_year && <section className="panel aims-reporting-term" aria-label="Reporting term" style={{ marginBottom: 18 }}><strong>AY {data.academic_year} · Semester {data.semester}</strong>{data.completion && <p>Active internships: {data.completion.deployed} · Coordinator approved: {data.completion.completed} · Grades released: {data.completion.grade_released}{data.completion.completed_legacy > 0 ? ` · Historical completed records: ${data.completion.completed_legacy}` : ''}</p>}<small>Internship activity uses this term and your access scope. Registered-account and partner inventories are labelled separately.</small></section>}
+          {section === 'settings' ? <WorkspaceSettings key={session.accessToken} session={session} onLogout={onLogout} adminOptions={session.role === 'admin' ? content : undefined} /> : content}
         </div>
       </main>
     </div>

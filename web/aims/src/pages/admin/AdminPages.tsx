@@ -307,7 +307,7 @@ export function AdminPages({
     // NOTIFICATIONS
     // ========================================
 
-    case 'notifications':
+    case 'announcements':
       content = (
         <NotificationsPage
           users={users}

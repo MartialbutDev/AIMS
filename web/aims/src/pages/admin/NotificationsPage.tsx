@@ -6,7 +6,6 @@ import {
 } from 'react'
 
 import { Icon } from '../../components/Icons'
-import { NotificationsInbox } from '../../components/NotificationsInbox'
 
 import {
   createAdminNotificationCampaign,
@@ -645,7 +644,7 @@ export function NotificationsPage({
               ADMIN MESSAGING
             </span>
 
-            <h1>Notifications</h1>
+            <h1>Announcements</h1>
 
             <p>
               Send important updates to individual
@@ -1134,7 +1133,6 @@ export function NotificationsPage({
           ADMIN PERSONAL NOTIFICATION INBOX
       ======================================== */}
 
-      <NotificationsInbox />
     </>
   )
 }

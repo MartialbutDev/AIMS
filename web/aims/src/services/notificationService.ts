@@ -13,8 +13,8 @@ interface BackendNotification {
   created_at: string
 }
 
-export async function getNotifications(skip = 0, limit = 50, unreadOnly = false): Promise<UserNotification[]> {
-  const notifications = await apiRequest<BackendNotification[]>(`/api/v1/notifications/?skip=${skip}&limit=${limit}&unread_only=${unreadOnly}`)
+export async function getNotifications(skip = 0, limit = 50, unreadOnly = false, signal?: AbortSignal): Promise<UserNotification[]> {
+  const notifications = await apiRequest<BackendNotification[]>(`/api/v1/notifications/?skip=${skip}&limit=${limit}&unread_only=${unreadOnly}`, { signal })
   return notifications.map((notification) => ({
     id: notification.id,
     type: notification.type,

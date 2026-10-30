@@ -35,6 +35,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
     'assignments',
     'document-verification',
     'notifications',
+    'announcements',
     'developer-info',
     'settings',
     'help-center',

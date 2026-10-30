@@ -360,14 +360,14 @@ export function AdminDashboardPage({
 
             <button
               type="button"
-              onClick={() => onNavigate('notifications')}
+              onClick={() => onNavigate('announcements')}
             >
               <span className="admin-dashboard-action-icon">
                 <Icon name="bell" size={18} />
               </span>
 
               <span>
-                <strong>Notifications</strong>
+                <strong>Announcements</strong>
                 <small>Send and schedule announcements</small>
               </span>
 
