@@ -1,5 +1,6 @@
 
 import React, { useEffect } from "react";
+import { AppState } from "react-native";
 import { Stack, useSegments } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { registerPushDevice, listenForPushNavigation } from "../src/services/push.service";
@@ -25,14 +26,24 @@ function RootLayoutNav() {
     if (area !== '(student)' && area !== 'onboarding') return;
     let cancelled = false;
     let stop: (() => void) | undefined;
+    let registering = false;
+    const register = async (requestPermission: boolean) => {
+      if (cancelled || registering) return;
+      registering = true;
+      try { await registerPushDevice(requestPermission); }
+      catch { /* Registration retries when the app returns to the foreground. */ }
+      finally { registering = false; }
+    };
+    const foreground = AppState.addEventListener('change', state => {
+      if (state === 'active') void register(false);
+    });
     void (async () => {
       if (!await SecureStore.getItemAsync('access_token') || cancelled) return;
-      try { await registerPushDevice(); } catch { /* Inbox remains available while registration is offline. */ }
-      if (cancelled) return;
       const cleanup = await listenForPushNavigation();
       if (cancelled) cleanup(); else stop = cleanup;
+      if (!cancelled) await register(true);
     })().catch(() => {});
-    return () => { cancelled = true; stop?.(); };
+    return () => { cancelled = true; stop?.(); foreground.remove(); };
   }, [area]);
 
   return (

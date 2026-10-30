@@ -126,6 +126,11 @@ const SETTINGS_SECTIONS: SettingSection[] = [
   },
 ];
 
+function phoneRegistrationError(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  return message || 'Check notification permission and your internet connection, then reconnect this phone.';
+}
+
 export default function NotificationPreferencesScreen() {
   const { colors, isDark } = useTheme();
   const [delivery, setDelivery] = useState<DeliveryStatus | null>(null);
@@ -154,19 +159,23 @@ export default function NotificationPreferencesScreen() {
   const handleToggle = async (key: keyof NotificationSettings, value: boolean) => {
     if (!settings) return;
 
+    let preferenceSaved = false;
     setSaving(true);
     try {
       const updated = await notificationSettingsService.updateSettings({
         [key]: value,
       });
       setSettings(updated);
+      preferenceSaved = true;
       if (key === "push_enabled") {
         if (value) Alert.alert("Phone notifications", await registerPushDevice());
         else await unregisterPushDevice();
+        setDelivery(await communicationService.delivery());
       }
     } catch (error) {
       console.error("Error updating setting:", error);
-      Alert.alert("Error", "Failed to update notification setting");
+      Alert.alert(preferenceSaved ? "Preference saved — phone not connected" : "Unable to save preference",
+        preferenceSaved ? phoneRegistrationError(error) : "Please check your connection and try again.");
       await loadSettings();
     } finally {
       setSaving(false);
@@ -334,6 +343,12 @@ export default function NotificationPreferencesScreen() {
           <Text style={{color: colors.textPrimary, fontSize: 18, fontWeight: '700'}}>Delivery status</Text>
           <Text style={{color: colors.textSecondary, lineHeight: 22}}>Your activity inbox remains available. These settings control optional email and phone alerts.</Text>
           <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.push_delivery_enabled ? 'Expo delivery enabled.' : 'Phone push awaits Expo setup.'} {delivery?.registered_devices ?? 0} registered devices.</Text>
+          <TouchableOpacity accessibilityRole="button" disabled={saving || !settings?.push_enabled} onPress={async () => {
+            setSaving(true);
+            try { Alert.alert('Phone notifications', await registerPushDevice()); setDelivery(await communicationService.delivery()); }
+            catch (error) { Alert.alert('Unable to connect phone', phoneRegistrationError(error)); }
+            finally { setSaving(false); }
+          }} style={{paddingVertical: 12, opacity: saving || !settings?.push_enabled ? .45 : 1}}><Text style={{color: colors.accent, fontWeight: '700'}}>Connect / reconnect this phone</Text></TouchableOpacity>
           <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.email_configured && delivery.email_delivery_enabled ? 'Email delivery enabled.' : 'Email awaits SMTP setup.'} {delivery?.email_verified ? 'Email verified.' : 'Verify your email before receiving email alerts.'}</Text>
           <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}><Text style={{color: colors.textPrimary}}>Send email updates</Text><Switch disabled={saving || !delivery} value={delivery?.email_enabled ?? false} onValueChange={async value => { setSaving(true); try { await communicationService.email(value); setDelivery(await communicationService.delivery()); } catch { Alert.alert('Unable to save', 'Please retry your email preference.'); } finally { setSaving(false); } }} trackColor={{false: colors.border, true: colors.accent}} thumbColor="#ffffff" /></View>
           <Text style={{color: colors.textTertiary, fontSize: 12}}>{delivery?.email.queued ?? 0} queued · {delivery?.email.smtp_accepted ?? 0} accepted by mail server · {delivery?.email.failed ?? 0} failed</Text>

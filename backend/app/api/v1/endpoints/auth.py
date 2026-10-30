@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.mailer import email_is_configured, send_action_email
 from app.core.security import (
+    oauth2_scheme,
     create_access_token,
     decode_token,
     get_current_user,
@@ -43,6 +44,43 @@ from app.schemas.user import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+@router.get('/sessions')
+def list_sessions(token: str=Depends(oauth2_scheme),
+                  user: User=Depends(get_current_user),db: Session=Depends(get_db)):
+    from app.services import auth_session_service as sessions
+    from app.models.auth_session import AuthSession
+    sessions.ready(db,True)
+    rows=db.query(AuthSession).filter(AuthSession.user_id==user.id,AuthSession.revoked_at.is_(None),
+        AuthSession.expires_at>sessions.now(),AuthSession.password_fingerprint==sessions.fingerprint(user)).order_by(AuthSession.last_seen_at.desc()).all()
+    return {'items':[{'id':row.id,'label':row.label,'current':row.id==sessions.digest(token),
+        'created_at':row.created_at,'last_seen_at':row.last_seen_at,'expires_at':row.expires_at} for row in rows],
+        'note':'Sessions created before this update appear when they next connect.'}
+
+
+@router.post('/sessions/revoke-others')
+def revoke_other_sessions(token: str=Depends(oauth2_scheme),
+                          user: User=Depends(get_current_user),db: Session=Depends(get_db)):
+    from app.services import auth_session_service as sessions
+    sessions.ready(db,True);sessions.revoke(db,user,sessions.digest(token),others=True)
+    return {'message':'Other sessions ended'}
+
+
+@router.delete('/sessions/{session_id}')
+def revoke_session(session_id: str,token: str=Depends(oauth2_scheme),
+                   user: User=Depends(get_current_user),db: Session=Depends(get_db)):
+    from app.services import auth_session_service as sessions
+    sessions.ready(db,True);sessions.revoke(db,user,sessions.digest(token),target=session_id)
+    return {'message':'Session ended'}
+
+
+@router.post('/logout')
+def logout_session(token: str=Depends(oauth2_scheme),
+                   user: User=Depends(get_current_user),db: Session=Depends(get_db)):
+    from app.services import auth_session_service as sessions
+    sessions.ready(db,True);sessions.revoke(db,user,sessions.digest(token))
+    return {'message':'Signed out'}
+
 GENERIC_RESET_MESSAGE = (
     "If your email is registered, you will receive a reset link"
 )
@@ -60,16 +98,15 @@ def _clean_middle_name(value: str | None) -> str | None:
 
 
 def _token_response(user: User) -> LoginResponse:
-    return LoginResponse(
-        access_token=create_access_token({
-            "sub": user.id,
-            "role": user.role.value,
-            "purpose": "access",
-            "pwd": hashlib.sha256(user.hashed_password.encode()).hexdigest(),
-        }),
-        token_type="bearer",
-        user=user,
-    )
+    from sqlalchemy.orm import object_session
+    from app.services.auth_session_service import track
+    token = create_access_token({
+        "sub":user.id,"role":user.role.value,"purpose":"access",
+        "pwd":hashlib.sha256(user.hashed_password.encode()).hexdigest(),
+    })
+    db=object_session(user)
+    if db is not None: track(db,user,token,decode_token(token),'Android' if user.role==UserRole.STUDENT else 'Mozilla')
+    return LoginResponse(access_token=token,token_type="bearer",user=user)
 
 
 def _authenticate(
@@ -405,6 +442,13 @@ async def change_password(
         password_data.new_password
     )
 
+    from app.models.password_reset import PasswordResetRevocation
+    from app.services.auth_session_service import now
+    from sqlalchemy import inspect
+    if inspect(db.connection()).has_table('password_reset_revocations'):
+        marker=db.get(PasswordResetRevocation,current_user.id)
+        if marker is None: marker=PasswordResetRevocation(user_id=current_user.id);db.add(marker)
+        marker.reset_at=now()
     db.commit()
     return {"message": "Password changed successfully"}
 

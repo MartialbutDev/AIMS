@@ -136,3 +136,7 @@ docker-compose.override.yml
 
 # Private completion certificates
 backend/assets/completion_certificates/
+
+*-firebase-adminsdk-*.json
+
+*.pem

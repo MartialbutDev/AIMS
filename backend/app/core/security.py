@@ -4,7 +4,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -49,6 +49,9 @@ def create_access_token(
     expires_delta: Optional[timedelta] = None
 ) -> str:
     claims = data.copy()
+    import uuid
+    claims.setdefault("iat", datetime.now(timezone.utc).timestamp())
+    claims.setdefault("jti", str(uuid.uuid4()))
 
     claims["exp"] = datetime.now(timezone.utc) + (
         expires_delta
@@ -83,7 +86,8 @@ def decode_token(token: str) -> Dict[str, Any]:
 
 def _user_from_access_token(
     token: str,
-    db: Session
+    db: Session,
+    agent: str = ""
 ) -> User:
     payload = decode_token(token)
 
@@ -125,18 +129,22 @@ def _user_from_access_token(
         if inspect(db.connection()).has_table('password_reset_revocations') and db.get(PasswordResetRevocation, user.id):
             raise HTTPException(401, 'Please sign in again after resetting your password')
 
+    from app.services.auth_session_service import track
+    track(db, user, token, payload, agent)
     db.info["notification_actor_id"] = user.id
     return user
 
 
 async def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> User:
-    return _user_from_access_token(token, db)
+    return _user_from_access_token(token, db, request.headers.get("user-agent", ""))
 
 
 async def get_current_user_from_token(
+    request: Request,
     token: Optional[str] = Query(default=None),
     header_token: Optional[str] = Depends(
         optional_oauth2_scheme
@@ -159,7 +167,7 @@ async def get_current_user_from_token(
             detail="Not authenticated"
         )
 
-    return _user_from_access_token(chosen, db)
+    return _user_from_access_token(chosen, db, request.headers.get("user-agent", ""))
 
 
 def require_role(required_role: str):

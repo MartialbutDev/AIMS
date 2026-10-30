@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from 'react'
+import { apiRequest } from '../services/apiClient'
 import { getCurrentUserSession, signIn } from '../services/authService'
 import { roles, type UserRole, type UserSession } from '../types/auth'
 
@@ -168,7 +169,8 @@ export function useAuthSession() {
   // LOGOUT
   // ==========================================================
 
-  function logout() {
+  async function logout() {
+    try { await apiRequest('/api/v1/auth/logout', { method: 'POST', signal: AbortSignal.timeout(10000) }) } catch { /* Local sign-out remains available offline. */ }
     localStorage.removeItem(SESSION_KEY)
 
     setTokenToRestore(null)

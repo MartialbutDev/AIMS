@@ -276,6 +276,7 @@ export const authService = {
   // ==========================================================
   async logout(): Promise<void> {
     await unregisterPushDevice();
+    try { await api.post("/auth/logout"); } catch { /* Clear this phone even when the server is unreachable. */ }
     try {
       await SecureStore.deleteItemAsync('access_token');
       await SecureStore.deleteItemAsync('user');

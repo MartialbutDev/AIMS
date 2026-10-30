@@ -73,3 +73,5 @@ from app.models.direct_placement import DirectPlacement, DirectPlacementEvent
 from app.models.notification_delivery import NotificationDeliveryPreference, NotificationEmailDelivery
 
 from app.models.password_reset import PasswordResetChallenge, PasswordResetLimit, PasswordResetRevocation
+
+from app.models.auth_session import AuthSession, AuthSessionCutoff

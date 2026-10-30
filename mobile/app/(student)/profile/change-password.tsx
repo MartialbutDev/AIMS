@@ -1,6 +1,7 @@
 // app/(student)/profile/change-password.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { authService } from "../../../src/services/auth.service";
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import {
@@ -76,9 +77,9 @@ export default function ChangePasswordScreen() {
       
       Alert.alert(
         "Success",
-        "Password changed successfully!",
+        "Password changed. Sign in again with your new password.",
         [
-          { text: "OK", onPress: () => router.back() }
+          { text: "OK", onPress: () => { void authService.logout().finally(() => router.replace("/(auth)/login")); } }
         ]
       );
       
