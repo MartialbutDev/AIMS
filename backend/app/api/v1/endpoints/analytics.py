@@ -16,6 +16,10 @@ from app.models.coordinator_assignment import CoordinatorStudentAssignment
 from app.models.document import Document, DocumentType
 from app.models.dtr import DTR, DTRStatus
 from app.models.user import User, UserRole
+from app.services import reporting_scope as reporting
+from app.models.internship_deployment import InternshipDeployment, DeploymentStatus
+from app.models.internship_completion import InternshipCompletionCase
+from app.services.deployment_service import DeploymentService
 
 router = APIRouter()
 
@@ -30,7 +34,7 @@ ROLE_PRESENTATION = {
     ),
     UserRole.DEAN: (
         "Department at a glance",
-        "Department-wide internship progress and placements.",
+        "Internship progress within your designation scope.",
     ),
     UserRole.CAREER_CENTER: (
         "Career center",
@@ -42,17 +46,6 @@ ROLE_PRESENTATION = {
     ),
 }
 
-REQUIRED_DOCUMENT_TYPES = (
-    DocumentType.RESUME,
-    DocumentType.APPLICATION_LETTER,
-    DocumentType.WAIVER,
-    DocumentType.MEDICAL_CERTIFICATE,
-    DocumentType.INTERNSHIP_PLAN,
-    DocumentType.INSURANCE,
-    DocumentType.ENDORSEMENT_LETTER,
-    DocumentType.ACCEPTANCE_LETTER,
-    DocumentType.CERTIFICATE_OF_COMPLETION,
-)
 
 
 def _months_back(
@@ -91,225 +84,47 @@ async def get_dean_analytics(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("dean")),
 ):
-    student_rows = db.query(
-        User.id,
-        User.gender,
-    ).filter(
-        User.role == UserRole.STUDENT,
-        User.is_active.is_(True),
-    ).all()
-
-    student_ids = {
-        row.id
-        for row in student_rows
-    }
-
-    genders = (
-        "male",
-        "female",
-        "other",
-        "prefer_not_to_say",
-        "not_provided",
-    )
-
-    gender_counts = {
-        gender: 0
-        for gender in genders
-    }
-
-    for row in student_rows:
-        gender = (
-            row.gender
-            if row.gender in gender_counts
-            else "not_provided"
-        )
-        gender_counts[gender] += 1
-
-    coordinators = db.query(User).filter(
-        User.role == UserRole.COORDINATOR,
-        User.is_active.is_(True),
-    ).order_by(
-        User.last_name,
-        User.first_name,
-    ).all()
-
-    assignments = (
-        db.query(CoordinatorStudentAssignment)
-        .join(
-            User,
-            User.id == CoordinatorStudentAssignment.student_id,
-        )
-        .filter(
-            User.role == UserRole.STUDENT,
-            User.is_active.is_(True),
-        )
-        .all()
-    )
-
-    by_coordinator: dict[str, set[str]] = {}
-
-    for assignment in assignments:
-        by_coordinator.setdefault(
-            assignment.coordinator_id,
-            set(),
-        ).add(assignment.student_id)
-
-    active_coordinator_ids = {
-        coordinator.id
-        for coordinator in coordinators
-    }
-
-    by_coordinator = {
-        coordinator_id: ids
-        for coordinator_id, ids in by_coordinator.items()
-        if coordinator_id in active_coordinator_ids
-    }
-
-    assigned_ids = (
-        set().union(*by_coordinator.values())
-        if by_coordinator
-        else set()
-    )
-
-    documents_by_student: dict[str, dict[str, str]] = {}
-    hours_by_student: dict[str, float] = {}
-
-    if assigned_ids:
-        documents = db.query(Document).filter(
-            Document.uploaded_by.in_(assigned_ids),
-            Document.type.in_(REQUIRED_DOCUMENT_TYPES),
-        ).order_by(
-            Document.created_at.desc()
-        ).all()
-
-        for document in documents:
-            documents_by_student.setdefault(
-                document.uploaded_by,
-                {},
-            ).setdefault(
-                document.type.value,
-                document.verification_status,
-            )
-
-        hours_rows = db.query(
-            DTR.student_id,
-            func.sum(DTR.total_hours),
-        ).filter(
-            DTR.student_id.in_(assigned_ids),
-            DTR.status == DTRStatus.APPROVED,
-        ).group_by(
-            DTR.student_id
-        ).all()
-
-        for student_id, hours in hours_rows:
-            hours_by_student[student_id] = max(
-                0.0,
-                float(hours or 0),
-            )
-
-    student_metrics: dict[
-        str, tuple[float, float, bool]
-    ] = {}
-
-    required_hours = max(
-        0,
-        settings.REQUIRED_INTERNSHIP_HOURS,
-    )
-
-    for student_id in assigned_ids:
-        statuses = documents_by_student.get(
-            student_id,
-            {},
-        )
-
-        verified = sum(
-            statuses.get(kind.value) == "verified"
-            for kind in REQUIRED_DOCUMENT_TYPES
-        )
-
-        doc_percent = (
-            100 * verified / len(REQUIRED_DOCUMENT_TYPES)
-        )
-
-        ojt_percent = (
-            min(
-                100.0,
-                hours_by_student.get(student_id, 0)
-                * 100 / required_hours,
-            )
-            if required_hours
-            else 0.0
-        )
-
-        is_complete = (
-            verified == len(REQUIRED_DOCUMENT_TYPES)
-            and ojt_percent >= 100
-        )
-
-        student_metrics[student_id] = (
-            doc_percent,
-            ojt_percent,
-            is_complete,
-        )
-
-    def _summary(ids: set[str]) -> dict:
-        rows = [
-            student_metrics[student_id]
-            for student_id in ids
-            if student_id in student_metrics
-        ]
-
-        count = len(rows)
-
-        complete = sum(
-            int(row[2])
-            for row in rows
-        )
-
-        return {
-            "average_document_completion_percent": (
-                round(sum(row[0] for row in rows) / count)
-                if count else 0
-            ),
-            "average_ojt_completion_percent": (
-                round(sum(row[1] for row in rows) / count)
-                if count else 0
-            ),
-            "fully_complete_students": complete,
-            "fully_complete_percent": (
-                round(complete * 100 / count)
-                if count else 0
-            ),
-        }
-
-    coordinator_metrics = []
-
-    for coordinator in coordinators:
-        ids = by_coordinator.get(
-            coordinator.id,
-            set(),
-        )
-
-        coordinator_metrics.append({
-            "coordinator_id": coordinator.id,
-            "coordinator_name": (
-                f"{coordinator.first_name} "
-                f"{coordinator.last_name}"
-            ).strip(),
-            "student_count": len(ids),
-            **_summary(ids),
-        })
-
-    return {
-        "enrolled_student_count": len(student_rows),
-        "gender_distribution": gender_counts,
-        "assigned_student_count": len(assigned_ids),
-        "unassigned_student_count": len(
-            student_ids - assigned_ids
-        ),
-        **_summary(assigned_ids),
-        "coordinators": coordinator_metrics,
-    }
+    year, semester = reporting.get_current_academic_term()
+    ids = reporting.student_ids(db,current_user,year,semester)
+    coordinator_ids = reporting.dean_coordinator_ids(db,current_user,year,semester)
+    coordinators = db.query(User).filter(User.id.in_(coordinator_ids),User.role==UserRole.COORDINATOR).order_by(User.last_name,User.first_name).all()
+    assignments = reporting.term(db.query(CoordinatorStudentAssignment),CoordinatorStudentAssignment,year,semester).filter(
+        CoordinatorStudentAssignment.student_id.in_(ids),CoordinatorStudentAssignment.coordinator_id.in_(coordinator_ids)).all()
+    by_coordinator = {c.id:set() for c in coordinators}
+    for assignment in assignments: by_coordinator.setdefault(assignment.coordinator_id,set()).add(assignment.student_id)
+    assigned_ids = set().union(*by_coordinator.values()) if by_coordinator else set()
+    genders = {key:0 for key in ('male','female','other','prefer_not_to_say','not_provided')}
+    for student in db.query(User).filter(User.id.in_(ids),User.role==UserRole.STUDENT):
+        genders[student.gender if student.gender in genders else 'not_provided']+=1
+    required_types = tuple(DeploymentService.REQUIRED_DOCUMENTS)
+    documents = reporting.term(db.query(Document),Document,year,semester).filter(Document.uploaded_by.in_(assigned_ids),
+        Document.type.in_(required_types)).order_by(Document.created_at.desc(),Document.id.desc()).all()
+    latest = {}
+    for document in documents: latest.setdefault(document.uploaded_by,{}).setdefault(document.type,document.verification_status)
+    hours = reporting.approved_hours(db,assigned_ids,year,semester)
+    deps = reporting.deployments(db,current_user,year,semester)
+    official = set()
+    from sqlalchemy import inspect
+    if inspect(db.connection()).has_table(InternshipCompletionCase.__tablename__):
+        official={id for (id,) in deps.join(InternshipCompletionCase,InternshipCompletionCase.deployment_id==InternshipDeployment.id).filter(
+            InternshipDeployment.status==DeploymentStatus.COMPLETED,InternshipCompletionCase.status=='completed',
+            InternshipCompletionCase.approved_at.isnot(None),InternshipCompletionCase.approved_by.isnot(None)).with_entities(InternshipDeployment.student_id)}
+    required_hours = max(0,settings.REQUIRED_INTERNSHIP_HOURS)
+    def summary(students):
+        count=len(students)
+        docs=sum(sum(latest.get(id,{}).get(kind)=='verified' for kind in required_types)/len(required_types)*100 for id in students)
+        progress=sum(min(100,hours.get(id,0)/required_hours*100) if required_hours else 0 for id in students)
+        complete=len(students & official)
+        return {'average_document_completion_percent':round(docs/count) if count else 0,
+                'average_ojt_completion_percent':round(progress/count) if count else 0,
+                'fully_complete_students':complete,'fully_complete_percent':round(complete/count*100) if count else 0}
+    return {**reporting.term_metadata(year,semester),'enrolled_student_count':len(ids),
+        'gender_distribution':genders,'assigned_student_count':len(assigned_ids),
+        'unassigned_student_count':len(ids-assigned_ids) if current_user.role==UserRole.ADMIN else None,
+        'unassigned_students_available':current_user.role==UserRole.ADMIN,
+        'completion':reporting.completion_counts(db,deps), **summary(assigned_ids),
+        'coordinators':[{'coordinator_id':c.id,'coordinator_name':f'{c.first_name} {c.last_name}',
+            'student_count':len(by_coordinator[c.id]),**summary(by_coordinator[c.id])} for c in coordinators]}
 
 
 @router.get("/dashboard")
@@ -327,54 +142,15 @@ async def get_dashboard_analytics(
 
     greeting, subtitle = ROLE_PRESENTATION[role]
 
-    total_students = db.query(User).filter(
-        User.role == UserRole.STUDENT
-    ).count()
-
-    total_staff = db.query(User).filter(
-        User.role.notin_([
-            UserRole.STUDENT,
-            UserRole.ADMIN,
-        ])
-    ).count()
-
-    active_companies = db.query(Company).filter(
-        Company.is_active.is_(True)
-    ).count()
-
-    applications = db.query(Application)
-    company_ids: list[str] = []
-
-    if role == UserRole.COORDINATOR:
-        applications = applications.join(
-            CoordinatorStudentAssignment,
-            CoordinatorStudentAssignment.student_id
-            == Application.student_id,
-        ).filter(
-            CoordinatorStudentAssignment.coordinator_id
-            == current_user.id
-        )
-
-        total_students = db.query(
-            CoordinatorStudentAssignment
-        ).filter(
-            CoordinatorStudentAssignment.coordinator_id
-            == current_user.id
-        ).count()
-
-    elif role == UserRole.HTE_SUPERVISOR:
-        company_ids = [
-            company_id
-            for (company_id,) in db.query(Company.id).filter(
-                func.lower(Company.contact_email)
-                == current_user.email.lower()
-            ).all()
-        ]
-
-        applications = applications.filter(
-            Application.company_id.in_(company_ids)
-        )
-
+    year, semester = reporting.get_current_academic_term()
+    ids = reporting.student_ids(db,current_user,year,semester)
+    total_students = len(ids)
+    total_staff = db.query(User).filter(User.role.notin_([UserRole.STUDENT,UserRole.ADMIN])).count()
+    active_companies = db.query(Company).filter(Company.is_active.is_(True)).count()
+    applications = reporting.term(db.query(Application),Application,year,semester)
+    company_ids = reporting.company_ids(db,current_user) if role==UserRole.HTE_SUPERVISOR else []
+    if role==UserRole.HTE_SUPERVISOR: applications=applications.filter(Application.company_id.in_(company_ids))
+    else: applications=applications.filter(Application.student_id.in_(ids))
     application_count = applications.count()
 
     pending_count = applications.filter(
@@ -410,7 +186,7 @@ async def get_dashboard_analytics(
     if role == UserRole.ADMIN:
         specs = [
             ("Registered users", db.query(User).count(), "users", "blue"),
-            ("Students", total_students, "users", "violet"),
+            ("Registered students", total_students, "users", "violet"),
             ("Faculty & staff", total_staff, "briefcase", "amber"),
             ("Active companies", active_companies, "chart", "green"),
         ]
@@ -420,23 +196,23 @@ async def get_dashboard_analytics(
             ("Assigned students", total_students, "users", "blue"),
             ("Applications", application_count, "file", "violet"),
             ("Awaiting review", pending_count, "briefcase", "amber"),
-            ("Placed students", placed_students, "chart", "green"),
+            ("Accepted students", placed_students, "chart", "green"),
         ]
 
     elif role == UserRole.DEAN:
         specs = [
-            ("Students", total_students, "users", "blue"),
+            ("Students in scope", total_students, "users", "blue"),
             ("Total applications", application_count, "file", "violet"),
-            ("Placed students", placed_students, "briefcase", "green"),
-            ("Placement rate", f"{placement_rate}%", "chart", "amber"),
+            ("Accepted students", placed_students, "briefcase", "green"),
+            ("Acceptance rate", f"{placement_rate}%", "chart", "amber"),
         ]
 
     elif role == UserRole.CAREER_CENTER:
         specs = [
-            ("Students", total_students, "users", "blue"),
-            ("Partner companies", active_companies, "briefcase", "violet"),
+            ("Students in scope", total_students, "users", "blue"),
+            ("Active company profiles", active_companies, "briefcase", "violet"),
             ("Applications", application_count, "file", "amber"),
-            ("Placed students", placed_students, "chart", "green"),
+            ("Accepted students", placed_students, "chart", "green"),
         ]
 
     else:
@@ -465,13 +241,18 @@ async def get_dashboard_analytics(
                 if isinstance(value, str)
                 else f"{value:,}"
             ),
-            "change": "Current database total",
+            "change": f"AY {year} · Semester {semester}",
             "icon": icon,
             "tone": tone,
         }
         for label, value, icon, tone in specs
     ]
 
+    if role in (UserRole.ADMIN,UserRole.CAREER_CENTER):
+        for metric in metrics:
+            if metric['label'] in ('Registered users','Registered students','Faculty & staff','Active companies','Active company profiles','Students in scope'):
+                metric['change']='Registered inventory · all terms'
+    if role==UserRole.HTE_SUPERVISOR: metrics[0]['change']='Active supervisor assignments'
     now = datetime.now(timezone.utc).replace(
         tzinfo=None
     )
@@ -525,26 +306,7 @@ async def get_dashboard_analytics(
         for month in months
     ]
 
-    recent_query = db.query(Application).options(
-        joinedload(Application.company)
-    ).order_by(
-        Application.applied_date.desc()
-    )
-
-    if role == UserRole.COORDINATOR:
-        recent_query = recent_query.join(
-            CoordinatorStudentAssignment,
-            CoordinatorStudentAssignment.student_id
-            == Application.student_id,
-        ).filter(
-            CoordinatorStudentAssignment.coordinator_id
-            == current_user.id
-        )
-
-    elif role == UserRole.HTE_SUPERVISOR:
-        recent_query = recent_query.filter(
-            Application.company_id.in_(company_ids)
-        )
+    recent_query = applications.options(joinedload(Application.company)).order_by(Application.applied_date.desc(),Application.id)
 
     recent = recent_query.limit(5).all()
     activities = []
@@ -601,6 +363,8 @@ async def get_dashboard_analytics(
     )
 
     return {
+        **reporting.term_metadata(year,semester),
+        "completion": reporting.completion_counts(db,reporting.deployments(db,current_user,year,semester)),
         "greeting": greeting,
         "subtitle": subtitle,
         "metrics": metrics,
@@ -612,7 +376,7 @@ async def get_dashboard_analytics(
         ),
         "tasks": tasks,
         "chartTitle": "Application activity",
-        "chartCaption": "Applications submitted per month",
+        "chartCaption": f"Applications in AY {year}, Semester {semester}; grouped by submission month",
         "chartValues": chart_values,
         "chartLabels": chart_labels,
     }

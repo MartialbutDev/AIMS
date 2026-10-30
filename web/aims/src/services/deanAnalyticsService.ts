@@ -11,6 +11,10 @@ export interface CoordinatorAnalytics {
 }
 
 export interface DeanAnalytics {
+  academic_year: string
+  semester: string
+  unassigned_students_available: boolean
+  completion: { deployed: number; completed: number; grade_released: number; completed_legacy: number }
   enrolled_student_count: number
   gender_distribution: {
     male: number
@@ -20,7 +24,7 @@ export interface DeanAnalytics {
     not_provided: number
   }
   assigned_student_count: number
-  unassigned_student_count: number
+  unassigned_student_count: number | null
   average_document_completion_percent: number
   average_ojt_completion_percent: number
   fully_complete_students: number

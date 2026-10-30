@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '../components/DashboardLayout'
 import { getAdminDashboard } from '../services/adminService'
 import { getCareerCenterDashboard } from '../services/careerCenterService'
@@ -23,6 +24,7 @@ const dashboardLoaders = {
 
 export function RoleDashboardPage({ session, onLogout }: RoleDashboardPageProps) {
   const role = session.role
+  const location = useLocation()
   const [result, setResult] = useState<{
     role: UserRole
     data?: DashboardData
@@ -44,7 +46,7 @@ export function RoleDashboardPage({ session, onLogout }: RoleDashboardPageProps)
         }
       })
     return () => { isCurrent = false }
-  }, [role])
+  }, [role, location.pathname])
 
   const currentResult = result?.role === role ? result : null
 

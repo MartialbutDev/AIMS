@@ -739,10 +739,8 @@ async def get_dtr_summary(
 
     required_hours = settings.REQUIRED_INTERNSHIP_HOURS
 
-    total_hours = round(
-        float(row.total_hours or 0),
-        2,
-    )
+    from app.services.reporting_scope import approved_hours
+    total_hours = approved_hours(db,{current_user.id},academic_year,semester)[current_user.id]
 
     remaining_hours = max(
         0,
@@ -780,6 +778,7 @@ async def get_dtr_summary(
             row.rejected or 0
         ),
         "total_hours": total_hours,
+        "academic_year": academic_year, "semester": semester,
         "required_hours": required_hours,
         "remaining_hours": remaining_hours,
         "progress_percent": progress_pct,

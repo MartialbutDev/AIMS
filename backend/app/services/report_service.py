@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session
+from app.core.assignment_access import get_current_academic_term
+from app.services.reporting_scope import term, approved_hours
+from app.services import reporting_scope as reporting
 from sqlalchemy import func, extract
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 
 from app.models.user import User
@@ -17,28 +20,29 @@ class ReportService:
     def get_student_summary(db: Session, user_id: str) -> Dict[str, Any]:
         """Get summary statistics for a student"""
         
+        year, semester = get_current_academic_term()
         # Get counts
-        applications = db.query(Application).filter(Application.student_id == user_id).count()
-        dtr_count = db.query(DTR).filter(DTR.student_id == user_id).count()
-        journals = db.query(Journal).filter(Journal.student_id == user_id).count()
-        documents = db.query(Document).filter(Document.uploaded_by == user_id).count()
+        applications = db.query(Application).filter(Application.student_id == user_id, Application.academic_year == year, Application.semester == semester).count()
+        dtr_count = db.query(DTR).filter(DTR.student_id == user_id, DTR.academic_year == year, DTR.semester == semester).count()
+        journals = db.query(Journal).filter(Journal.student_id == user_id, Journal.academic_year == year, Journal.semester == semester).count()
+        documents = db.query(Document).filter(Document.uploaded_by == user_id, Document.academic_year == year, Document.semester == semester).count()
         
         # Get approved DTR hours
-        approved_dtr = db.query(DTR).filter(
-            DTR.student_id == user_id,
-            DTR.status == "approved"
-        ).all()
-        total_hours = sum([dtr.total_hours or 0 for dtr in approved_dtr])
+        total_hours = approved_hours(db,{user_id},year,semester)[user_id]
         
         # Get application status distribution
         app_status = db.query(
             Application.status,
             func.count(Application.id).label('count')
-        ).filter(Application.student_id == user_id).group_by(Application.status).all()
+        ).filter(Application.student_id == user_id, Application.academic_year == year, Application.semester == semester).group_by(Application.status).all()
         
         status_distribution = {status: count for status, count in app_status}
         
+        user = db.get(User,user_id)
+        completion = reporting.completion_counts(db, reporting.deployments(db,user,year,semester))
         return {
+            "completion": completion,
+            "academic_year": year, "semester": semester,
             "applications": applications,
             "dtr_count": dtr_count,
             "journals": journals,
@@ -51,6 +55,8 @@ class ReportService:
     def get_weekly_progress(db: Session, user_id: str, weeks: int = 8) -> List[Dict[str, Any]]:
         """Get weekly progress data for charts"""
         
+        year, semester = get_current_academic_term()
+        weeks = max(1,min(int(weeks),52))
         data = []
         for i in range(weeks):
             week_start = datetime.now() - timedelta(days=(weeks - i) * 7)
@@ -58,21 +64,21 @@ class ReportService:
             
             # Count DTR entries for this week
             dtr_count = db.query(DTR).filter(
-                DTR.student_id == user_id,
+                DTR.student_id == user_id, DTR.academic_year == year, DTR.semester == semester,
                 DTR.date >= week_start,
                 DTR.date < week_end
             ).count()
             
             # Count journals for this week
             journal_count = db.query(Journal).filter(
-                Journal.student_id == user_id,
+                Journal.student_id == user_id, Journal.academic_year == year, Journal.semester == semester,
                 Journal.created_at >= week_start,
                 Journal.created_at < week_end
             ).count()
             
             # Count applications for this week
             app_count = db.query(Application).filter(
-                Application.student_id == user_id,
+                Application.student_id == user_id, Application.academic_year == year, Application.semester == semester,
                 Application.applied_date >= week_start,
                 Application.applied_date < week_end
             ).count()
@@ -89,11 +95,12 @@ class ReportService:
     @staticmethod
     def get_activity_distribution(db: Session, user_id: str) -> List[Dict[str, Any]]:
         """Get activity distribution for pie chart"""
+        year, semester = get_current_academic_term()
         
-        applications = db.query(Application).filter(Application.student_id == user_id).count()
-        dtr_count = db.query(DTR).filter(DTR.student_id == user_id).count()
-        journals = db.query(Journal).filter(Journal.student_id == user_id).count()
-        documents = db.query(Document).filter(Document.uploaded_by == user_id).count()
+        applications = db.query(Application).filter(Application.student_id == user_id, Application.academic_year == year, Application.semester == semester).count()
+        dtr_count = db.query(DTR).filter(DTR.student_id == user_id, DTR.academic_year == year, DTR.semester == semester).count()
+        journals = db.query(Journal).filter(Journal.student_id == user_id, Journal.academic_year == year, Journal.semester == semester).count()
+        documents = db.query(Document).filter(Document.uploaded_by == user_id, Document.academic_year == year, Document.semester == semester).count()
         
         return [
             {"name": "Applications", "count": applications, "color": "#000080"},
@@ -106,11 +113,13 @@ class ReportService:
     def get_recent_activity(db: Session, user_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent activity for the student"""
         
+        year, semester = get_current_academic_term()
+        limit = max(1,min(int(limit),100))
         activities = []
         
         # Get recent applications
         apps = db.query(Application).filter(
-            Application.student_id == user_id
+            Application.student_id == user_id, Application.academic_year == year, Application.semester == semester
         ).order_by(Application.applied_date.desc()).limit(limit).all()
         
         for app in apps:
@@ -124,12 +133,12 @@ class ReportService:
                 "title": f"Application: {app.position}",
                 "description": company_name,
                 "status": app.status,
-                "created_at": app.applied_date
+                "created_at": app.applied_date.replace(tzinfo=timezone.utc) if app.applied_date else datetime.min.replace(tzinfo=timezone.utc)
             })
         
         # Get recent DTR entries
         dtrs = db.query(DTR).filter(
-            DTR.student_id == user_id
+            DTR.student_id == user_id, DTR.academic_year == year, DTR.semester == semester
         ).order_by(DTR.created_at.desc()).limit(limit).all()
         
         for dtr in dtrs:
@@ -139,12 +148,12 @@ class ReportService:
                 "title": f"DTR: {dtr.date.strftime('%b %d, %Y') if dtr.date else 'Unknown date'}",
                 "description": f"{dtr.total_hours or 0}h recorded",
                 "status": dtr.status,
-                "created_at": dtr.created_at
+                "created_at": dtr.created_at.replace(tzinfo=timezone.utc)
             })
         
         # Get recent journals
         journals = db.query(Journal).filter(
-            Journal.student_id == user_id
+            Journal.student_id == user_id, Journal.academic_year == year, Journal.semester == semester
         ).order_by(Journal.created_at.desc()).limit(limit).all()
         
         for journal in journals:
@@ -154,7 +163,7 @@ class ReportService:
                 "title": f"Journal: {journal.title}",
                 "description": f"Week {journal.week}",
                 "status": journal.status,
-                "created_at": journal.created_at
+                "created_at": journal.created_at.replace(tzinfo=timezone.utc)
             })
         
         # Sort by created_at descending

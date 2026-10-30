@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 
@@ -28,7 +28,7 @@ async def get_student_summary(
 
 @router.get("/weekly-progress")
 async def get_weekly_progress(
-    weeks: int = 8,
+    weeks: int = Query(8, ge=1, le=52),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -61,7 +61,7 @@ async def get_activity_distribution(
 
 @router.get("/recent-activity")
 async def get_recent_activity(
-    limit: int = 10,
+    limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

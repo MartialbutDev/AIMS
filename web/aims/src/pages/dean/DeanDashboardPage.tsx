@@ -263,6 +263,7 @@ export function DeanDashboardPage() {
           </span>
 
           <h1>The internship program, in perspective.</h1>
+          <p>AY {analytics.academic_year} · Semester {analytics.semester} · Students within your designation scope</p>
 
           <p>
             Aggregate progress and coordinator workload.
@@ -294,7 +295,7 @@ export function DeanDashboardPage() {
 
       <section className="stake-dean-brief" aria-label="Program leadership brief">
         <div><span className="stake-kicker">DEAN'S BRIEF</span><h2>From student coverage<br />to program completion.</h2><p>Use aggregate outcomes to guide coordinator coverage and academic support.</p><button type="button" className="stake-yellow-button" onClick={() => navigate('/dean/direct-placements')}>Review direct placements <span aria-hidden="true">→</span></button></div>
-        <div className="stake-dean-coverage"><span>Coordinator coverage</span><strong>{analytics.assigned_student_count}<small> students assigned</small></strong><div className="stake-coverage-note"><span className="stake-yellow-dot" />{analytics.unassigned_student_count} students not yet assigned</div><p>Administrators manage coordinator designations for the current internship cohort.</p></div>
+        <div className="stake-dean-coverage"><span>Coordinator coverage</span><strong>{analytics.assigned_student_count}<small> students assigned</small></strong><div className="stake-coverage-note"><span className="stake-yellow-dot" />{analytics.unassigned_students_available ? `${analytics.unassigned_student_count} students not yet assigned` : 'Assignment coverage within your oversight'}</div><p>Administrators manage coordinator designations for the current internship cohort.</p></div>
       </section>
 
       {/* ========================================
@@ -306,22 +307,21 @@ export function DeanDashboardPage() {
         aria-label="Internship program metrics"
       >
         <Metric
-          label="Active student accounts"
+          label="Students in oversight"
           value={analytics.enrolled_student_count}
-          note="Students in the internship system"
+          note="Students within your reporting scope"
         />
 
         <Metric
           label="Assigned to coordinators"
           value={analytics.assigned_student_count}
           note={
-            `${analytics.unassigned_student_count} ` +
-            'not yet assigned'
+            analytics.unassigned_students_available ? `${analytics.unassigned_student_count} not yet assigned` : 'Current-term assignments in your scope'
           }
         />
 
         <Metric
-          label="Fully complete"
+          label="Coordinator approved"
           value={`${analytics.fully_complete_percent}%`}
           note={
             `${analytics.fully_complete_students} ` +
@@ -332,7 +332,7 @@ export function DeanDashboardPage() {
         <Metric
           label="Coordinator count"
           value={analytics.coordinators.length}
-          note="Active coordinators"
+          note="Designated coordinators for this term"
         />
       </section>
 
@@ -405,7 +405,7 @@ export function DeanDashboardPage() {
         <section className="panel dean-panel">
           <div className="panel-heading">
             <div>
-              <h2>Program completeness</h2>
+              <h2>Requirements progress</h2>
 
               <p>
                 Average across students assigned
@@ -431,7 +431,7 @@ export function DeanDashboardPage() {
 
             <CompletionBar
               value={analytics.fully_complete_percent}
-              label="Students complete in both areas"
+              label="Students with coordinator approval"
             />
           </div>
         </section>
@@ -489,7 +489,7 @@ export function DeanDashboardPage() {
                     value={
                       coordinator.average_document_completion_percent
                     }
-                    label="Documents verified (average)"
+                    label="Pre-deployment documents verified (average)"
                   />
 
                   <CompletionBar
@@ -505,7 +505,7 @@ export function DeanDashboardPage() {
                     {coordinator.fully_complete_students === 1
                       ? ''
                       : 's'}{' '}
-                    fully complete in both areas
+                    with coordinator-approved completion
                   </p>
                 </article>
               )
@@ -525,8 +525,8 @@ export function DeanDashboardPage() {
       ======================================== */}
 
       <p className="dean-privacy-note">
-        Completeness is calculated from verified
-        required documents and approved OJT hours.
+        Official completion requires the coordinator’s approval.
+        Document and approved-hour percentages show requirements progress.
         Gender details are optional, and no individual
         student identities are displayed here.
       </p>

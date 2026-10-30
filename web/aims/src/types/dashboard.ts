@@ -14,7 +14,14 @@ export interface DashboardActivity {
   tone: 'blue' | 'violet' | 'amber' | 'green'
 }
 
+export interface CompletionCounts {
+  pre_deployment: number; deployed: number; requested: number; company_confirmed: number; returned: number; completed: number; completed_legacy: number; grade_released: number
+}
+
 export interface DashboardData {
+  academic_year?: string
+  semester?: string
+  completion?: CompletionCounts
   greeting: string
   subtitle: string
   metrics: DashboardMetric[]

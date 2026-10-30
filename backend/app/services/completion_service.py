@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import HTTPException
 from sqlalchemy import inspect, or_
 from app.core.config import settings
+from app.services.reporting_scope import valid_approved_record
 from app.core.assignment_access import get_current_academic_term, get_coordinator_student_assignment
 from app.core.designation_scope import dean_designation_scope
 from app.models.user import User, UserRole
@@ -93,8 +94,7 @@ def checklist(db, obj, case=None):
                                    DTR.semester == obj.semester).all()
     journals = db.query(Journal).filter(Journal.student_id == obj.student_id, Journal.academic_year == obj.academic_year,
                                        Journal.semester == obj.semester).all()
-    valid = [r for r in records if start and r.date.date() >= start and r.date.date() <= today() and
-             value(r.status) == 'approved' and r.time_out and r.total_hours and math.isfinite(r.total_hours) and 0 < r.total_hours <= 24]
+    valid = [r for r in records if start and valid_approved_record(r,start,today())]
     hours = round(sum(r.total_hours for r in valid), 2)
     required = int(settings.REQUIRED_INTERNSHIP_HOURS)
     docs = DeploymentService.get_checklist(db, obj)

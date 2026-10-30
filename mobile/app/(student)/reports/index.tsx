@@ -1,8 +1,8 @@
 // app/(student)/reports/index.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,12 +40,12 @@ export default function ReportsScreen() {
   const [weeklyProgress, setWeeklyProgress] = useState<WeeklyProgress[]>([]);
   const [distribution, setDistribution] = useState<ActivityDistribution[]>([]);
   const [activities, setActivities] = useState<RecentActivity[]>([]);
-  const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "semester">("month");
   const [selectedChart, setSelectedChart] = useState<"progress" | "distribution">("progress");
 
-  useEffect(() => {
-    fetchReportData();
-  }, []);
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    void fetchReportData();
+  }, []));
 
   const fetchReportData = async () => {
     try {
@@ -74,17 +74,6 @@ export default function ReportsScreen() {
     await fetchReportData();
   };
 
-  const getPeriodLabel = (period: "week" | "month" | "semester") => {
-    switch (period) {
-      case "week":
-        return "This Week";
-      case "month":
-        return "This Month";
-      case "semester":
-        return "This Semester";
-    }
-  };
-
   const getReportCards = (): ReportCardProps[] => {
     if (!summary) return [];
     
@@ -101,7 +90,7 @@ export default function ReportsScreen() {
         icon: "calendar-outline",
         label: "DTR Records",
         value: summary.dtr_count.toString(),
-        change: `${summary.total_hours}h logged`,
+        change: `${summary.total_hours}h approved`,
         color: "#10B981",
         trend: summary.dtr_count > 0 ? "up" : "neutral",
       },
@@ -109,7 +98,7 @@ export default function ReportsScreen() {
         icon: "book-outline",
         label: "Journals",
         value: summary.journals.toString(),
-        change: `${summary.journals} submitted`,
+        change: `${summary.journals} records`,
         color: "#F59E0B",
         trend: summary.journals > 0 ? "up" : "neutral",
       },
@@ -306,39 +295,19 @@ export default function ReportsScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        <View style={[styles.periodSelector, { backgroundColor: colors.card }]}>
-          {["week", "month", "semester"].map((period) => (
-            <TouchableOpacity
-              key={period}
-              style={[
-                styles.periodButton,
-                selectedPeriod === period && [styles.periodButtonActive, { backgroundColor: colors.primary }],
-              ]}
-              onPress={() => setSelectedPeriod(period as typeof selectedPeriod)}
-            >
-              <Text
-                style={[
-                  styles.periodButtonText,
-                  { color: selectedPeriod === period ? '#FFFFFF' : colors.textSecondary },
-                ]}
-              >
-                {period.charAt(0).toUpperCase() + period.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {summary && <View style={[styles.summaryCard, { backgroundColor: colors.card }]}><Text style={{ color: colors.textPrimary, fontWeight: '700' }}>AY {summary.academic_year} · Semester {summary.semester}</Text><Text style={{ color: colors.textSecondary, marginTop: 8 }}>All totals and charts below use this academic term. The progress chart shows the latest eight weeks.</Text><Text style={{ color: colors.textPrimary, marginTop: 8 }}>Coordinator approved: {summary.completion.completed} · Grade released: {summary.completion.grade_released ? 'Yes' : 'Not yet'}</Text></View>}
 
         {summary && (
           <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.summaryTitle, { color: colors.textPrimary }]}>
-              Overview ({getPeriodLabel(selectedPeriod)})
+              Current-term overview
             </Text>
             <View style={styles.summaryGrid}>
               <View style={styles.summaryItem}>
                 <Text style={[styles.summaryValue, { color: colors.textPrimary }]}>
                   {summary.total_hours > 0 ? `${summary.total_hours}h` : '0h'}
                 </Text>
-                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Total Hours</Text>
+                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>School-approved hours</Text>
               </View>
               <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
               <View style={styles.summaryItem}>

@@ -187,8 +187,9 @@ def get_intern(
         Journal.semester == semester, Journal.status != JournalStatus.DRAFT,
         Journal.submitted_date >= start,
     )
-    hours = attendance.filter(DTR.status == DTRStatus.APPROVED).with_entities(func.coalesce(func.sum(DTR.total_hours), 0)).scalar()
-    approved_hours = round(max(0, float(hours or 0)), 2)
+    from app.services.reporting_scope import valid_approved_record
+    hours = sum(row.total_hours for row in attendance if valid_approved_record(row,deployment.deployment_date))
+    approved_hours = round(hours,2)
     result.records_available = True
     result.approved_hours = approved_hours
     result.remaining_hours = round(max(0, required_hours - approved_hours), 2)
