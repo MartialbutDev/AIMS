@@ -37,7 +37,6 @@ const NAV_BY_ROLE = {
     { label: 'Assignments', slug: 'assignments', icon: 'file' },
     { label: 'Completion & archive', slug: 'completion', icon: 'check' },
     { label: 'Announcements', slug: 'announcements', icon: 'bell' },
-    { label: 'Developer info', slug: 'developer-info', icon: 'file' },
   ],
 
   coordinator: [
@@ -66,7 +65,6 @@ const NAV_BY_ROLE = {
     { label: 'Companies', slug: 'companies', icon: 'briefcase' },
     { label: 'Applications', slug: 'applications', icon: 'file' },
     { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Developer info', slug: 'developer-info', icon: 'file' },
     { label: 'Partnership review', slug: 'direct-placements', icon: 'briefcase' },
   ],
 
@@ -75,7 +73,6 @@ const NAV_BY_ROLE = {
     { label: 'Intern monitoring', slug: 'interns', icon: 'briefcase' },
     { label: 'Applications', slug: 'applications', icon: 'users' },
     { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Developer info', slug: 'developer-info', icon: 'file' },
   ],
 } as const
 
