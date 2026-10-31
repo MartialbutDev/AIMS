@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from 'react'
+import { CompanyAccessPage } from './CompanyAccessPage'
 
 import type { UserSession } from '../../types/auth'
 
@@ -286,6 +287,10 @@ export function AdminPages({
     // ========================================
     // COORDINATOR ASSIGNMENTS
     // ========================================
+
+    case 'company-access':
+      content = <CompanyAccessPage onManageAccounts={() => onNavigate('users')} />
+      break
 
     case 'coordinators':
       content = <CoordinatorManagement />

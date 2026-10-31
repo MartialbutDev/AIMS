@@ -31,6 +31,7 @@ const NAV_BY_ROLE = {
   admin: [
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Users', slug: 'users', icon: 'users' },
+    { label: 'Company access', slug: 'company-access', icon: 'briefcase' },
     { label: 'Coordinator designations', slug: 'coordinators', icon: 'users' },
     { label: 'Onboarding review', slug: 'document-verification', icon: 'check' },
     { label: 'Assignments', slug: 'assignments', icon: 'file' },
@@ -130,6 +131,7 @@ export function DashboardLayout({
   const sectionLabels: Record<string, string> = {
     dashboard: 'Overview',
     users: 'Users',
+    'company-access': 'Company access',
     assignments: 'Assignments',
     students: 'Students',
     'historical-students': 'History',

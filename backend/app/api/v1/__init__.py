@@ -40,6 +40,7 @@ from app.api.v1.endpoints import (
     dean_coordinators,
     coordinator_reminders,
     company_monitoring,
+    company_access,
 )
 
 # Existing document router.
@@ -51,6 +52,7 @@ from app.routers.documents import documents_router
 # ============================================================
 
 router = APIRouter()
+router.include_router(company_access.router)
 from app.api.v1.endpoints import internship_completion
 router.include_router(internship_completion.router)
 
