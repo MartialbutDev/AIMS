@@ -105,6 +105,34 @@ def get_my_deployment(
     }
 
 
+@router.get("/student/{student_id}/approval")
+def get_student_deployment_approval(
+    student_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.COORDINATOR:
+        raise HTTPException(403, 'Coordinator access required')
+    year, semester = get_current_academic_term()
+    ensure_coordinator_student_access(db, current_user, student_id,
+        academic_year=year, semester=semester, mode='read')
+    student = db.get(User, student_id)
+    if not student or student.role != UserRole.STUDENT:
+        raise HTTPException(404, 'Student not found')
+    records = db.query(InternshipDeployment).filter(
+        InternshipDeployment.student_id == student_id,
+        InternshipDeployment.academic_year == year,
+        InternshipDeployment.semester == semester,
+    ).order_by(InternshipDeployment.created_at.desc(), InternshipDeployment.id).all()
+    from app.models.application import Application, ApplicationStatus
+    accepted = db.query(Application.id).filter(Application.student_id == student_id,
+        Application.academic_year == year, Application.semester == semester,
+        Application.status == ApplicationStatus.ACCEPTED).count()
+    return {'academic_year': year, 'semester': semester, 'accepted_application_count': accepted,
+            'items': [{**serialize_deployment(db, record),
+                       'approval': DeploymentService.get_approval(db, record, current_user)} for record in records]}
+
+
 @router.get("/{deployment_id}")
 def get_deployment(
     deployment_id: str,

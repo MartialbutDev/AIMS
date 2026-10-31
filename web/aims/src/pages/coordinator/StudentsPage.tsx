@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState, type FormEvent } from 'react'
 import { Icon } from '../../components/Icons'
 import { StudentRecordDialog } from './StudentRecordDialog'
+import { DeploymentApprovalPanel } from './DeploymentApprovalPanel'
 import type { ReminderCategory } from '../../services/coordinatorReminderService'
 import {
   getCoordinatorStudentDetail,
@@ -114,6 +115,7 @@ function StudentDetails({ detail, onEvaluationSaved }: { detail: CoordinatorStud
       <button type="button" onClick={() => setSection('dtr')}><span className="sr-summary-icon"><Icon name="clock" size={23} /></span><strong>DTR summary & photos</strong><span>{journey.pending_dtr_count} awaiting review · {journey.rejected_dtr_count} rejected</span><small>Attendance, work logs, and photo pairs <Icon name="arrow" size={15} /></small></button>
       <button type="button" onClick={() => setSection('journals')}><span className="sr-summary-icon"><Icon name="briefcase" size={23} /></span><strong>OJT journals</strong><span>{detail.journals.filter(item => item.status !== 'draft').length} submitted or reviewed</span><small>Weekly reflections and journal previews <Icon name="arrow" size={15} /></small></button>
     </section>
+    <DeploymentApprovalPanel key={`deployment-${student.id}`} studentId={student.id} studentName={fullName} />
     <EvaluationPanel key={student.id} studentId={student.id} evaluation={detail.evaluation} onSaved={onEvaluationSaved} />
     {section && <StudentRecordDialog key={student.id + section} detail={detail} category={section} onClose={() => setSection(null)} />}
   </div>
