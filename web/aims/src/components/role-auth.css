@@ -1,13 +1,13 @@
 .citc-auth { --citc-navy: #0b0b2f; --citc-yellow: #ffc629; min-height: 100dvh; display: grid; grid-template-columns: minmax(340px, .9fr) minmax(510px, 1.1fr); background: #fff; color: var(--citc-navy); }
 .citc-auth button, .citc-auth a, .citc-auth input { -webkit-tap-highlight-color: transparent; }
 .citc-auth :is(button, a, input):focus-visible { outline: 3px solid #b78500; outline-offset: 4px; }
-.citc-identity { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 44px; padding: 42px clamp(30px, 4.4vw, 72px) 30px; background: var(--citc-navy); color: #fff; border-top: 6px solid var(--citc-yellow); }
+.citc-identity { position: relative; overflow: hidden; display: grid; grid-template-rows: 34px minmax(min-content, 1fr) auto; gap: 44px; padding: 42px clamp(30px, 4.4vw, 72px) 30px; background: var(--citc-navy); color: #fff; border-top: 6px solid var(--citc-yellow); }
 .citc-identity::after { content: ''; width: 520px; height: 520px; position: absolute; bottom: -355px; left: -160px; border: 70px solid #ffffff05; border-radius: 50%; pointer-events: none; }
 .citc-system { display: flex; align-items: center; gap: 17px; width: fit-content; }
 .citc-system > span { font: 800 34px/1 Manrope, sans-serif; letter-spacing: -1.5px; }
 .citc-gold { color: var(--citc-yellow); }
 .citc-system small { padding-left: 17px; border-left: 1px solid #ffffff40; color: #d9d9e9; font-size: 9px; line-height: 1.6; letter-spacing: 1.2px; }
-.citc-identity-body { position: relative; z-index: 1; padding: 22px 0; }
+.citc-identity-body { position: relative; z-index: 1; grid-row: 2; align-self: center; padding: 22px 0; }
 .citc-college-logo { background: #fff; border-radius: 6px; padding: 10px 15px; margin-bottom: 38px; max-width: 400px; }
 .citc-college-logo img { display: block; width: 100%; aspect-ratio: 2.6; object-fit: cover; object-position: center 48%; }
 .citc-auth .citc-overline { margin: 0 0 14px; font-size: 10px; font-weight: 700; line-height: 1.5; letter-spacing: 2px; text-transform: uppercase; }
@@ -19,7 +19,7 @@
 .citc-journey span { display: flex; align-items: center; gap: 7px; font-size: 11px; color: #ededf5; }
 .citc-journey svg { color: var(--citc-yellow); flex-shrink: 0; }
 .citc-journey i { width: 20px; height: 1px; background: #ffffff35; }
-.citc-university { position: relative; z-index: 1; margin: 0; padding-top: 22px; border-top: 1px solid #ffffff20; color: #b5b5cf; font-size: 10px; line-height: 1.75; letter-spacing: .5px; }
+.citc-university { grid-row: 3; position: relative; z-index: 1; margin: 0; padding-top: 22px; border-top: 1px solid #ffffff20; color: #b5b5cf; font-size: 10px; line-height: 1.75; letter-spacing: .5px; }
 .citc-workspace { display: flex; flex-direction: column; padding: 36px clamp(30px, 5.5vw, 88px) 25px; min-width: 0; }
 .citc-workspace-top { display: flex; justify-content: space-between; gap: 14px; color: #626277; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
 .citc-access-label { display: inline-flex; align-items: center; gap: 7px; font-size: 9px; font-weight: 500; letter-spacing: 0; white-space: nowrap; }
@@ -67,10 +67,10 @@
 @media (max-width: 1000px) { .citc-auth { grid-template-columns: minmax(310px, .8fr) minmax(420px, 1fr); } .citc-identity { padding-inline: 28px; } .citc-workspace { padding-inline: 30px; } .citc-journey { gap: 7px; } .citc-journey i { width: 9px; } }
 @media (max-width: 760px) {
   .citc-auth { grid-template-columns: 1fr; }
-  .citc-identity { padding: 21px 24px; gap: 18px; }
+  .citc-identity { display: flex; flex-direction: column; padding: 21px 24px; gap: 18px; }
   .citc-system > span { font-size: 27px; }
   .citc-system small { font-size: 8px; }
-  .citc-identity-body { display: flex; align-items: center; gap: 18px; padding: 0; }
+  .citc-identity-body { display: flex; align-self: stretch; align-items: center; gap: 18px; padding: 0; }
   .citc-college-logo { width: 225px; max-width: 63%; margin: 0; padding: 5px 9px; }
   .citc-identity-body > .citc-overline { font-size: 8px; margin: 0; letter-spacing: 1px; max-width: 90px; }
   .citc-identity h2, .citc-identity-intro, .citc-journey, .citc-university { display: none; }
