@@ -115,3 +115,7 @@
   .citc-role { transition: none; }
   .citc-role:hover { transform: none; }
 }
+
+.citc-system--logo { display: block; width: min(100%, 350px); padding: 8px 12px; box-sizing: border-box; background: #fff; border-radius: 12px; }
+.citc-system--logo img { display: block; width: 100%; height: 126px; object-fit: contain; }
+@media (max-width: 760px) { .citc-system--logo { width: 245px; max-width: 100%; padding: 4px 10px; } .citc-system--logo img { height: 82px; } }

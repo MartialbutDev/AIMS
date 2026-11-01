@@ -17,3 +17,8 @@ AIMS_COORDINATOR_SOURCE.txt
 **/*.keystore
 **/android/
 **/ios/
+**/*.pem
+**/*.key
+**/*.p12
+**/*.p8
+**/*-firebase-adminsdk-*.json

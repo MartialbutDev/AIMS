@@ -16,9 +16,9 @@ export default function AppLogo({
   const getSource = () => {
     switch (variant) {
       case 'login':
-        return require("../../../assets/images/login-page-logo.png");
+        return require("../../../assets/images/aims-identity-icon.png");
       default:
-        return require("../../../assets/images/aims-logo.png");
+        return require("../../../assets/images/aims-identity-icon.png");
     }
   };
 

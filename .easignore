@@ -1,0 +1,22 @@
+# EAS archives the repository root. This Android project needs only mobile/.
+/*
+!/mobile
+**/node_modules/
+**/.expo/
+**/.git/
+**/.vscode/
+**/dist/
+**/dist-apk-check/
+**/android/
+**/ios/
+**/.env
+**/.env.*
+**/*.log
+**/*.backup
+**/*.pem
+**/*.key
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.p8
+**/*-firebase-adminsdk-*.json

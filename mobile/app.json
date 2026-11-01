@@ -2,9 +2,9 @@
   "expo": {
     "name": "AIMS",
     "slug": "aims",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
-    "icon": "./assets/images/aims-app-icon.png",
+    "icon": "./assets/images/aims-identity-icon.png",
     "scheme": "aims",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -12,10 +12,10 @@
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
-        "backgroundColor": "#080078",
-        "foregroundImage": "./assets/images/aims-app-icon.png"
+        "backgroundColor": "#0b0b2f",
+        "foregroundImage": "./assets/images/aims-identity-icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -23,19 +23,19 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/aims-identity-icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/aims-logo-source.png",
-          "imageWidth": 240,
+          "image": "./assets/images/aims-identity-icon.png",
+          "imageWidth": 180,
           "resizeMode": "contain",
-          "backgroundColor": "#080078",
+          "backgroundColor": "#0b0b2f",
           "dark": {
-            "backgroundColor": "#080078"
+            "backgroundColor": "#0b0b2f"
           }
         }
       ],
