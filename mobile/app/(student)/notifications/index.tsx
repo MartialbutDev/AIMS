@@ -211,7 +211,7 @@ export default function NotificationsScreen() {
       <Ionicons name="notifications-off-outline" size={64} color={colors.border} />
       <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Notifications</Text>
       <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-        You're all caught up! New notifications will appear here.
+        You&apos;re all caught up! New notifications will appear here.
       </Text>
     </View>
   );

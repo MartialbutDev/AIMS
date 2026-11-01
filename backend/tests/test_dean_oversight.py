@@ -122,6 +122,10 @@ class DeanOversightTests(unittest.TestCase):
         self.assertEqual(next(row['count'] for row in data['stages'] if row['key'] == 'legacy_completed'), 1)
 
     def test_duplicate_placements_do_not_double_count_active_students(self):
+        # Simulate pre-migration duplicate data to verify fail-closed behavior.
+        with self.db.get_bind().begin() as connection:
+            connection.exec_driver_sql('DROP INDEX IF EXISTS uq_one_accepted_application_per_student_term')
+            connection.exec_driver_sql('DROP INDEX IF EXISTS uq_active_student_deployment_term')
         self.db.add(Application(id='duplicate-app', student_id='s1', company_id='other', academic_year='2026-2027', semester='1', position='Other role', status=ApplicationStatus.ACCEPTED))
         self.db.flush()
         self.db.add(Deployment(id='duplicate-dep', application_id='duplicate-app', student_id='s1', company_id='other', academic_year='2026-2027', semester='1', status=DeploymentStatus.PRE_DEPLOYMENT))

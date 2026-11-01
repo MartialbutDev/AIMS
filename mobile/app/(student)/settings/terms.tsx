@@ -90,7 +90,7 @@ export default function TermsScreen() {
             7. Disclaimer of Warranties
           </Text>
           <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-            The application is provided "as is" and "as available" without warranties of any kind, either express or implied. We do not warrant that the application will be uninterrupted, error-free, or free from viruses or other harmful components.
+            The application is provided &quot;as is&quot; and &quot;as available&quot; without warranties of any kind, either express or implied. We do not warrant that the application will be uninterrupted, error-free, or free from viruses or other harmful components.
           </Text>
 
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
@@ -111,7 +111,7 @@ export default function TermsScreen() {
             10. Changes to Terms
           </Text>
           <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-            We reserve the right to modify or replace these Terms at any time. If a revision is material, we will try to provide at least 30 days' notice prior to any new terms taking effect. What constitutes a material change will be determined at our sole discretion.
+            We reserve the right to modify or replace these Terms at any time. If a revision is material, we will try to provide at least 30 days&apos; notice prior to any new terms taking effect. What constitutes a material change will be determined at our sole discretion.
           </Text>
 
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>

@@ -38,6 +38,8 @@ export interface CoordinatorJourney {
 }
 
 export interface CoordinatorStudentDetail {
+  academic_year: string
+  semester: '1' | '2'
   student: Pick<
     CoordinatorStudent,
     | 'id'
@@ -175,6 +177,8 @@ export function getCoordinatorStudentDetail(
 
 export function saveCoordinatorEvaluation(
   studentId: string,
+  academicYear: string,
+  semester: '1' | '2',
   grade: number,
   notes: string,
 ): Promise<{
@@ -187,6 +191,7 @@ export function saveCoordinatorEvaluation(
     {
       method: 'PUT',
       body: JSON.stringify({
+        academic_year: academicYear, semester,
         grade,
         notes: notes || null,
       }),

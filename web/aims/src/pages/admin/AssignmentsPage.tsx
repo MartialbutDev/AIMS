@@ -47,10 +47,10 @@ export function AssignmentsPage() {
 
     setCoordinatorId((current) =>
       result.coordinators.some(
-        (coordinator) => coordinator.id === current
+        (coordinator) => coordinator.can_assign && coordinator.id === current
       )
         ? current
-        : result.coordinators[0]?.id ?? ''
+        : result.coordinators.find(coordinator => coordinator.can_assign)?.id ?? ''
     )
 
     setStudentId((current) =>
@@ -85,7 +85,7 @@ export function AssignmentsPage() {
         if (!isCurrent) return
 
         setData(result)
-        setCoordinatorId(result.coordinators[0]?.id ?? '')
+        setCoordinatorId(result.coordinators.find(coordinator => coordinator.can_assign)?.id ?? '')
         setStudentId(
           result.unassigned_students[0]?.id ?? ''
         )
@@ -119,7 +119,7 @@ export function AssignmentsPage() {
     event.preventDefault()
 
     if (isSaving || removingStudentId) return
-    if (!coordinatorId || !studentId) return
+    if (!coordinatorId || !studentId || !data) return
 
     setError('')
     setSuccessMessage('')
@@ -128,7 +128,9 @@ export function AssignmentsPage() {
     try {
       await assignStudentToCoordinator(
         coordinatorId,
-        studentId
+        studentId,
+        data.academic_year,
+        data.semester
       )
 
       setSuccessMessage('Student assigned successfully.')
@@ -161,10 +163,10 @@ export function AssignmentsPage() {
     coordinatorIdToRemove: string,
     student: AssignedStudent
   ) {
-    if (isSaving || removingStudentId) return
+    if (isSaving || removingStudentId || !data) return
 
     const confirmed = window.confirm(
-      `Remove ${student.name} from this coordinator?`
+      `Remove ${student.name} from this coordinator for semester ${data.semester}, AY ${data.academic_year}? Historical assignments will remain.`
     )
 
     if (!confirmed) return
@@ -176,7 +178,9 @@ export function AssignmentsPage() {
     try {
       await removeStudentCoordinatorAssignment(
         coordinatorIdToRemove,
-        student.id
+        student.id,
+        data.academic_year,
+        data.semester
       )
 
       setSuccessMessage(
@@ -221,11 +225,13 @@ export function AssignmentsPage() {
           <h1>Student Assignments</h1>
 
           <p>
-            Assign each active student to one coordinator.
+            Assign each active student to one authorized coordinator for the current term.
             Deans see aggregate progress only.
           </p>
         </div>
       </div>
+
+      {data && <p className="workspace-description">AY {data.academic_year} · {data.semester === '1' ? '1st' : '2nd'} Semester. Historical assignments are preserved.</p>}
 
       {/* ERROR MESSAGE */}
 
@@ -306,8 +312,9 @@ export function AssignmentsPage() {
                   <option
                     key={coordinator.id}
                     value={coordinator.id}
+                    disabled={!coordinator.can_assign}
                   >
-                    {coordinator.name}
+                    {coordinator.name}{!coordinator.can_assign ? ' — designate for this term first' : ''}
                   </option>
                 ))}
               </select>
@@ -337,7 +344,7 @@ export function AssignmentsPage() {
                   >
                     {student.name}
                     {student.student_id
-                      ? ` · ${student.student_id}`
+                      ? ` Â· ${student.student_id}`
                       : ''}
                   </option>
                 ))}

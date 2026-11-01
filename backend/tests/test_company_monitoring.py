@@ -1,6 +1,7 @@
 """Isolated SQLite regression tests: never connects to or writes the AIMS database."""
 import sys
 import unittest
+from unittest.mock import patch
 from datetime import date, datetime, time
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,7 +29,8 @@ class CompanyMonitoringTests(unittest.TestCase):
         self.engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
         Base.metadata.create_all(self.engine, tables=[model.__table__ for model in [User, Company, HTESupervisorCompany, InternshipDeployment, DTR, Journal]])
         self.db = Session(self.engine)
-        monitoring.get_current_academic_term = lambda: ("2026-2027", "1")
+        term_patch = patch.object(monitoring, "get_current_academic_term", return_value=("2026-2027", "1"))
+        term_patch.start(); self.addCleanup(term_patch.stop)
         self.actor = SimpleNamespace(id="supervisor-a", role=UserRole.HTE_SUPERVISOR)
         self.db.add_all([
             User(id="s1", first_name="Ana", middle_name="M.", last_name="Reyes", email="student@example.invalid", student_id="2026-001", hashed_password="test", role=UserRole.STUDENT),
@@ -76,6 +78,10 @@ class CompanyMonitoringTests(unittest.TestCase):
             submitted_date=submitted))
 
     def test_company_scope_and_current_term(self):
+        # Simulate pre-migration duplicate data to verify fail-closed behavior.
+        with self.db.get_bind().begin() as connection:
+            connection.exec_driver_sql('DROP INDEX IF EXISTS uq_one_accepted_application_per_student_term')
+            connection.exec_driver_sql('DROP INDEX IF EXISTS uq_active_student_deployment_term')
         self.deploy("past", "s1", "a", term="2")
         self.deploy("pre", "s1", "a", status=DeploymentStatus.PRE_DEPLOYMENT)
         self.deploy("unconfirmed", "s1", "a", confirmed=False)

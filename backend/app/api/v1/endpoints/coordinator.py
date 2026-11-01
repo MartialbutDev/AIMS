@@ -46,6 +46,8 @@ REQUIRED_DOCUMENT_TYPES = (
 
 
 class EvaluationInput(BaseModel):
+    academic_year: str = Field(pattern=r"^\d{4}-\d{4}$")
+    semester: Literal["1", "2"]
     grade: Decimal = Field(
         ge=Decimal("1.00"),
         le=Decimal("5.00"),
@@ -124,22 +126,9 @@ def require_assigned_student(
     return student
 
 
-def _reject_ambiguous_record_write(db: Session, student_id: str) -> None:
-    """Fail closed if a student's records span multiple assigned terms.
-
-    Application, DTR, Journal and Evaluation models in this endpoint do not
-    provide a verified academic-term relationship. An assignment alone does
-    not prove which term a record belongs to.
-    """
-    assignments = db.query(CoordinatorStudentAssignment.id).filter(
-        CoordinatorStudentAssignment.student_id == student_id
-    ).limit(2).all()
-    if len(assignments) > 1:
-        raise HTTPException(
-            409,
-            "Record's academic term cannot be verified across multiple "
-            "student assignments; term-scoped records are required",
-        )
+def _require_current_record_term(record) -> None:
+    if (record.academic_year, record.semester) != _current_term():
+        raise HTTPException(409, "This record belongs to a historical or unverified term and cannot be changed here")
 
 
 def _hours_summary(records: list[DTR]) -> dict:
@@ -275,6 +264,7 @@ async def list_students(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("coordinator")),
 ):
+    year, semester = _current_term()
     query = db.query(User).filter(
         User.role == UserRole.STUDENT
     )
@@ -322,22 +312,23 @@ async def list_students(
 
     documents = (
         db.query(Document)
-        .filter(Document.uploaded_by.in_(student_ids))
+        .filter(Document.uploaded_by.in_(student_ids), Document.academic_year == year, Document.semester == semester)
         .order_by(Document.created_at.desc())
         .all()
     )
 
     dtrs = db.query(DTR).filter(
-        DTR.student_id.in_(student_ids)
+        DTR.student_id.in_(student_ids), DTR.academic_year == year, DTR.semester == semester
     ).all()
 
     applications = db.query(Application).filter(
-        Application.student_id.in_(student_ids)
+        Application.student_id.in_(student_ids), Application.academic_year == year, Application.semester == semester
     ).all()
 
     evaluations = db.query(CoordinatorEvaluation).filter(
         CoordinatorEvaluation.coordinator_id == current_user.id,
         CoordinatorEvaluation.student_id.in_(student_ids),
+        CoordinatorEvaluation.academic_year == year, CoordinatorEvaluation.semester == semester,
     ).all()
 
     docs_by_student: dict[str, list[Document]] = {}
@@ -526,6 +517,7 @@ async def get_student_detail(
     evaluation = db.query(CoordinatorEvaluation).filter(
         CoordinatorEvaluation.coordinator_id == current_user.id,
         CoordinatorEvaluation.student_id == student.id,
+        CoordinatorEvaluation.academic_year == year, CoordinatorEvaluation.semester == semester,
     ).first()
 
     latest: dict[str, Document] = {}
@@ -628,17 +620,22 @@ async def save_student_evaluation(
     student = require_assigned_student(
         db, current_user, student_id, mode="write"
     )
-    _reject_ambiguous_record_write(db, student_id)
+    year, semester = _current_term()
+    if (evaluation_data.academic_year, evaluation_data.semester) != (year, semester):
+        raise HTTPException(409, "The academic term changed or is historical. Refresh the student record before saving.")
+    db.query(User).filter(User.id == student_id).with_for_update().one()
 
     evaluation = db.query(CoordinatorEvaluation).filter(
         CoordinatorEvaluation.coordinator_id == current_user.id,
         CoordinatorEvaluation.student_id == student.id,
+        CoordinatorEvaluation.academic_year == year, CoordinatorEvaluation.semester == semester,
     ).first()
 
     if evaluation is None:
         evaluation = CoordinatorEvaluation(
             coordinator_id=current_user.id,
             student_id=student.id,
+            academic_year=year, semester=semester,
             grade=evaluation_data.grade,
             notes=evaluation_data.notes,
         )
@@ -671,6 +668,7 @@ async def get_student_document_file(
     document = db.query(Document).filter(
         Document.id == document_id,
         Document.uploaded_by == student_id,
+        Document.academic_year == _current_term()[0], Document.semester == _current_term()[1],
     ).first()
 
     if document is None:
@@ -706,6 +704,7 @@ async def get_student_dtr_photo(
     entry = db.query(DTR).filter(
         DTR.id == dtr_id,
         DTR.student_id == student_id,
+        DTR.academic_year == _current_term()[0], DTR.semester == _current_term()[1],
     ).first()
 
     if entry is None:
@@ -811,6 +810,7 @@ async def get_review_queue(
         db.query(DTR)
         .filter(
             DTR.student_id.in_(ids),
+            DTR.academic_year == _current_term()[0], DTR.semester == _current_term()[1],
             DTR.status != DTRStatus.PENDING,
         )
         .order_by(DTR.date.desc())
@@ -822,6 +822,7 @@ async def get_review_queue(
         db.query(Journal)
         .filter(
             Journal.student_id.in_(ids),
+            Journal.academic_year == _current_term()[0], Journal.semester == _current_term()[1],
             Journal.status != JournalStatus.DRAFT,
         )
         .order_by(Journal.week.desc())
@@ -923,7 +924,7 @@ async def review_dtr(
         entry.student_id,
         mode="write",
     )
-    _reject_ambiguous_record_write(db, entry.student_id)
+    _require_current_record_term(entry)
 
     if entry.status != DTRStatus.SUBMITTED:
         raise HTTPException(
@@ -987,7 +988,7 @@ async def review_journal(
         entry.student_id,
         mode="write",
     )
-    _reject_ambiguous_record_write(db, entry.student_id)
+    _require_current_record_term(entry)
 
     if entry.status not in (
         JournalStatus.SUBMITTED,
@@ -1037,6 +1038,7 @@ async def get_assigned_student_journal_file(
     journal = db.query(Journal).filter(
         Journal.id == journal_id,
         Journal.student_id == student_id,
+        Journal.academic_year == _current_term()[0], Journal.semester == _current_term()[1],
     ).first()
 
     if journal is None:

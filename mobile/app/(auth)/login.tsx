@@ -887,7 +887,7 @@ export default function LoginScreen() {
                         },
                       ]}
                     >
-                      Don't have an account?
+                      Don&apos;t have an account?
                     </Text>
 
                     <TouchableOpacity

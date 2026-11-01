@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Icon } from '../../components/Icons'
 import { StudentRecordDialog } from './StudentRecordDialog'
 import { DeploymentApprovalPanel } from './DeploymentApprovalPanel'
@@ -31,10 +31,14 @@ function ProgressBar({ value, label }: { value: number; label: string }) {
 
 function EvaluationPanel({
   studentId,
+  academicYear,
+  semester,
   evaluation,
   onSaved,
 }: {
   studentId: string
+  academicYear: string
+  semester: '1' | '2'
   evaluation: CoordinatorStudentDetail['evaluation']
   onSaved: (grade: number, notes: string) => void
 }) {
@@ -50,7 +54,7 @@ function EvaluationPanel({
     setError('')
     setSaved(false)
     try {
-      const result = await saveCoordinatorEvaluation(studentId, Number(grade), notes)
+      const result = await saveCoordinatorEvaluation(studentId, academicYear, semester, Number(grade), notes)
       onSaved(result.grade, result.notes ?? '')
       setSaved(true)
     } catch (saveError) {
@@ -65,7 +69,7 @@ function EvaluationPanel({
       <div className="panel-heading"><div><h2>Coordinator assessment</h2><p>Internal assessment: 1.00 is highest; 5.00 is lowest. Use Completion & archive to release the official final grade.</p></div></div>
       <div className="evaluation-fields">
         <label>Assessment grade
-          <input aria-label="Final grade" type="number" min="1" max="5" step="0.01" required value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="e.g. 1.25" />
+          <input aria-label="Internal assessment grade" type="number" min="1" max="5" step="0.01" required value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="e.g. 1.25" />
         </label>
         <label>Evaluation notes
           <textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={5000} rows={3} placeholder="Add a concise OJT performance summary…" />
@@ -73,7 +77,7 @@ function EvaluationPanel({
       </div>
       {error && <p className="form-error" role="alert">{error}</p>}
       {saved && <p className="evaluation-saved" role="status">Evaluation saved.</p>}
-      <button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save grade'} <Icon name="check" size={15} /></button>
+      <button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save assessment'} <Icon name="check" size={15} /></button>
     </form>
   )
 }
@@ -116,7 +120,7 @@ function StudentDetails({ detail, onEvaluationSaved }: { detail: CoordinatorStud
       <button type="button" onClick={() => setSection('journals')}><span className="sr-summary-icon"><Icon name="briefcase" size={23} /></span><strong>OJT journals</strong><span>{detail.journals.filter(item => item.status !== 'draft').length} submitted or reviewed</span><small>Weekly reflections and journal previews <Icon name="arrow" size={15} /></small></button>
     </section>
     <DeploymentApprovalPanel key={`deployment-${student.id}`} studentId={student.id} studentName={fullName} />
-    <EvaluationPanel key={student.id} studentId={student.id} evaluation={detail.evaluation} onSaved={onEvaluationSaved} />
+    <EvaluationPanel key={student.id} studentId={student.id} academicYear={detail.academic_year} semester={detail.semester} evaluation={detail.evaluation} onSaved={onEvaluationSaved} />
     {section && <StudentRecordDialog key={student.id + section} detail={detail} category={section} onClose={() => setSection(null)} />}
   </div>
 }

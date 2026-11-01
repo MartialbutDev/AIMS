@@ -20,13 +20,14 @@ from app.core.database import Base
 class CoordinatorEvaluation(Base):
     __tablename__ = "coordinator_evaluations"
 
-    # Existing database constraint.
-    # Replace with term-aware uniqueness in the migration phase.
+    # Legacy rows with unknown terms are retained; new writes always specify a term.
     __table_args__ = (
         UniqueConstraint(
             "coordinator_id",
             "student_id",
-            name="uq_coordinator_evaluation_owner",
+            "academic_year",
+            "semester",
+            name="uq_coordinator_evaluation_term",
         ),
     )
 

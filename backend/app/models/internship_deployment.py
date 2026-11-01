@@ -10,6 +10,8 @@ from sqlalchemy import (
     Enum as SQLEnum,
     ForeignKey,
     UniqueConstraint,
+    Index,
+    text,
 )
 from sqlalchemy.sql import func
 
@@ -27,6 +29,9 @@ class InternshipDeployment(Base):
     __tablename__ = "internship_deployments"
 
     __table_args__ = (
+        Index('uq_active_student_deployment_term', 'student_id', 'academic_year', 'semester',
+            unique=True, postgresql_where=text("status IN ('PRE_DEPLOYMENT', 'DEPLOYED')"),
+            sqlite_where=text("status IN ('PRE_DEPLOYMENT', 'DEPLOYED')")),
         UniqueConstraint(
             "application_id",
             name="uq_deployment_application",

@@ -124,7 +124,7 @@ export default function PrivacyPolicyScreen() {
           </Text>
 
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Children's Privacy
+            Children&apos;s Privacy
           </Text>
           <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
             Our application is intended for use by college students and faculty members. We do not knowingly collect personal information from individuals under the age of 18. If you become aware that a child has provided us with personal information, please contact us immediately.
@@ -134,7 +134,7 @@ export default function PrivacyPolicyScreen() {
             Changes to This Policy
           </Text>
           <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-            We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date. We encourage you to review this Privacy Policy periodically.
+            We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the &quot;Last Updated&quot; date. We encourage you to review this Privacy Policy periodically.
           </Text>
 
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>

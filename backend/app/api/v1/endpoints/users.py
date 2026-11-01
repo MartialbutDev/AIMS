@@ -2,9 +2,9 @@
 import csv
 import io
 import uuid
-from typing import List
+from typing import List, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query, status
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -14,6 +14,7 @@ from datetime import datetime
 from sqlalchemy import func
 
 from app.core.database import get_db
+from app.core.assignment_access import get_current_academic_term
 from app.core.security import get_current_user, get_password_hash, require_role
 from app.models.coordinator_assignment import CoordinatorStudentAssignment
 from app.models.dean_coordinator_designation import DeanCoordinatorDesignation
@@ -36,6 +37,8 @@ CSV_REQUIRED_COLUMNS = {"email", "first_name", "last_name", "role", "password"}
 class CoordinatorAssignmentInput(BaseModel):
     coordinator_id: str = Field(min_length=1, max_length=36)
     student_id: str = Field(min_length=1, max_length=36)
+    academic_year: str = Field(pattern=r"^\d{4}-\d{4}$")
+    semester: Literal["1", "2"]
 
 
 def _create_managed_user(user_data: AdminUserCreate) -> User:
@@ -227,54 +230,42 @@ async def get_all_users(
     return users
 
 
+def _require_current_assignment_term(academic_year: str, semester: str) -> tuple[str, str]:
+    current = get_current_academic_term()
+    if (academic_year, semester) != current:
+        raise HTTPException(409, "The academic term changed or is historical. Refresh Student Assignments before continuing.")
+    return current
+
+
 @router.get("/coordinator-assignments")
 async def get_coordinator_assignments(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
-    """Return coordinators and available students for admin assignment management."""
-    coordinators = db.query(User).filter(
-        User.role == UserRole.COORDINATOR,
-        User.is_active.is_(True),
-    ).order_by(User.last_name, User.first_name).all()
-    students = db.query(User).filter(
-        User.role == UserRole.STUDENT,
-        User.is_active.is_(True),
-    ).order_by(User.last_name, User.first_name).all()
-    assignments = db.query(CoordinatorStudentAssignment, User).join(
-        User,
-        User.id == CoordinatorStudentAssignment.student_id,
-    ).filter(User.role == UserRole.STUDENT).all()
-
-    assignments_by_coordinator: dict[str, list[dict[str, str | None]]] = {}
-    assigned_student_ids = set()
+    """Show only current-term assignments; preserve past-term rosters."""
+    year, semester = get_current_academic_term()
+    coordinators = db.query(User).filter(User.role == UserRole.COORDINATOR,
+        User.is_active.is_(True)).order_by(User.last_name, User.first_name).all()
+    eligible = {row[0] for row in db.query(DeanCoordinatorDesignation.coordinator_id).filter(
+        DeanCoordinatorDesignation.academic_year == year, DeanCoordinatorDesignation.semester == semester,
+        DeanCoordinatorDesignation.is_active.is_(True)).all()}
+    students = db.query(User).filter(User.role == UserRole.STUDENT,
+        User.is_active.is_(True)).order_by(User.last_name, User.first_name).all()
+    assignments = db.query(CoordinatorStudentAssignment, User).join(User,
+        User.id == CoordinatorStudentAssignment.student_id).filter(User.role == UserRole.STUDENT,
+        CoordinatorStudentAssignment.academic_year == year,
+        CoordinatorStudentAssignment.semester == semester).all()
+    groups = {}
+    assigned = set()
     for assignment, student in assignments:
-        assigned_student_ids.add(student.id)
-        assignments_by_coordinator.setdefault(assignment.coordinator_id, []).append({
-            "id": student.id,
-            "student_id": student.student_id,
-            "name": f"{student.first_name} {student.last_name}".strip(),
-        })
-
-    return {
-        "coordinators": [
-            {
-                "id": coordinator.id,
-                "name": f"{coordinator.first_name} {coordinator.last_name}".strip(),
-                "students": assignments_by_coordinator.get(coordinator.id, []),
-            }
-            for coordinator in coordinators
-        ],
-        "unassigned_students": [
-            {
-                "id": student.id,
-                "student_id": student.student_id,
-                "name": f"{student.first_name} {student.last_name}".strip(),
-            }
-            for student in students
-            if student.id not in assigned_student_ids
-        ],
-    }
+        assigned.add(student.id)
+        groups.setdefault(assignment.coordinator_id, []).append({"id": student.id,
+            "student_id": student.student_id, "name": f"{student.first_name} {student.last_name}".strip()})
+    return {"academic_year": year, "semester": semester,
+        "coordinators": [{"id": user.id, "name": f"{user.first_name} {user.last_name}".strip(),
+            "can_assign": user.id in eligible, "students": groups.get(user.id, [])} for user in coordinators],
+        "unassigned_students": [{"id": user.id, "student_id": user.student_id,
+            "name": f"{user.first_name} {user.last_name}".strip()} for user in students if user.id not in assigned]}
 
 
 @router.post("/coordinator-assignments", status_code=status.HTTP_201_CREATED)
@@ -283,71 +274,57 @@ async def create_coordinator_assignment(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
-    coordinator = db.query(User).filter(
-        User.id == assignment_data.coordinator_id,
-        User.role == UserRole.COORDINATOR,
-        User.is_active.is_(True),
-    ).first()
-    if coordinator is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active coordinator not found")
-
-    # Admins may link students only to a administrator-designated coordinator.
-    # This is an interim safeguard; assignments still need an academic-term
-    # migration before semester-specific authorization is possible.
-    dean_designation = db.query(DeanCoordinatorDesignation.id).filter(
-        DeanCoordinatorDesignation.coordinator_id == coordinator.id,
-        DeanCoordinatorDesignation.is_active.is_(True),
-    ).first()
-    if dean_designation is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Coordinator has no active administrator-authorized designation",
-        )
-
-    student = db.query(User).filter(
-        User.id == assignment_data.student_id,
-        User.role == UserRole.STUDENT,
-        User.is_active.is_(True),
-    ).first()
+    year, semester = _require_current_assignment_term(assignment_data.academic_year, assignment_data.semester)
+    student = db.query(User).filter(User.id == assignment_data.student_id,
+        User.role == UserRole.STUDENT, User.is_active.is_(True)).with_for_update().first()
     if student is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active student not found")
-
-    existing_assignment = db.query(CoordinatorStudentAssignment).filter(
-        CoordinatorStudentAssignment.student_id == student.id,
-    ).first()
-    if existing_assignment:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student is already assigned to a coordinator")
-
-    assignment = CoordinatorStudentAssignment(
-        coordinator_id=coordinator.id,
-        student_id=student.id,
-    )
+        raise HTTPException(404, "Active student not found")
+    coordinator = db.query(User).filter(User.id == assignment_data.coordinator_id,
+        User.role == UserRole.COORDINATOR, User.is_active.is_(True)).with_for_update().first()
+    if coordinator is None:
+        raise HTTPException(404, "Active coordinator not found")
+    designation = db.query(DeanCoordinatorDesignation).filter(
+        DeanCoordinatorDesignation.coordinator_id == coordinator.id,
+        DeanCoordinatorDesignation.academic_year == year,
+        DeanCoordinatorDesignation.semester == semester,
+        DeanCoordinatorDesignation.is_active.is_(True)).with_for_update().first()
+    if designation is None:
+        raise HTTPException(403, "Coordinator has no active administrator-authorized designation for this academic term")
+    existing = db.query(CoordinatorStudentAssignment).filter_by(student_id=student.id,
+        academic_year=year, semester=semester).first()
+    if existing:
+        raise HTTPException(409, "Student is already assigned to a coordinator for this academic term")
+    assignment = CoordinatorStudentAssignment(coordinator_id=coordinator.id, student_id=student.id,
+        academic_year=year, semester=semester)
     db.add(assignment)
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Student is already assigned to a coordinator") from exc
-
-    return {"coordinator_id": coordinator.id, "student_id": student.id}
+        code = getattr(exc.orig, "pgcode", None) or getattr(exc.orig, "sqlstate", None)
+        if code == "23505" or "unique constraint" in str(exc.orig).lower():
+            raise HTTPException(409, "Student is already assigned to a coordinator for this academic term") from exc
+        raise HTTPException(500, "Assignment could not be saved. Ask the administrator to check the database schema.") from exc
+    return {"coordinator_id": coordinator.id, "student_id": student.id, "academic_year": year, "semester": semester}
 
 
 @router.delete("/coordinator-assignments/{coordinator_id}/{student_id}")
 async def delete_coordinator_assignment(
-    coordinator_id: str,
-    student_id: str,
+    coordinator_id: str, student_id: str,
+    academic_year: str = Query(..., pattern=r"^\d{4}-\d{4}$"),
+    semester: Literal["1", "2"] = Query(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
-    assignment = db.query(CoordinatorStudentAssignment).filter(
-        CoordinatorStudentAssignment.coordinator_id == coordinator_id,
-        CoordinatorStudentAssignment.student_id == student_id,
-    ).first()
+    year, term = _require_current_assignment_term(academic_year, semester)
+    db.query(User).filter(User.id == student_id).with_for_update().first()
+    assignment = db.query(CoordinatorStudentAssignment).filter_by(coordinator_id=coordinator_id,
+        student_id=student_id, academic_year=year, semester=term).with_for_update().first()
     if assignment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coordinator assignment not found")
+        raise HTTPException(404, "Coordinator assignment not found in the current academic term")
     db.delete(assignment)
     db.commit()
-    return {"message": "Student assignment removed"}
+    return {"message": "Current-term student assignment removed; historical assignments preserved"}
 
 
 @router.get("/{user_id}", response_model=UserResponse)

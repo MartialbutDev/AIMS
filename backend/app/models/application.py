@@ -9,6 +9,8 @@ from sqlalchemy import (
     Enum as SQLEnum,
     ForeignKey,
     Text,
+    Index,
+    text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -28,6 +30,9 @@ class ApplicationStatus(str, PyEnum):
 
 class Application(Base):
     __tablename__ = "applications"
+    __table_args__ = (Index('uq_one_accepted_application_per_student_term',
+        'student_id', 'academic_year', 'semester', unique=True,
+        postgresql_where=text("status = 'ACCEPTED'"), sqlite_where=text("status = 'ACCEPTED'")),)
 
     id = Column(
         String(36),

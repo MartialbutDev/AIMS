@@ -105,16 +105,18 @@ def run_migrations_online():
     app/core/database.py
     """
 
-    with engine.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            include_name=include_name,
-        )
-
+    def migrate(connection):
+        context.configure(connection=connection, target_metadata=target_metadata,
+            compare_type=True, include_name=include_name)
         with context.begin_transaction():
             context.run_migrations()
+
+    supplied = config.attributes.get("connection")
+    if supplied is not None:
+        migrate(supplied)
+    else:
+        with engine.connect() as connection:
+            migrate(connection)
 
 
 # ============================================================

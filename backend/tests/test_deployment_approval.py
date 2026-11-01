@@ -137,6 +137,10 @@ class DeploymentApprovalTests(unittest.TestCase):
         self.assertEqual(deployment.status,DeploymentStatus.PRE_DEPLOYMENT)
 
     def test_conflicting_deployment_and_inactive_student_fail_closed(self):
+        # Simulate pre-migration duplicate data to verify fail-closed behavior.
+        with self.db.get_bind().begin() as connection:
+            connection.exec_driver_sql('DROP INDEX IF EXISTS uq_one_accepted_application_per_student_term')
+            connection.exec_driver_sql('DROP INDEX IF EXISTS uq_active_student_deployment_term')
         deployment=self.regular();self.f.documents()
         self.db.get(User,'s1').is_active=False;self.db.commit()
         self.assertEqual(self.confirm(deployment).status_code,409)

@@ -59,6 +59,7 @@ backend/logs/
 # =============================================================
 # Backend user uploads (NEVER commit — private student files)
 # =============================================================
+backend/assets/onboarding/
 backend/assets/uploads/
 backend/assets/dtr_uploads/
 backend/assets/journal_uploads/

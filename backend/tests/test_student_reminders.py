@@ -3,6 +3,7 @@ import asyncio
 import json
 import sys
 import unittest
+from unittest.mock import patch
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -37,9 +38,12 @@ class StudentReminderTests(unittest.TestCase):
         Base.metadata.create_all(self.engine, tables=[model.__table__ for model in tables])
         self.db = Session(self.engine)
         self.actor = SimpleNamespace(id="c1", role=UserRole.COORDINATOR)
-        reminder.get_current_academic_term = lambda: ("2026-2027", "1")
-        assignment_access.get_current_academic_term = lambda: ("2026-2027", "1")
-        coordinator._current_term = lambda: ("2026-2027", "1")
+        term_patch = patch.object(reminder, "get_current_academic_term", return_value=("2026-2027", "1"))
+        term_patch.start(); self.addCleanup(term_patch.stop)
+        term_patch = patch.object(assignment_access, "get_current_academic_term", return_value=("2026-2027", "1"))
+        term_patch.start(); self.addCleanup(term_patch.stop)
+        term_patch = patch.object(coordinator, "_current_term", return_value=("2026-2027", "1"))
+        term_patch.start(); self.addCleanup(term_patch.stop)
         for identifier, role in [("c1", UserRole.COORDINATOR), ("s1", UserRole.STUDENT), ("s2", UserRole.STUDENT)]:
             self.db.add(User(id=identifier, first_name=identifier, last_name="Test", email=identifier + "@example.invalid", hashed_password="test", role=role, is_active=True))
         self.db.add(CoordinatorStudentAssignment(id="assignment", coordinator_id="c1", student_id="s1", academic_year="2026-2027", semester="1"))
