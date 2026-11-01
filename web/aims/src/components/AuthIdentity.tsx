@@ -1,12 +1,10 @@
 import { Icon } from './Icons'
 import citcLogo from '../assets/citc-identity.png'
-import aimsLogo from '../assets/aims-logo-lockup.png'
 import './role-auth.css'
 
 export function AuthIdentity() {
   return (
     <aside className="citc-identity">
-      <a href="/" className="citc-system citc-system--logo" aria-label="AIMS home"><img src={aimsLogo} alt="AIMS — Academic Internship Management System" /></a>
       <div className="citc-identity-body">
         <div className="citc-college-logo"><img src={citcLogo} alt="College of Information Technology and Computing" /></div>
         <p className="citc-overline">USTP · CAGAYAN DE ORO</p>
