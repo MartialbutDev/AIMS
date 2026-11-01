@@ -52,6 +52,10 @@ class DirectPlacementTests(unittest.TestCase):
         for company in ['partner','pending']:
             self.db.add(HTESupervisorCompany(id='hte-'+company,supervisor_id='hte',company_id=company,is_active=True))
         self.db.add(HTESupervisorCompany(id='hte-other',supervisor_id='hte2',company_id='other',is_active=True))
+        # Normal happy-path fixtures include an explicitly coordinator-reviewed endorsement.
+        self.db.add(Document(id='fixture-endorsement',type=DocumentType.ENDORSEMENT_LETTER,uploaded_by='s1',
+            file_path='endorsement-fixture.pdf',verification_status='verified',reviewed_by='c1',
+            reviewed_at=datetime.now(timezone.utc).replace(tzinfo=None),academic_year='2026-2027',semester='1'))
         self.db.commit();self.as_user('c1',UserRole.COORDINATOR)
         app=FastAPI();app.include_router(endpoint.router,prefix='/direct');app.include_router(applications.router,prefix='/applications');app.include_router(deployments.router,prefix='/deployments')
         app.dependency_overrides[endpoint.get_db]=lambda:self.db

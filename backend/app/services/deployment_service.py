@@ -111,6 +111,9 @@ class DeploymentService:
             application.student_id, application.company_id, application.academic_year, application.semester
         ) == (deployment.student_id, deployment.company_id, deployment.academic_year, deployment.semester)
         check('acceptance', 'Company accepted the matching internship application', matches)
+        from app.services.endorsement_service import endorsement_state
+        check('endorsement', 'Endorsement letter has coordinator content review (no signature authentication)',
+              endorsement_state(db, deployment.student_id, deployment.academic_year, deployment.semester)['ready'])
         conflict = db.query(InternshipDeployment.id).filter(
             InternshipDeployment.student_id == deployment.student_id,
             InternshipDeployment.academic_year == deployment.academic_year,

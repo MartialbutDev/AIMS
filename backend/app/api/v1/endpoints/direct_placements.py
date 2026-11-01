@@ -196,6 +196,20 @@ def review(placement_id: str, payload: Review, db: Session = Depends(get_db), ac
     return service.serialize(db,placement,actor,history=True)
 
 
+@router.post('/{placement_id}/release')
+def release_to_company(placement_id: str, db: Session = Depends(get_db), actor: User = Depends(get_current_user)):
+    if actor.role != UserRole.COORDINATOR: raise HTTPException(403, 'Coordinator access required')
+    placement = record(db, actor, placement_id, write=True)
+    service.assignment_for(db, actor, placement.student_id, write=True)
+    from app.services.endorsement_service import require_endorsement
+    require_endorsement(db, placement.student_id, placement.academic_year, placement.semester)
+    service.release_application(db, placement, actor.id)
+    if not placement.application_id:
+        raise HTTPException(409, 'Student acknowledgement, partnership clearance and coordinator assignment must be ready before forwarding')
+    db.commit()
+    return service.serialize(db, placement, actor, history=True)
+
+
 @router.post('/{placement_id}/student-decision')
 def student_decision(placement_id: str, payload: StudentDecision, db: Session = Depends(get_db), actor: User = Depends(get_current_user)):
     if actor.role != UserRole.STUDENT: raise HTTPException(403,'Student access required')

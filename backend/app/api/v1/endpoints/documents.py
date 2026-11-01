@@ -36,6 +36,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -47,7 +48,7 @@ from app.core.assignment_access import (
 )
 
 from app.models.user import User, UserRole
-from app.models.document import Document
+from app.models.document import Document, DocumentType
 
 from app.models.coordinator_assignment import (
     CoordinatorStudentAssignment,
@@ -335,7 +336,10 @@ def _coordinator_documents(
 
     if pending_only:
         query = query.filter(
-            Document.verification_status == "pending"
+            or_(Document.verification_status == "pending", and_(
+                Document.type == DocumentType.ENDORSEMENT_LETTER,
+                Document.verification_status == 'verified',
+                or_(Document.reviewed_by.is_(None), Document.reviewed_at.is_(None))))
         )
 
     rows = (
@@ -448,7 +452,10 @@ def review_document(
             semester=semester,
         )
 
-        if document.verification_status != "pending":
+        legacy_endorsement = (document.type == DocumentType.ENDORSEMENT_LETTER
+            and document.verification_status == 'verified'
+            and not (document.reviewed_by and document.reviewed_at))
+        if document.verification_status != "pending" and not legacy_endorsement:
             raise HTTPException(
                 status_code=409,
                 detail="Document is no longer pending review",

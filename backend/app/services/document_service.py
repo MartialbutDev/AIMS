@@ -474,6 +474,9 @@ class DocumentService:
                 "this is incorrect.",
             )
 
+        if document_type == 'endorsement_letter':
+            return ('pending', 'OCR extracts text only; it does not authenticate signatures. Coordinator content review of the endorsement letter is required before forwarding an application to the company.')
+
         if document_type not in cls.AUTO_VERIFY_TYPES:
             return (
                 "pending",

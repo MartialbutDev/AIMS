@@ -42,7 +42,7 @@ function formatDate(value: string | null | undefined) {
 }
 
 function isPending(status: string, tab: ReviewTab) {
-  if (tab === 'applications') return ['pending', 'reviewing', 'interview'].includes(status)
+  if (tab === 'applications') return ['pending', 'reviewing'].includes(status)
   if (tab === 'dtrs') return status === 'submitted'
   return ['submitted', 'reviewing'].includes(status)
 }
@@ -220,14 +220,14 @@ export function ApplicationsPage() {
                   <div className="co-review-record-top"><strong>{item.student_name}</strong><Status value={item.status} /></div>
                   <p>{item.position} · {item.company_name || 'Company not specified'}</p>
                   <small>Applied {formatDate(item.applied_date)}</small>
+                  {['pending', 'reviewing'].includes(item.status) && <p className="co-review-hint">Endorsement letter: {item.endorsement.ready ? 'Coordinator content review recorded' : label(item.endorsement.status)}. {item.endorsement.ready ? 'Check that the letter names this company before forwarding.' : 'Student uploads the letter in mobile; review it under Document review → Internship documents, then refresh this queue.'} OCR extracts text only and does not authenticate signatures.</p>}
                   {expandedId === item.id && <div className="co-review-details"><span>Student ID: {item.student_id}</span><span>Application ID: {item.id}</span><span>Current status: {label(item.status)}</span></div>}
                 </div>
                 <div className="co-review-actions">
                   <button type="button" disabled={!!busy} onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>{expandedId === item.id ? 'Less details' : 'Details'}</button>
                   {isPending(item.status, 'applications') && <>
                     {item.status === 'pending' && <button type="button" disabled={!!busy} onClick={() => requestDecision('applications', item, 'reviewing')}>Reviewing</button>}
-                    {item.status !== 'interview' && <button type="button" disabled={!!busy} onClick={() => requestDecision('applications', item, 'interview')}>Interview</button>}
-                    <button type="button" className="co-review-approve" disabled={!!busy} onClick={() => requestDecision('applications', item, 'accepted')}>Accept</button>
+                    <button type="button" className="co-review-approve" disabled={!!busy || !item.endorsement.ready} onClick={() => requestDecision('applications', item, 'endorsed')}>Endorse and forward</button>
                     <button type="button" className="co-review-reject" disabled={!!busy} onClick={() => requestDecision('applications', item, 'rejected')}>Reject</button>
                   </>}
                 </div>
@@ -283,6 +283,7 @@ export function ApplicationsPage() {
           <span className="co-overline">CONFIRM REVIEW ACTION</span>
           <h2 id="co-review-confirm-title">{label(decision.status)} {decision.kind === 'applications' ? 'application' : decision.kind === 'dtrs' ? 'DTR' : 'journal'}?</h2>
           <p id="co-review-confirm-description">This will update the record for <strong>{decision.name}</strong> to <strong>{label(decision.status)}</strong>. Please verify the supporting records before continuing.</p>
+          {decision.status === 'endorsed' && <p>Confirm that the coordinator-reviewed endorsement letter identifies this student and the intended company. This forwards the application for the company’s decision; it does not authenticate signatures or approve deployment.</p>}
           <div className="co-review-confirm-actions">
             <button type="button" className="co-button co-button-outline" disabled={!!busy} onClick={() => setDecision(null)}>Cancel</button>
             <button type="button" className={`co-button ${decision.status === 'rejected' ? 'co-review-confirm-danger' : 'co-button-primary'}`} disabled={!!busy} onClick={() => void confirmDecision()}>{busy ? 'Saving…' : `Confirm ${label(decision.status)}`}</button>

@@ -231,6 +231,7 @@ export function InternshipDocumentReviewPage() {
           <p>
             Review internship documents submitted by your
             assigned students for the current academic term.
+            {' '}Tesseract OCR extracts text and supports content checks; AIMS does not authenticate signatures. Endorsement letters require coordinator content review before applications can be forwarded to a company.
           </p>
         </div>
 
@@ -327,9 +328,7 @@ export function InternshipDocumentReviewPage() {
                   <h3>{document.student.name}</h3>
 
                   <span className="dv-status">
-                    {statusName(
-                      document.verification_status,
-                    )}
+                    {document.type === 'endorsement_letter' && document.verification_status === 'verified' && !(document.reviewed_by && document.reviewed_at) ? 'Needs coordinator content review' : statusName(document.verification_status)}
                   </span>
                 </div>
 
@@ -400,8 +399,7 @@ export function InternshipDocumentReviewPage() {
                   Preview document
                 </button>
 
-                {document.verification_status ===
-                  'pending' && (
+                {(document.verification_status === 'pending' || (document.type === 'endorsement_letter' && document.verification_status === 'verified' && !(document.reviewed_by && document.reviewed_at))) && (
                   <>
                     <button
                       type="button"
@@ -475,6 +473,7 @@ export function InternshipDocumentReviewPage() {
               confirming your decision. Approval
               confirms a content review, not independent
               authentication of the document.
+              {' '}Tesseract OCR does not authenticate signatures. For endorsement letters, check the student details, intended company and school-issued content against the original letter.
             </p>
 
             <label htmlFor="internship-review-notes">

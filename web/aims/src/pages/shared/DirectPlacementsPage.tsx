@@ -15,6 +15,8 @@ function stage(p: DirectPlacement) {
   if (!p.coordinator_ready) return 'Assignment needs review'
   if (!p.partnership_ready) return p.partnership_status === 'returned' ? 'Partnership returned' : 'Pending partnership review'
   if (p.student_decision !== 'acknowledged') return 'Awaiting student acknowledgement'
+  if (!p.application_id && !p.endorsement.ready) return 'Awaiting coordinator-reviewed endorsement letter'
+  if (!p.application_id) return 'Ready to forward to company'
   if (p.application_status === 'accepted') return 'Pre-deployment requirements'
   return 'Awaiting company decision'
 }
@@ -27,6 +29,7 @@ export function DirectPlacementsPage({ role }: { role: UserRole }) {
   const [options, setOptions] = useState<PlacementOptions | null>(null), [studentSearch, setStudentSearch] = useState(''), [companySearch, setCompanySearch] = useState('')
   const [creating, setCreating] = useState(false), [draft, setDraft] = useState(blank), [newCompany, setNewCompany] = useState(false)
   const [notes, setNotes] = useState(''), [linkedCompany, setLinkedCompany] = useState(''), [cancelReason, setCancelReason] = useState(''), [deploymentDate, setDeploymentDate] = useState(today)
+  const [forwarding, setForwarding] = useState(false)
   const sequence = useRef(0), editor = useRef<HTMLDivElement>(null)
   const canPropose = role === 'coordinator' || role === 'dean'
   useEffect(() => {
@@ -40,7 +43,7 @@ export function DirectPlacementsPage({ role }: { role: UserRole }) {
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [studentSearch, companySearch, revision])
   async function select(id: string) {
-    const request = ++sequence.current; setError(''); setNotes(''); setCancelReason('')
+    const request = ++sequence.current; setForwarding(false); setError(''); setNotes(''); setCancelReason('')
     try { const data = await service.detail(id); if (request === sequence.current) { setSelected(data); setLinkedCompany(data.company_id ?? '') } }
     catch (e) { if (request === sequence.current) setError(e instanceof Error ? e.message : 'Could not load placement') }
   }
@@ -77,8 +80,10 @@ export function DirectPlacementsPage({ role }: { role: UserRole }) {
     </form></section>}
     <div className="dp-columns"><section className="dp-card"><h2>Current-term requests</h2>{loading ? <p className="dp-muted">Loading placements…</p> : !result?.items.length ? <div className="dp-empty"><Icon name="briefcase" size={28} /><p>No direct placements yet.</p><small>Normal student applications remain available.</small></div> : result.items.map(p => <button className={`dp-row${selected?.id === p.id ? ' dp-row--selected' : ''}`} key={p.id} onClick={() => void select(p.id)} disabled={busy}><strong>{p.student_name}</strong><span>{p.company_name} · {p.position}</span><small>{stage(p)}</small></button>)}<nav className="dp-pagination" aria-label="Direct placement pages"><button className="dp-secondary" disabled={page <= 1 || loading} onClick={() => setPage(v => v - 1)}>Previous</button><span>Page {page}</span><button className="dp-secondary" disabled={!result || page * result.limit >= result.total || loading} onClick={() => setPage(v => v + 1)}>Next</button></nav></section>
       <section className="dp-card dp-detail" aria-live="polite">{!selected ? <div className="dp-empty"><Icon name="users" size={30} /><h2>Select a proposal</h2><p>Review its partnership checks, acknowledgement and decision history here.</p></div> : <><span className="dp-stage">{stage(selected)}</span><h2>{selected.student_name}</h2><p className="dp-muted">{selected.student_number ?? 'No student number'} · {selected.company_name}</p><h3>{selected.position}</h3><p className="dp-reason">{selected.reason}</p>{(selected.contact_person || selected.contact_email) && <p className="dp-muted">Business contact: {selected.contact_person} {selected.contact_email}</p>}
-        <div className="dp-checks">{[{ label: 'Partnership cleared', passed: selected.partnership_ready }, { label: 'Student acknowledged', passed: selected.student_decision === 'acknowledged' }, { label: 'Company accepted', passed: selected.application_status === 'accepted' }, { label: 'Official deployment', passed: !!started }].map(check => <div key={check.label}><span className={check.passed ? 'dp-check dp-check--passed' : 'dp-check'}><Icon name={check.passed ? 'check' : 'clock'} size={15} /></span><span>{check.label}</span></div>)}</div>
+        <div className="dp-checks">{[{ label: 'Partnership cleared', passed: selected.partnership_ready }, { label: 'Student acknowledged', passed: selected.student_decision === 'acknowledged' }, { label: 'Endorsement content reviewed', passed: selected.endorsement.ready }, { label: 'Company accepted', passed: selected.application_status === 'accepted' }, { label: 'Official deployment', passed: !!started }].map(check => <div key={check.label}><span className={check.passed ? 'dp-check dp-check--passed' : 'dp-check'}><Icon name={check.passed ? 'check' : 'clock'} size={15} /></span><span>{check.label}</span></div>)}</div>
         {!selected.coordinator_ready && active && <p className="dp-error">Coordinator assignment or designation needs reconciliation before this proposal can proceed.</p>}
+        {active && !selected.application_id && <p className="dp-info">Endorsement letter: {human(selected.endorsement.status)}. The student uploads the school-issued letter in mobile. A coordinator must review the content under Document review before it can be forwarded. Tesseract extracts text; signatures are not authenticated.</p>}
+        {role === 'coordinator' && active && !selected.application_id && <section className="dp-action"><button type="button" className="dp-primary" disabled={busy || !selected.coordinator_ready || !selected.partnership_ready || selected.student_decision !== 'acknowledged' || !selected.endorsement.ready} onClick={() => setForwarding(true)}>Review forwarding</button>{forwarding && <div><h3>Forward placement to company?</h3><p>{selected.student_name} → {selected.company_name} · {selected.position}</p><p>Check that the reviewed endorsement letter identifies this student and company. Content review does not authenticate signatures. Company acceptance and official deployment remain separate.</p><button type="button" className="dp-secondary" disabled={busy} onClick={() => setForwarding(false)}>Cancel</button><button type="button" className="dp-primary" disabled={busy} onClick={() => void act(() => service.release(selected.id), 'Application endorsed and forwarded to the company.')}>Confirm forward to company</button></div>}</section>}
         {!selected.partnership_ready && active && <p className="dp-info">Partnership review is pending or needs revalidation. No deployment or clock-in is authorized by this proposal.</p>}
         {selected.partnership_notes && <p className="dp-info"><strong>Career Center notes</strong><br />{selected.partnership_notes}</p>}
         <details className="dp-moa"><summary>MOA readiness checks</summary>{selected.moa.checks.map(check => <p key={check.label}><Icon name={check.passed ? 'check' : 'clock'} size={14} />{check.label}</p>)}</details>

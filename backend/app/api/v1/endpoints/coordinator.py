@@ -28,6 +28,8 @@ from app.models.journal import Journal, JournalStatus
 from app.models.user import User, UserRole
 from app.services.notification_service import NotificationService
 
+from app.services.endorsement_service import endorsement_state
+
 router = APIRouter()
 
 REQUIRED_DOCUMENT_TYPES = (
@@ -729,7 +731,7 @@ async def get_student_dtr_photo(
 # ============================================================
 
 class ApplicationReviewInput(BaseModel):
-    status: Literal["reviewing", "interview", "accepted", "rejected"]
+    status: Literal["reviewing", "endorsed", "rejected"]
 
 
 class RecordReviewInput(BaseModel):
@@ -798,7 +800,8 @@ async def get_review_queue(
             Company,
             Company.id == Application.company_id,
         )
-        .filter(Application.student_id.in_(ids))
+        .filter(Application.student_id.in_(ids),
+                Application.academic_year == _current_term()[0], Application.semester == _current_term()[1])
         .order_by(Application.applied_date.desc())
         .limit(limit)
         .all()
@@ -838,6 +841,7 @@ async def get_review_queue(
                 "position": app.position,
                 "status": app.status.value,
                 "applied_date": app.applied_date,
+                "endorsement": endorsement_state(db, app.student_id, app.academic_year, app.semester),
             }
             for app, company_name in app_rows
         ],
@@ -887,64 +891,13 @@ async def review_application(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("coordinator")),
 ):
-    app = db.query(Application).filter(
-        Application.id == application_id
-    ).first()
-
-    if app is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Application not found",
-        )
-
-    require_assigned_student(
-        db,
-        current_user,
-        app.student_id,
-        mode="write",
-    )
-    _reject_ambiguous_record_write(db, app.student_id)
-
-    if app.status not in (
-        ApplicationStatus.PENDING,
-        ApplicationStatus.REVIEWING,
-        ApplicationStatus.INTERVIEW,
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="This application can no longer be reviewed",
-        )
-
-    old_status = app.status
-    app.status = ApplicationStatus(review.status)
-    app.updated_date = func.now()
-
-    db.commit()
-    db.refresh(app)
-
-    if app.status != old_status:
-        company = db.query(Company).filter(
-            Company.id == app.company_id
-        ).first()
-
-        _notify_safely(
-            lambda: NotificationService.create_application_notification(
-                db=db,
-                user_id=app.student_id,
-                application_id=app.id,
-                status=app.status.value,
-                company_name=(
-                    company.name
-                    if company
-                    else "the company"
-                ),
-            )
-        )
-
-    return {
-        "id": app.id,
-        "status": app.status.value,
-    }
+    # Share the canonical transition/term/assignment/document gates.
+    # Coordinator endorsement never substitutes for company acceptance.
+    from app.api.v1.endpoints.applications import update_application_status
+    from app.schemas.application import ApplicationUpdate
+    result = await update_application_status(application_id,
+        ApplicationUpdate(status=review.status), db=db, current_user=current_user)
+    return {"id": result.id, "status": result.status}
 
 
 @router.put("/review-queue/dtrs/{dtr_id}")

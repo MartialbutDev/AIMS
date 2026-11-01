@@ -640,9 +640,11 @@ async def update_application_status(
                 ApplicationStatus.PENDING: {
                     ApplicationStatus.REVIEWING,
                     ApplicationStatus.ENDORSED,
+                    ApplicationStatus.REJECTED,
                 },
                 ApplicationStatus.REVIEWING: {
                     ApplicationStatus.ENDORSED,
+                    ApplicationStatus.REJECTED,
                 },
             }
 
@@ -655,6 +657,8 @@ async def update_application_status(
                 )
 
             if requested_status == ApplicationStatus.ENDORSED:
+                from app.services.endorsement_service import require_endorsement
+                require_endorsement(db, application.student_id, application.academic_year, application.semester)
                 application.endorsed_by = current_user.id
                 application.endorsed_at = datetime.utcnow()
 

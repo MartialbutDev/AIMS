@@ -1,5 +1,6 @@
 import { apiRequest } from './apiClient'
 export interface DirectPlacement {
+  endorsement: { ready: boolean; status: string; document_id: string | null; message: string };
   id: string; student_id: string; student_name: string; student_number: string | null; coordinator_id: string;
   academic_year: string; semester: string; company_id: string | null; company_name: string;
   contact_person: string | null; contact_email: string | null; position: string; reason: string;
@@ -22,6 +23,7 @@ export interface DirectProposal {
 }
 const root = '/api/v1/direct-placements'
 export const directPlacementService = {
+  release: (id: string) => apiRequest<DirectPlacement>(`${root}/${encodeURIComponent(id)}/release`, { method: 'POST' }),
   list: (page = 1, signal?: AbortSignal) => apiRequest<{ items: DirectPlacement[]; total: number; page: number; limit: number }>(`${root}?page=${page}`, { signal }),
   detail: (id: string) => apiRequest<DirectPlacement>(`${root}/${encodeURIComponent(id)}`),
   options: (studentSearch = '', companySearch = '', signal?: AbortSignal) => apiRequest<PlacementOptions>(`${root}/options?student_search=${encodeURIComponent(studentSearch)}&company_search=${encodeURIComponent(companySearch)}`, { signal }),

@@ -216,6 +216,7 @@ export async function getCoordinatorStudentFile(
 // ============================================================
 
 export interface CoordinatorReviewApplication {
+  endorsement: { ready: boolean; status: string; document_id: string | null; message: string }
   id: string
   student_id: string
   student_name: string
@@ -257,8 +258,7 @@ export interface CoordinatorReviewQueue {
 
 export type ApplicationReviewStatus =
   | 'reviewing'
-  | 'interview'
-  | 'accepted'
+  | 'endorsed'
   | 'rejected'
 
 export type RecordReviewStatus =

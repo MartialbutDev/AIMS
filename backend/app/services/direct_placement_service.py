@@ -15,6 +15,7 @@ from app.models.direct_placement import DirectPlacement as Placement, DirectPlac
 from app.models.internship_deployment import InternshipDeployment, DeploymentStatus
 from app.models.notification import Notification, NotificationType
 from app.models.user import User, UserRole
+from app.services.endorsement_service import endorsement_state
 
 ACTIVE = ('pending', 'released')
 TERMINAL_APPLICATIONS = (ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN)
@@ -110,6 +111,8 @@ def require_no_direct_conflict(db, student_id, year, semester, application_id=No
 def release_application(db, placement, actor_id):
     if placement.application_id or placement.status not in ACTIVE: return
     if placement.student_decision != 'acknowledged' or not partnership_ready(db, placement): return
+    from app.services.endorsement_service import endorsement_state
+    if not endorsement_state(db, placement.student_id, placement.academic_year, placement.semester)['ready']: return
     if not assigned_coordinator_ready(db, placement):
         raise HTTPException(409, 'Coordinator assignment changed. Cancel and recreate this proposal under the current assignment.')
     existing = db.query(Application.id).filter(Application.student_id == placement.student_id,
@@ -160,7 +163,8 @@ def serialize(db, placement, actor, history=False):
     result.update(student_name=f'{student.first_name} {student.last_name}', student_number=student.student_id,
         created_at=placement.created_at.replace(tzinfo=timezone.utc), application_status=application.status.value if application else None,
         partnership_ready=partnership_ready(db, placement), moa=moa_state(company),
-        coordinator_ready=assigned_coordinator_ready(db, placement), deployment=None)
+        coordinator_ready=assigned_coordinator_ready(db, placement), deployment=None,
+        endorsement=endorsement_state(db, placement.student_id, placement.academic_year, placement.semester))
     if deployment:
         result['deployment'] = {'id':deployment.id, 'status':deployment.status.value}
         if actor.role in (UserRole.COORDINATOR,UserRole.STUDENT):
