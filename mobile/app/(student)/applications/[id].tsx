@@ -5,7 +5,6 @@ import { StatusBar } from "expo-status-bar";
 import { useState, useEffect } from "react";
 import {
   ActivityIndicator,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import api from "../../../src/services/api";
@@ -114,7 +114,7 @@ export default function ApplicationDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading application...</Text>
@@ -125,7 +125,7 @@ export default function ApplicationDetailScreen() {
 
   if (!application) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView edges={['bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centerContent}>
           <Ionicons name="document-text-outline" size={64} color={colors.border} />
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>Application not found</Text>
@@ -140,7 +140,7 @@ export default function ApplicationDetailScreen() {
   const statusColor = getStatusColor(application.status);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
       <View style={styles.header}>

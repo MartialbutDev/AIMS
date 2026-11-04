@@ -314,6 +314,7 @@ export default function StudentLayout() {
         style={[
           styles.content,
           {
+            // The student layout owns the top inset; child screens must not add it again.
             paddingTop: insets.top,
             backgroundColor: colors.background,
           },

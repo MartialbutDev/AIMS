@@ -23,8 +23,8 @@ export default function AppSettingsScreen() {
     finally { setClearing(false); }
   }
   const link = (label: string, action: () => void) => <TouchableOpacity accessibilityRole="button" onPress={action} style={{ paddingVertical: 12 }}><Text style={{ color: colors.accent, fontWeight: '700' }}>{label}</Text></TouchableOpacity>;
-  return <SafeAreaView edges={['top','bottom']} style={{ flex: 1, backgroundColor: colors.background }}>
-    <View style={{ padding: 18, flexDirection: 'row', alignItems: 'center', gap: 18 }}>{link('Back', () => router.back())}<Text style={{ ...text, fontWeight: '800', fontSize: 23 }}>App settings</Text></View>
+  return <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ paddingHorizontal: 20, paddingTop: 0, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 18 }}>{link('Back', () => router.back())}<Text style={{ ...text, fontWeight: '800', fontSize: 23 }}>App settings</Text></View>
     <ScrollView contentContainerStyle={{ padding: 18, gap: 18 }}>
       <View style={card}><Text style={{ ...text, fontWeight: '700', fontSize: 18 }}>Language</Text><Text style={text}>English</Text></View>
       <View style={card}><Text style={{ ...text, fontWeight: '700', fontSize: 18 }}>Temporary files</Text><Text style={muted}>Remove cached images and downloaded temporary files from this phone. Files can be downloaded again when needed.</Text>

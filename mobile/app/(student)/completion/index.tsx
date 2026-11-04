@@ -78,7 +78,7 @@ export default function CompletionScreen() {
     finally { if (active.current) setBusy(false) }
   }
 
-  return <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+  return <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]} edges={['bottom']}>
     <View style={styles.header}><TouchableOpacity accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={24} color={colors.textPrimary} /></TouchableOpacity><View><Text style={[styles.kicker, { color: colors.accent }]}>CITC · INTERNSHIP JOURNEY</Text><Text style={[styles.title, text]}>Completion & archive</Text></View></View>
     <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => { if (!busy) void load() }} tintColor={colors.accent} />} keyboardShouldPersistTaps="handled">
       <Text style={[styles.paragraph, muted]}>Request completion after your requirements are reviewed. Company confirmation comes next, followed by your coordinator’s approval and grade release.</Text>

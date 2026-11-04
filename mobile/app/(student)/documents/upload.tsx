@@ -6,7 +6,6 @@ import { useState, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +15,7 @@ import {
   Image,
   Animated,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { useDocumentPicker } from "../../../src/hooks/useDocumentPicker";
@@ -395,7 +395,7 @@ export default function UploadDocumentScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView edges={['bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
 
       <View style={styles.header}>

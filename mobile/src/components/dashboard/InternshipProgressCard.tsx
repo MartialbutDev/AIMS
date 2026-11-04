@@ -2,7 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { MotiView } from "moti";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Animated from "react-native-reanimated";
 
 import { useTheme } from "../../context/ThemeContext";
@@ -19,6 +19,7 @@ interface InternshipProgressCardProps {
   academicYear?: string | null;
   semester?: string | null;
   deploymentDate?: string | null;
+  onViewCompletion?: () => void;
 }
 
 const STATUS_LABELS: Record<DeploymentStatus, string> = {
@@ -37,6 +38,7 @@ export default function InternshipProgressCard({
   academicYear,
   semester,
   deploymentDate,
+  onViewCompletion,
 }: InternshipProgressCardProps) {
   const { colors, isDark } = useTheme();
 
@@ -306,6 +308,21 @@ export default function InternshipProgressCard({
             )}
           </View>
         )}
+        {onViewCompletion && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="View internship completion and archive"
+            onPress={onViewCompletion}
+            activeOpacity={0.7}
+            style={[styles.completionShortcut, { borderTopColor: colors.border }]}
+          >
+            <Ionicons name="ribbon-outline" size={18} color={accentColor} />
+            <Text style={[styles.completionShortcutText, { color: accentColor }]}>
+              View completion
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={accentColor} />
+          </TouchableOpacity>
+        )}
       </LinearGradient>
     </MotiView>
   );
@@ -412,6 +429,20 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 14,
     fontWeight: "700",
+  },
+  completionShortcut: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 44,
+    borderTopWidth: 1,
+    marginTop: 14,
+    paddingTop: 10,
+  },
+  completionShortcutText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
   },
   metaText: {
     fontSize: 12,

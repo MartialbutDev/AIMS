@@ -4,7 +4,10 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState, useEffect } from "react";
 import {
+  ActivityIndicator,
   FlatList,
+  Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,6 +16,7 @@ import {
   View,
   Alert,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 import * as Linking from "expo-linking";
 
@@ -78,7 +82,10 @@ const parseDate = (value?: string | null): number => {
 export default function DocumentsScreen() {
   const { colors, isDark } = useTheme();
   const { handleScroll } = useAutoHideTab();
+  const insets = useSafeAreaInsets();
+  const [actionDocument, setActionDocument] = useState<Document | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
@@ -134,6 +141,28 @@ export default function DocumentsScreen() {
 
   const getTypeIcon = (type: string): keyof typeof Ionicons.glyphMap => {
     return TYPE_ICONS[type.toLowerCase()] || "document-text-outline";
+  };
+
+  const deleteDocument = async (document: Document) => {
+    setDeletingId(document.id);
+    try {
+      await api.delete(`/documents/${encodeURIComponent(document.id)}`);
+      setDocuments((current) => current.filter((item) => item.id !== document.id));
+      Alert.alert("Document deleted", "Your upload has been removed.");
+    } catch (error) {
+      const detail = (error as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+      Alert.alert("Could not delete document", typeof detail === "string"
+        ? detail : "Check your connection and try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const confirmDelete = (document: Document) => {
+    Alert.alert("Delete document?", `Remove ${document.original_filename || document.type.replace(/_/g, " ")}? This cannot be undone. Documents already used or reviewed must be retained.`, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => void deleteDocument(document) },
+    ]);
   };
 
   const handlePreview = async (document: Document) => {
@@ -234,11 +263,15 @@ export default function DocumentsScreen() {
 
         <View style={styles.documentActions}>
           <TouchableOpacity
-            style={[styles.previewButton, { borderColor: colors.border }]}
-            onPress={() => handlePreview(item)}
-            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Options for ${item.original_filename || item.type.replace(/_/g, " ")}`}
+            accessibilityState={{ disabled: deletingId !== null, expanded: actionDocument?.id === item.id, busy: deletingId === item.id }}
+            disabled={deletingId !== null}
+            style={[styles.optionsButton, { opacity: deletingId !== null ? 0.5 : 1 }]}
+            onPress={(event) => { event.stopPropagation(); setActionDocument(item); }}
           >
-            <Ionicons name="eye-outline" size={20} color={colors.accent} />
+            {deletingId === item.id ? <ActivityIndicator size="small" color={colors.accent} />
+              : <Ionicons name="ellipsis-vertical" size={22} color={colors.textSecondary} />}
           </TouchableOpacity>
 
           <View
@@ -424,6 +457,76 @@ export default function DocumentsScreen() {
         }
         ListFooterComponent={<View style={styles.listFooter} />}
       />
+
+      <Modal
+        visible={actionDocument !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionDocument(null)}
+      >
+        <View style={styles.menuOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel="Close document options"
+            onPress={() => setActionDocument(null)}
+          />
+          <View
+            accessibilityViewIsModal
+            style={[styles.menuSheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}
+          >
+            <ScrollView bounces={false}>
+              <View style={[styles.menuHeader, { borderBottomColor: colors.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text accessibilityRole="header" style={[styles.menuTitle, { color: colors.textPrimary }]}>Document options</Text>
+                  <Text numberOfLines={2} style={[styles.menuFilename, { color: colors.textSecondary }]}>
+                    {actionDocument?.original_filename || actionDocument?.type.replace(/_/g, " ")}
+                  </Text>
+                </View>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close document options" style={styles.optionsButton} onPress={() => setActionDocument(null)}>
+                  <Ionicons name="close" size={22} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.menuOption}
+                onPress={() => {
+                  const document = actionDocument;
+                  setActionDocument(null);
+                  if (document) router.push(`/(student)/documents/${document.id}` as any);
+                }}
+              >
+                <Ionicons name="information-circle-outline" size={22} color={colors.accent} />
+                <Text style={[styles.menuOptionText, { color: colors.textPrimary }]}>View details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={styles.menuOption}
+                onPress={() => {
+                  const document = actionDocument;
+                  setActionDocument(null);
+                  if (document) void handlePreview(document);
+                }}
+              >
+                <Ionicons name="eye-outline" size={22} color={colors.accent} />
+                <Text style={[styles.menuOptionText, { color: colors.textPrimary }]}>View document</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={[styles.menuOption, { borderTopWidth: 1, borderTopColor: colors.border }]}
+                onPress={() => {
+                  const document = actionDocument;
+                  setActionDocument(null);
+                  if (document) confirmDelete(document);
+                }}
+              >
+                <Ionicons name="trash-outline" size={22} color={colors.error} />
+                <Text style={[styles.menuOptionText, { color: colors.error }]}>Delete document</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -505,15 +608,40 @@ const styles = StyleSheet.create({
   documentDescription: { fontSize: 13, marginTop: 2 },
   documentDate: { fontSize: 11, marginTop: 2, opacity: 0.7 },
   documentActions: { alignItems: "flex-end", gap: 4 },
-  previewButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1,
+  optionsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 4,
   },
+  menuOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  menuSheet: {
+    width: "100%",
+    maxWidth: 560,
+    maxHeight: "80%",
+    alignSelf: "center",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  menuHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+  },
+  menuTitle: { fontSize: 17, fontWeight: "700" },
+  menuFilename: { fontSize: 12, lineHeight: 18, marginTop: 4 },
+  menuOption: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, paddingVertical: 14 },
+  menuOptionText: { flex: 1, fontSize: 15, fontWeight: "500" },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",

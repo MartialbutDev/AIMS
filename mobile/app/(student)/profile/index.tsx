@@ -727,7 +727,6 @@ export default function ProfileScreen() {
               "Role",
               profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
             )}
-            {renderReadOnlyField("Verified", profile.is_verified ? "Yes" : "No")}
             {renderReadOnlyField(
               "Joined",
               new Date(profile.created_at).toLocaleDateString()
@@ -736,6 +735,32 @@ export default function ProfileScreen() {
         </View>
 
         {renderInternshipInformation()}
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Internship Records</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Completion and archive"
+              onPress={() => router.push("/(student)/completion")}
+              activeOpacity={0.7}
+              style={styles.menuItem}
+            >
+              <View style={[styles.menuItemLeft, { flex: 1 }]}>
+                <Ionicons name="ribbon-outline" size={22} color={colors.accent} />
+                <View style={{ flex: 1, marginLeft: 12, marginRight: 12 }}>
+                  <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "600" }}>
+                    Completion &amp; Archive
+                  </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 4 }}>
+                    Checklist, completion requests, released grades and past internships.
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* ✅ Documents Section */}
         {renderDocumentsSection()}

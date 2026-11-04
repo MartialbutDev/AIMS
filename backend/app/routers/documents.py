@@ -4,6 +4,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 import mimetypes
+import logging
 from typing import Literal, Optional
 
 from fastapi import (
@@ -18,6 +19,8 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -29,7 +32,9 @@ from app.core.assignment_access import (
     ensure_coordinator_student_access,
     get_current_academic_term,
 )
-from app.models.user import User
+from app.models.user import User, UserRole
+from app.models.application import Application
+from app.models.internship_deployment import InternshipDeployment, DeploymentStatus
 from app.models.document import Document
 from app.models.document_review import DocumentReview
 from app.models.coordinator_assignment import (
@@ -719,3 +724,60 @@ async def get_document_review_history(
         _review_payload(review)
         for review in reviews
     ]
+
+
+@documents_router.delete("/{document_id}", status_code=204)
+def delete_document(
+    document_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete an unused student upload; retain application and internship evidence."""
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Only students can delete their own uploads")
+    try:
+        document = db.query(Document).filter(
+            Document.id == document_id, Document.uploaded_by == current_user.id,
+        ).with_for_update().first()
+        if document is None:
+            raise HTTPException(status_code=404, detail="Document not found")
+        term = get_current_academic_term()
+        if (document.academic_year, document.semester) != term:
+            raise HTTPException(status_code=409, detail="Historical or unclassified documents are retained. Contact your coordinator.")
+        if document.reviewed_by or document.reviewed_at or db.query(DocumentReview.id).filter(
+            DocumentReview.document_id == document.id,
+        ).first():
+            raise HTTPException(status_code=409, detail="This document has a coordinator review and must be retained. Upload a replacement or contact your coordinator.")
+        if db.query(Application.id).filter(or_(
+            Application.resume_id == document.id, Application.application_letter_id == document.id,
+        )).first():
+            raise HTTPException(status_code=409, detail="This document is linked to an application and must be retained. You can upload a new version.")
+        if db.query(InternshipDeployment.id).filter(
+            InternshipDeployment.student_id == current_user.id,
+            InternshipDeployment.academic_year == document.academic_year,
+            InternshipDeployment.semester == document.semester,
+            InternshipDeployment.status.in_([DeploymentStatus.DEPLOYED, DeploymentStatus.COMPLETED]),
+        ).first():
+            raise HTTPException(status_code=409, detail="Documents for a deployed or completed internship must be retained. Contact your coordinator.")
+        # Only remove files inside the uploads directory; never trust a stored path.
+        uploads = (Path(settings.ASSET_DIR) / "uploads").resolve()
+        path = (Path(settings.ASSET_DIR) / document.file_path).resolve()
+        shared = db.query(Document.id).filter(
+            Document.id != document.id, Document.file_path == document.file_path,
+        ).first()
+        db.delete(document)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This document is in use and cannot be deleted.") from exc
+    except Exception:
+        db.rollback()
+        raise
+    if not shared and path.is_relative_to(uploads) and path != uploads:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logging.getLogger(__name__).exception("Unable to clean up deleted document file")
+    return None
+
+

@@ -40,8 +40,8 @@ export default function PrivacySecurityScreen() {
     finally { setBusy(false); }
   }
   const link = (label: string, action: () => void, disabled = false) => <TouchableOpacity accessibilityRole="button" disabled={disabled} onPress={action} style={{ paddingVertical: 12, opacity: disabled ? .45 : 1 }}><Text style={{ color: colors.accent, fontWeight: '700' }}>{label}</Text></TouchableOpacity>;
-  return <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: colors.background }}>
-    <View style={{ flexDirection: 'row', alignItems: 'center', padding: 18, gap: 12 }}>{link('Back', () => router.back())}<Text style={{ ...text, fontWeight: '800', fontSize: 23 }}>Privacy & security</Text></View>
+  return <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 0, paddingBottom: 12, gap: 12 }}>{link('Back', () => router.back())}<Text style={{ ...text, fontWeight: '800', fontSize: 23 }}>Privacy & security</Text></View>
     <ScrollView contentContainerStyle={{ padding: 18, gap: 18 }}>
       <View style={card}><Ionicons name="lock-closed-outline" size={28} color={colors.accent} /><Text style={{ ...text, fontSize: 19, fontWeight: '700' }}>Your account</Text><Text style={muted}>Manage your password, phone alerts and active sign-ins.</Text>
         {link('Change password', () => router.push('/(student)/profile/change-password'))}
