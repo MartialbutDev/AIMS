@@ -75,6 +75,21 @@ class EndorsementRequiredTests(unittest.TestCase):
         self.assertEqual(result.status_code,200,result.text)
         self.assertEqual(self.db.query(InternshipDeployment).one().status.value,'pre_deployment')
 
+    def test_applicant_email_requires_forwarding_and_company_access(self):
+        self.application()
+        self.f.as_user('hte',UserRole.HTE_SUPERVISOR)
+        self.assertEqual(self.client.get('/applications/hte').json()['items'],[])
+        self.assertEqual(self.client.get('/applications/normal').status_code,403)
+        self.f.as_user('c1',UserRole.COORDINATOR)
+        self.letter();self.review_letter();self.assertEqual(self.forward().status_code,200)
+        self.f.as_user('hte',UserRole.HTE_SUPERVISOR)
+        row=self.client.get('/applications/hte').json()['items'][0]
+        self.assertEqual(row['student_email'],'s1@example.invalid')
+        self.assertEqual(self.client.get('/applications/normal').json()['student_email'],'s1@example.invalid')
+        self.f.as_user('hte2',UserRole.HTE_SUPERVISOR)
+        self.assertEqual(self.client.get('/applications/hte').json()['items'],[])
+        self.assertEqual(self.client.get('/applications/normal').status_code,403)
+
     def test_pending_rejected_other_student_and_term_letters_do_not_qualify(self):
         self.application();doc=self.letter()
         for changes in [{'verification_status':'pending'},{'verification_status':'rejected'},
@@ -93,11 +108,11 @@ class EndorsementRequiredTests(unittest.TestCase):
         self.assertEqual(self.review_letter().status_code,200)
         self.assertEqual(self.forward(False).status_code,200)
 
-    def test_newer_pending_replacement_blocks_older_verified_letter(self):
+    def test_pending_replacement_preserves_current_reviewed_endorsement(self):
         self.application();self.letter();self.review_letter()
         self.letter(id='new-letter',created_at=datetime.now(timezone.utc).replace(tzinfo=None)+timedelta(seconds=10))
-        self.assertEqual(self.forward().status_code,409)
-        self.assertEqual(endorsement_state(self.db,'s1','2026-2027','1')['document_id'],'new-letter')
+        self.assertEqual(self.forward().status_code,200)
+        self.assertEqual(endorsement_state(self.db,'s1','2026-2027','1')['document_id'],'letter')
 
     def test_ocr_text_and_confidence_never_auto_verify_endorsement(self):
         result=DocumentService._determine_status('endorsement_letter',{'is_valid':True,'confidence':100},'signed university endorsement student company '*20,

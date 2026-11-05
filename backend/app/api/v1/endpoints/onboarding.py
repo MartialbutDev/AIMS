@@ -6,14 +6,12 @@ documents. Coordinator assignment requires a administrator-approved designation.
 """
 
 import asyncio
-import io
 import uuid
 
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pymupdf as fitz
-import pytesseract
 
 from fastapi import (
     APIRouter,
@@ -57,6 +55,7 @@ from app.services.cor_faculty_extraction import (
 )
 
 from app.services.ocr_service import OCRService
+from app.services.document_identification import inspect_upload
 
 from app.services.onboarding_validation import (
     validate_cor,
@@ -482,43 +481,11 @@ async def _save_private_upload(
         await file.close()
 
 
-def _extract_text(
-    path: Path,
-    media_type: str,
-) -> str:
-
-    if media_type != "application/pdf":
-        return OCRService.extract_text_from_image(
-            str(path)
-        )
-
-    chunks: list[str] = []
-
-    with fitz.open(path) as pdf:
-        for page in pdf:
-            text = page.get_text(
-                "text"
-            ).strip()
-
-            if len(text) < 40:
-                pixmap = page.get_pixmap(
-                    matrix=fitz.Matrix(2, 2),
-                    alpha=False,
-                )
-
-                with Image.open(
-                    io.BytesIO(
-                        pixmap.tobytes("png")
-                    )
-                ) as image:
-                    text = pytesseract.image_to_string(
-                        image.convert("RGB"),
-                        timeout=20,
-                    ).strip()
-
-            chunks.append(text)
-
-    return "\n".join(chunks).strip()
+def _extract_text(path: Path, media_type: str) -> str:
+    """Use the same per-page scanned-PDF fallback as internship uploads."""
+    return OCRService.extract_text(
+        str(path), "pdf" if media_type == "application/pdf" else "image"
+    )
 
 
 def _is_test_fixture(
@@ -604,21 +571,14 @@ async def _upload(
     )
 
     try:
-        try:
-            extracted = await asyncio.to_thread(
-                _extract_text,
-                path,
-                media_type,
-            )
-
-            ocr_error = None
-
-        except Exception:
-            extracted = ""
-            ocr_error = (
-                "Text extraction was unsuccessful; "
-                "manual review required"
-            )
+        inspection = await asyncio.to_thread(
+            inspect_upload, str(path),
+            'pdf' if media_type == 'application/pdf' else 'image', kind,
+        )
+        extracted = inspection['text']
+        ocr_error = inspection['ocr_error']
+        if inspection['identification']['status'] == 'mismatch':
+            raise HTTPException(422, 'Document rejected: ' + inspection['identification']['message'])
 
         if _is_test_fixture(extracted):
             raise HTTPException(
@@ -671,6 +631,12 @@ async def _upload(
                 layout_details=layout,
             )
         )
+
+        validation['identification'] = inspection['identification']
+        validation['full_content_checked'] = inspection['full_content_checked']
+        if inspection['identification']['status'] in {'uncertain', 'ambiguous'} and validation.get('automatic_result') == 'matched':
+            validation['automatic_result'] = 'needs_review'
+            validation.setdefault('reasons', []).append(inspection['identification']['message'])
 
         if ocr_error:
             validation["automatic_result"] = (

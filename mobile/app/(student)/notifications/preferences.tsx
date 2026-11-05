@@ -1,29 +1,11 @@
-import { communicationService, DeliveryStatus } from '../../../src/services/communication.service';
-// app/(student)/notifications/preferences.tsx
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Switch,
-} from "react-native";
-
-import { useTheme } from "../../../src/context/ThemeContext";
-import {
-  notificationSettingsService,
-  NotificationSettings,
-} from "../../../src/services/notification-settings.service";
-
-import type { UpdateNotificationSettingsData } from "../../../src/services/notification-settings.service";
-import { registerPushDevice, unregisterPushDevice } from "../../../src/services/push.service";
-
+import { useState, useEffect } from 'react';
+import { ActivityIndicator, Alert, Switch, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../../src/context/ThemeContext';
+import { communicationService, type DeliveryStatus } from '../../../src/services/communication.service';
+import { notificationSettingsService, type NotificationSettings, type UpdateNotificationSettingsData } from '../../../src/services/notification-settings.service';
+import { registerPushDevice, unregisterPushDevice } from '../../../src/services/push.service';
+import { AccountPage, AccountHero, Panel, SectionLabel, ActionButton, ui } from '../../../src/components/account/AccountUI';
 interface SettingSection {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -128,7 +110,7 @@ function phoneRegistrationError(error: unknown): string {
 }
 
 export default function NotificationPreferencesScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [delivery, setDelivery] = useState<DeliveryStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -178,8 +160,6 @@ export default function NotificationPreferencesScreen() {
     }
   };
 
-  const handleReset = () => handleToggleAll(true);
-
   const handleToggleAll = (enabled: boolean) => {
     if (!settings) return;
 
@@ -215,321 +195,24 @@ export default function NotificationPreferencesScreen() {
     );
   };
 
-  const renderSettingItem = (
-    key: keyof NotificationSettings,
-    label: string,
-    description: string,
-    value: boolean
-  ) => (
-    <View key={key} style={[styles.settingItem, { borderBottomColor: colors.border }]}>
-      <View style={styles.settingInfo}>
-        <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>{label}</Text>
-        <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
-          {description}
-        </Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={(newValue) => handleToggle(key, newValue)}
-        trackColor={{ false: colors.border, true: colors.primary }}
-        thumbColor={value ? "#FFFFFF" : "#F4F3F4"}
-        disabled={saving}
-      />
-    </View>
-  );
 
-  const renderSection = (section: SettingSection) => {
-    if (!settings) return null;
-
-    const allEnabled = section.settings.every(
-      (s) => settings[s.key as keyof NotificationSettings] === true
-    );
-
-    return (
-      <View key={section.title} style={[styles.section, { backgroundColor: colors.card }]}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionHeaderLeft}>
-            <Ionicons name={section.icon} size={20} color={colors.accent} />
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              {section.title}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => {
-              section.settings.forEach((s) => {
-                handleToggle(s.key as keyof NotificationSettings, !allEnabled);
-              });
-            }}
-            disabled={saving}
-          >
-            <Text style={[styles.sectionToggleAll, { color: colors.accent }]}>
-              {allEnabled ? "Disable All" : "Enable All"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        {section.settings.map((s) =>
-          renderSettingItem(
-            s.key as keyof NotificationSettings,
-            s.label,
-            s.description,
-            settings[s.key as keyof NotificationSettings] as boolean
-          )
-        )}
-      </View>
-    );
-  };
-
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Loading settings...
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
-
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-          Notification Preferences
-        </Text>
-        <TouchableOpacity onPress={handleReset} style={styles.resetButton}>
-          <Ionicons name="refresh-outline" size={22} color={colors.accent} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-        {/* Push Notifications Toggle */}
-        <View style={{backgroundColor: colors.card, padding: 20, borderRadius: 18, marginBottom: 18, gap: 12}}>
-          <Text style={{color: colors.textPrimary, fontSize: 18, fontWeight: '700'}}>Delivery status</Text>
-          <Text style={{color: colors.textSecondary, lineHeight: 22}}>Your activity inbox remains available. These settings control optional email and phone alerts.</Text>
-          <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.push_delivery_enabled ? 'Phone alerts are enabled.' : 'Phone alerts are not available yet.'} {delivery?.registered_devices ?? 0} registered devices.</Text>
-          <TouchableOpacity accessibilityRole="button" disabled={saving || !settings?.push_enabled} onPress={async () => {
-            setSaving(true);
-            try { Alert.alert('Phone notifications', await registerPushDevice()); setDelivery(await communicationService.delivery()); }
-            catch (error) { Alert.alert('Unable to connect phone', phoneRegistrationError(error)); }
-            finally { setSaving(false); }
-          }} style={{paddingVertical: 12, opacity: saving || !settings?.push_enabled ? .45 : 1}}><Text style={{color: colors.accent, fontWeight: '700'}}>Connect / reconnect this phone</Text></TouchableOpacity>
-          <Text style={{color: colors.textSecondary, lineHeight: 22}}>{delivery?.email_configured && delivery.email_delivery_enabled ? 'Email delivery enabled.' : 'Email alerts are not available yet.'} {delivery?.email_verified ? 'Email verified.' : 'Verify your email before receiving email alerts.'}</Text>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}><Text style={{color: colors.textPrimary}}>Send email updates</Text><Switch disabled={saving || !delivery || (!delivery.email_enabled && !(delivery.email_configured && delivery.email_delivery_enabled && delivery.email_verified))} value={delivery?.email_enabled ?? false} onValueChange={async value => { setSaving(true); try { await communicationService.email(value); setDelivery(await communicationService.delivery()); } catch { Alert.alert('Unable to save', 'Please retry your email preference.'); } finally { setSaving(false); } }} trackColor={{false: colors.border, true: colors.accent}} thumbColor="#ffffff" /></View>
-          <Text style={{color: colors.textTertiary, fontSize: 12}}>{delivery?.email.queued ?? 0} queued · {delivery?.email.smtp_accepted ?? 0} accepted by mail server · {delivery?.email.failed ?? 0} failed</Text>
-        </View>
-        <View style={[styles.pushSection, { backgroundColor: colors.card }]}>
-          <View style={styles.pushSectionLeft}>
-            <View style={[styles.pushIcon, { backgroundColor: `${colors.primary}15` }]}>
-              <Ionicons name="notifications" size={24} color={colors.accent} />
-            </View>
-            <View>
-              <Text style={[styles.pushLabel, { color: colors.textPrimary }]}>
-                Push Notifications
-              </Text>
-              <Text style={[styles.pushDescription, { color: colors.textSecondary }]}>
-                Enable or disable all push notifications
-              </Text>
-            </View>
-          </View>
-          <Switch
-            value={settings?.push_enabled ?? true}
-            onValueChange={(value) => handleToggle("push_enabled", value)}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor={settings?.push_enabled ? "#FFFFFF" : "#F4F3F4"}
-            disabled={saving}
-          />
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={[styles.quickAction, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => handleToggleAll(true)}
-            disabled={saving}
-          >
-            <Ionicons name="checkmark-circle-outline" size={20} color="#10B981" />
-            <Text style={[styles.quickActionText, { color: colors.textPrimary }]}>
-              Enable categories
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.quickAction, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => handleToggleAll(false)}
-            disabled={saving}
-          >
-            <Ionicons name="ban-outline" size={20} color="#EF4444" />
-            <Text style={[styles.quickActionText, { color: colors.textPrimary }]}>
-              Mute categories
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.quickAction, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={handleReset}
-            disabled={saving}
-          >
-            <Ionicons name="refresh-outline" size={20} color={colors.accent} />
-            <Text style={[styles.quickActionText, { color: colors.textPrimary }]}>
-              Reset categories
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Settings Sections */}
-        {SETTINGS_SECTIONS.map(renderSection)}
-
-        <View style={styles.footerSpacer} />
-      </ScrollView>
-    </View>
-  );
+  const toggle = (key: keyof NotificationSettings, label: string, description: string, value: boolean) => <View key={key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 66, paddingVertical: 8 }}>
+    <View style={{ flex: 1 }}><Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14, lineHeight: 21 }}>{label}</Text><Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 4 }}>{description}</Text></View>
+    <Switch accessibilityLabel={label} disabled={saving} value={value} onValueChange={v => void handleToggle(key, v)} trackColor={{ false: colors.border, true: colors.accent }} thumbColor="#FFFFFF" />
+  </View>;
+  return <AccountPage title="Notification preferences">
+    <AccountHero icon="notifications-outline" title="Updates that matter to you." description="Choose your alerts. Your in-app inbox stays available whenever you need it." label="KEEP IN THE LOOP" />
+    {loading ? <Panel><ActivityIndicator color={colors.accent} /><Text style={[ui.description, { color: colors.textSecondary }]}>Loading your preferences…</Text></Panel> : !settings ? <Panel><Text style={[ui.description, { color: colors.textSecondary }]}>Your preferences could not be loaded.</Text><ActionButton title="Try again" secondary onPress={() => void loadSettings()} /></Panel> : <>
+      <SectionLabel title="Delivery channels" />
+      <Panel>{toggle('push_enabled', 'Phone notifications', 'Receive alerts on your registered phone.', settings.push_enabled)}
+        <View style={{ backgroundColor: colors.surfaceSecondary, borderRadius: 12, padding: 12, gap: 5 }}><Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 12 }}>{delivery?.push_delivery_enabled ? 'Phone delivery available' : 'Phone delivery unavailable'}</Text><Text style={[ui.description, { color: colors.textSecondary }]}>{delivery?.registered_devices ?? 0} registered devices. Connect this phone after allowing notifications in Android settings.</Text></View>
+        <ActionButton title="Connect / reconnect this phone" secondary disabled={!settings.push_enabled || saving} onPress={async () => { setSaving(true); try { Alert.alert('Phone notifications', await registerPushDevice()); setDelivery(await communicationService.delivery()); } catch (error) { Alert.alert('Unable to connect phone', phoneRegistrationError(error)); } finally { setSaving(false); } }} />
+      </Panel>
+      <Panel><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><View style={{ flex: 1 }}><Text style={{ color: colors.textPrimary, fontWeight: '600', fontSize: 14 }}>Email updates</Text><Text style={[ui.description, { color: colors.textSecondary, marginTop: 4 }]}>{delivery?.email_configured && delivery.email_delivery_enabled ? (delivery.email_verified ? 'Send optional alerts to your account email.' : 'Email verification is required before email alerts can be enabled.') : 'Email alerts are currently unavailable. Phone alerts and your inbox are separate.'}</Text></View><Switch accessibilityLabel="Email updates" disabled={saving || !delivery || (!delivery.email_enabled && !(delivery.email_configured && delivery.email_delivery_enabled && delivery.email_verified))} value={delivery?.email_enabled ?? false} onValueChange={async value => { setSaving(true); try { await communicationService.email(value); setDelivery(await communicationService.delivery()); } catch { Alert.alert('Unable to save', 'Please retry your email preference.'); } finally { setSaving(false); } }} trackColor={{ false: colors.border, true: colors.accent }} thumbColor="#FFFFFF" /></View></Panel>
+      <SectionLabel title="Alert categories" hint="Choose the internship activities you want updates about." />
+      <View style={{ flexDirection: 'row', gap: 10 }}><View style={{ flex: 1 }}><ActionButton title="Enable all" secondary disabled={saving} onPress={() => handleToggleAll(true)} /></View><View style={{ flex: 1 }}><ActionButton title="Mute all" secondary disabled={saving} onPress={() => handleToggleAll(false)} /></View></View>
+      {SETTINGS_SECTIONS.map(section => <View key={section.title} style={{ gap: 10 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Ionicons name={section.icon} size={18} color={colors.accent} /><Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>{section.title}</Text></View><Panel>{section.settings.map((setting, index) => <View key={setting.key} style={index ? { borderTopWidth: 1, borderTopColor: colors.border } : undefined}>{toggle(setting.key, setting.label, setting.description, settings[setting.key] === true)}</View>)}</Panel></View>)}
+      {saving && <Text accessibilityLiveRegion="polite" style={[ui.description, { color: colors.textSecondary }]}>Saving your preferences…</Text>}
+    </>}
+  </AccountPage>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  centerContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 0,
-    paddingBottom: 12,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  resetButton: {
-    padding: 8,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
-  pushSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: "#000000",
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  pushSectionLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  pushIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  pushLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  pushDescription: {
-    fontSize: 12,
-  },
-  quickActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 16,
-  },
-  quickAction: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  quickActionText: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  section: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000000",
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  sectionHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  sectionToggleAll: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  settingItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  settingLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 2,
-  },
-  settingDescription: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  footerSpacer: {
-    height: 20,
-  },
-});

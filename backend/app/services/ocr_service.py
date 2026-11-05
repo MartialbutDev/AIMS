@@ -10,7 +10,7 @@ from pathlib import Path
 import pymupdf as fitz
 import pytesseract
 from fastapi import HTTPException, UploadFile
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from pytesseract import TesseractError
 
 from app.core.config import settings
@@ -71,27 +71,80 @@ class OCRService:
                 detail="Unable to save uploaded file",
             ) from exc
 
+    # Match the former onboarding fallback threshold and time limit.
+    MIN_PDF_TEXT_CHARS = 40
+    OCR_TIMEOUT_SECONDS = 20
+    MAX_RENDER_PIXELS = 8_000_000
+
+    @staticmethod
+    def extract_header(file_path: str, file_type: str) -> str:
+        """Read only the visual top 40% of page one, before content checks."""
+        if file_type == 'pdf':
+            with fitz.open(file_path) as document:
+                if document.needs_pass or not document.page_count:
+                    raise ValueError('Unreadable PDF header')
+                page = document[0]
+                # Text coordinates are unrotated; transform the visual header clip.
+                visual = page.rect
+                clip = fitz.Rect(visual.x0, visual.y0, visual.x1, visual.y0 + visual.height * 0.4)
+                text = page.get_text('text', clip=clip * page.derotation_matrix, sort=True).strip()
+                if len(text) >= OCRService.MIN_PDF_TEXT_CHARS:
+                    return text
+                area = clip.width * clip.height
+                if area <= 0:
+                    raise ValueError('Invalid PDF header dimensions')
+                scale = min(2.0, (OCRService.MAX_RENDER_PIXELS / area) ** 0.5)
+                pixmap = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip,
+                                         colorspace=fitz.csRGB, alpha=False)
+                with Image.frombytes('RGB', (pixmap.width, pixmap.height), pixmap.samples) as image:
+                    recognized = pytesseract.image_to_string(image, timeout=OCRService.OCR_TIMEOUT_SECONDS).strip()
+                return recognized or text
+        if file_type == 'image':
+            with Image.open(file_path) as source, ImageOps.exif_transpose(source) as oriented:
+                with oriented.crop((0, 0, oriented.width, max(1, int(oriented.height * 0.4)))) as crop:
+                    with crop.convert('RGB') as image:
+                        image.thumbnail((2800, 2800))
+                        return pytesseract.image_to_string(image, timeout=OCRService.OCR_TIMEOUT_SECONDS).strip()
+        raise ValueError('Unsupported header file type')
+
     @staticmethod
     def extract_text_from_pdf(pdf_path: str) -> str:
-        """Extract embedded text from a PDF using PyMuPDF."""
+        """Read embedded text, OCRing each scanned/sparse page when needed.
+
+        Extraction failures propagate so callers require manual review rather
+        than validating a partial document after a failed page.
+        """
         try:
-            logger.info("Extracting PDF text: %s", pdf_path)
             chunks: list[str] = []
-
             with fitz.open(pdf_path) as document:
-                for page_number, page in enumerate(document, start=1):
-                    page_text = page.get_text("text")
-                    if page_text.strip():
-                        chunks.append(f"--- Page {page_number} ---\n{page_text}")
-
-            text = "\n".join(chunks).strip()
-            logger.info("PDF text extracted: %d characters", len(text))
-            return text
-
-        except Exception:
-            logger.exception("PDF text extraction failed: %s", pdf_path)
-            # Preserve the previous service contract: failed extraction yields no text.
-            return ""
+                if document.needs_pass:
+                    raise ValueError("Password-protected PDF")
+                for page in document:
+                    text = page.get_text("text").strip()
+                    if len(text) < OCRService.MIN_PDF_TEXT_CHARS:
+                        area = page.rect.width * page.rect.height
+                        if area <= 0:
+                            raise ValueError("Invalid PDF page dimensions")
+                        # Render at 2x resolution, bounded for unusually large pages.
+                        scale = min(2.0, (OCRService.MAX_RENDER_PIXELS / area) ** 0.5)
+                        pixmap = page.get_pixmap(matrix=fitz.Matrix(scale, scale),
+                                                 colorspace=fitz.csRGB, alpha=False)
+                        with Image.frombytes("RGB", (pixmap.width, pixmap.height), pixmap.samples) as image:
+                            recognized = pytesseract.image_to_string(
+                                image, timeout=OCRService.OCR_TIMEOUT_SECONDS).strip()
+                        # Preserve short embedded text if a blank OCR result adds nothing.
+                        text = recognized or text
+                    if text:
+                        chunks.append(text)
+            return "\n".join(chunks).strip()
+        except HTTPException:
+            raise
+        except (TesseractError, pytesseract.TesseractNotFoundError, RuntimeError) as exc:
+            logger.exception("PDF OCR failed")
+            raise HTTPException(500, "PDF OCR is unavailable, timed out or failed; manual review required") from exc
+        except Exception as exc:
+            logger.exception("PDF text extraction failed")
+            raise HTTPException(400, "PDF text could not be extracted; manual review required") from exc
 
     @staticmethod
     def extract_text_from_image(image_path: str) -> str:
@@ -105,7 +158,7 @@ class OCRService:
             with Image.open(image_path) as source:
                 image = source.convert("RGB")
                 try:
-                    text = pytesseract.image_to_string(image)
+                    text = pytesseract.image_to_string(image, timeout=OCRService.OCR_TIMEOUT_SECONDS)
                 finally:
                     image.close()
 

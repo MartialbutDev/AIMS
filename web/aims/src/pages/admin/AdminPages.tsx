@@ -274,6 +274,9 @@ export function AdminPages({
       content = (
         <UsersPage
           users={users}
+          currentEmail={session.email}
+          onUserUpdated={updated => setUsers(current => current.map(user => user.id === updated.id ? updated : user))}
+          onUserDeleted={id => setUsers(current => current.filter(user => user.id !== id))}
           usersLoading={usersLoading}
           usersError={usersError}
           onAddUser={openUserDialog}

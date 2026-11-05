@@ -1,3 +1,4 @@
+from app.services.document_version_service import effective_documents
 """Read-only, term-bound Dean oversight. No grades or document contents are exposed."""
 import re
 from collections import Counter, defaultdict
@@ -94,8 +95,9 @@ def snapshot(db, actor, year, semester):
     documents = records(Document, Document.uploaded_by).order_by(Document.created_at.desc(), Document.id.desc()).all()
     latest = {}
     reviews = {id: Counter() for id in ids}
+    for doc in effective_documents(db, documents):
+        latest[(doc.uploaded_by, doc.type)] = doc.verification_status
     for doc in documents:
-        latest.setdefault((doc.uploaded_by, doc.type), doc.verification_status)
         if doc.verification_status == 'pending':
             reviews[doc.uploaded_by]['documents'] += 1
     for record in records(DTR, DTR.student_id).filter(DTR.status == DTRStatus.SUBMITTED):

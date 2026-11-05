@@ -25,6 +25,7 @@ router = APIRouter()
 class Intern(BaseModel):
     deployment_id: str
     student_name: str
+    student_email: str
     student_number: str | None
     company_name: str
     status: str
@@ -106,6 +107,7 @@ def intern_response(deployment, student, company) -> Intern:
     return Intern(
         deployment_id=deployment.id,
         student_name=" ".join(part.strip() for part in [student.first_name, student.middle_name, student.last_name] if part and part.strip()),
+        student_email=student.email,
         student_number=student.student_id,
         company_name=company.name,
         status=deployment.status.value,

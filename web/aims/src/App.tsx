@@ -58,6 +58,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
 
   dean: [
     'dashboard',
+    'moa-partners',
     'completion',
     'notifications',
     'settings',

@@ -147,7 +147,9 @@ class CompanyMonitoringTests(unittest.TestCase):
         self.add_journal("submitted", submitted=datetime(2026, 10, 3))
         self.db.flush()
         payload = self.detail().model_dump()
-        self.assertNotIn("email", payload["intern"])
+        self.assertEqual(payload["intern"]["student_email"], "student@example.invalid")
+        self.assertNotIn("hashed_password", payload["intern"])
+        self.assertNotIn("phone", payload["intern"])
         for field in ["notes", "feedback", "latitude", "longitude", "image_in_path"]:
             self.assertNotIn(field, payload["attendance"][0])
         for field in ["content", "feedback", "file_path"]:

@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 import mimetypes
 import logging
+import tempfile
+from starlette.concurrency import run_in_threadpool
 from typing import Literal, Optional
 
 from fastapi import (
@@ -18,8 +20,8 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy.orm import Session, object_session
+from sqlalchemy import or_, and_
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
@@ -35,12 +37,15 @@ from app.core.assignment_access import (
 from app.models.user import User, UserRole
 from app.models.application import Application
 from app.models.internship_deployment import InternshipDeployment, DeploymentStatus
-from app.models.document import Document
+from app.models.document import Document, DocumentType
 from app.models.document_review import DocumentReview
 from app.models.coordinator_assignment import (
     CoordinatorStudentAssignment,
 )
 from app.services.document_service import DocumentService
+from app.services.ocr_service import OCRService
+from app.services.document_identification import identify_header
+from app.services.document_version_service import annotate, current_approved, review_times
 
 
 documents_router = APIRouter(
@@ -108,7 +113,9 @@ def _assert_assigned_student(
     )
 
 
-def _review_payload(review: DocumentReview) -> dict:
+def _review_payload(review: DocumentReview, stamp=None) -> dict:
+    if stamp is None:
+        stamp = review_times(object_session(review), [review])[review.id]
     return {
         "id": review.id,
         "document_id": review.document_id,
@@ -117,8 +124,8 @@ def _review_payload(review: DocumentReview) -> dict:
         "decision": review.decision,
         "notes": review.notes,
         "created_at": (
-            review.created_at.isoformat()
-            if review.created_at
+            stamp.replace(tzinfo=timezone.utc).isoformat()
+            if stamp
             else None
         ),
     }
@@ -132,8 +139,10 @@ def _document_type(document: Document) -> str:
 def _coordinator_document_payload(
     document: Document,
     student: User,
+    version: dict | None = None,
 ) -> dict:
     return {
+        **(version if version is not None else annotate(object_session(document), [document]).get(document.id, {})),
         "id": document.id,
         "student": {
             "id": student.id,
@@ -274,9 +283,9 @@ def _coordinator_documents(
     )
 
     if pending_only:
-        query = query.filter(
-            Document.verification_status == "pending"
-        )
+        query = query.filter(or_(Document.verification_status == 'pending', and_(
+            Document.type == DocumentType.ENDORSEMENT_LETTER, Document.verification_status == 'verified',
+            or_(Document.reviewed_by.is_(None), Document.reviewed_at.is_(None)))))
 
     rows = (
         query.order_by(Document.created_at.desc())
@@ -284,6 +293,7 @@ def _coordinator_documents(
     )
 
     results = []
+    versions = annotate(db, [document for document, _ in rows])
 
     for document, student in rows:
         # Enforce the same assignment authorization
@@ -301,6 +311,7 @@ def _coordinator_documents(
             _coordinator_document_payload(
                 document,
                 student,
+                versions[document.id],
             )
         )
 
@@ -313,16 +324,67 @@ def _coordinator_documents(
 
 @documents_router.get("/")
 async def get_documents(
+    current_term_only: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return (
-        db.query(Document)
-        .filter(
-            Document.uploaded_by == current_user.id
-        )
-        .all()
-    )
+    query = db.query(Document).filter(Document.uploaded_by == current_user.id)
+    if current_term_only:
+        year, semester = get_current_academic_term()
+        query = query.filter(Document.academic_year == year, Document.semester == semester)
+    documents = query.order_by(Document.created_at.desc(), Document.id.desc()).all()
+    versions = annotate(db, documents)
+    return [DocumentService._serialize_document(document, versions[document.id]) for document in documents]
+
+
+
+@documents_router.post("/identify")
+async def identify_document_type(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Suggest an upload category without creating records or retaining the file."""
+    try:
+        if _role(current_user) != 'student':
+            raise HTTPException(403, 'Student access required')
+        file_type = OCRService.validate_file_type(file.filename or '')
+        extension = Path(file.filename or '').suffix.lower()
+        with tempfile.TemporaryDirectory(prefix='aims-identify-') as folder:
+            path = Path(folder) / ('header' + extension)
+            size = 0
+            with path.open('wb') as output:
+                while chunk := await file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > 10 * 1024 * 1024:
+                        raise HTTPException(413, 'Type suggestions support files up to 10 MB. Choose the type manually for larger files.')
+                    output.write(chunk)
+            if size == 0:
+                raise HTTPException(400, 'The selected file is empty')
+            try:
+                header = await run_in_threadpool(OCRService.extract_header, str(path), file_type)
+            except Exception:
+                return {'status': 'unavailable', 'suggested_type': None,
+                        'message': 'Could not read the header. Choose the document type manually.',
+                        'method': 'header_first_rules'}
+            result = identify_header(header, 'document')
+            detected = result['detected_type']
+            supported = {'resume', 'application_letter', 'waiver', 'medical_certificate',
+                         'internship_plan', 'insurance', 'endorsement_letter',
+                         'acceptance_letter', 'certificate_of_completion'}
+            if detected in supported:
+                return {'status': 'suggested', 'suggested_type': detected,
+                        'message': 'Suggested from the document header. Confirm the type before uploading; content checks still apply.',
+                        'method': result['method']}
+            if detected in {'cor', 'orientation'}:
+                message = 'This appears to be a registration or orientation document. Submit it through the onboarding requirements screen.'
+            elif detected == 'unrelated_receipt':
+                message = 'This appears to be a receipt or invoice. Check that you selected the correct internship document.'
+            else:
+                message = 'The header does not identify a supported type clearly. Choose the type manually.'
+            return {'status': 'unsupported' if detected else ('ambiguous' if len(result['candidates']) > 1 else 'uncertain'),
+                    'suggested_type': None, 'message': message, 'method': result['method']}
+    finally:
+        await file.close()
 
 
 @documents_router.post("/upload")
@@ -435,12 +497,10 @@ async def get_review_queue(
         .all()
     )
 
+    versions = annotate(db, docs)
     return {
         "total": total,
-        "items": [
-            DocumentService._serialize_document(doc)
-            for doc in docs
-        ],
+        "items": [DocumentService._serialize_document(doc, versions[doc.id]) for doc in docs],
     }
 
 
@@ -479,10 +539,8 @@ async def get_student_documents_for_review(
         .all()
     )
 
-    return [
-        DocumentService._serialize_document(doc)
-        for doc in docs
-    ]
+    versions = annotate(db, docs)
+    return [DocumentService._serialize_document(doc, versions[doc.id]) for doc in docs]
 
 
 @documents_router.get(
@@ -540,7 +598,7 @@ async def get_document(
         document,
     )
 
-    return document
+    return DocumentService._serialize_document(document)
 
 
 @documents_router.get("/{document_id}/image")
@@ -626,7 +684,8 @@ async def review_document(
                 semester=semester,
             )
 
-        if document.verification_status != "pending":
+        legacy_endorsement = document.type.value == 'endorsement_letter' and document.verification_status == 'verified' and not (document.reviewed_by and document.reviewed_at)
+        if document.verification_status != "pending" and not legacy_endorsement:
             raise HTTPException(
                 status_code=409,
                 detail="Document is no longer pending review",
@@ -720,10 +779,8 @@ async def get_document_review_history(
         .all()
     )
 
-    return [
-        _review_payload(review)
-        for review in reviews
-    ]
+    times = review_times(db, reviews)
+    return [_review_payload(review, times[review.id]) for review in sorted(reviews, key=lambda item: (times[item.id], item.id), reverse=True)]
 
 
 @documents_router.delete("/{document_id}", status_code=204)
@@ -744,6 +801,8 @@ def delete_document(
         term = get_current_academic_term()
         if (document.academic_year, document.semester) != term:
             raise HTTPException(status_code=409, detail="Historical or unclassified documents are retained. Contact your coordinator.")
+        if document.verification_status == 'verified':
+            raise HTTPException(status_code=409, detail="Approved document versions are retained. Upload a replacement or ask your coordinator to revoke approval.")
         if document.reviewed_by or document.reviewed_at or db.query(DocumentReview.id).filter(
             DocumentReview.document_id == document.id,
         ).first():
@@ -781,3 +840,47 @@ def delete_document(
     return None
 
 
+
+
+class DocumentRevocationRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+@documents_router.post("/{document_id}/revoke")
+async def revoke_document(document_id: str, payload: DocumentRevocationRequest,
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_reviewer(current_user)
+    reason = payload.reason.strip()
+    if not reason:
+        raise HTTPException(400, "A revocation reason is required")
+    try:
+        document = db.query(Document).filter(Document.id == document_id).with_for_update().first()
+        if document is None:
+            raise HTTPException(404, "Document not found")
+        year, semester = get_current_academic_term()
+        if (document.academic_year, document.semester) != (year, semester):
+            raise HTTPException(409, "Historical or unclassified approvals cannot be revoked here")
+        _assert_assigned_student(db, current_user, document.uploaded_by, mode='write', academic_year=year, semester=semester)
+        if db.query(InternshipDeployment.id).filter(InternshipDeployment.student_id == document.uploaded_by,
+            InternshipDeployment.academic_year == year, InternshipDeployment.semester == semester,
+            InternshipDeployment.status == DeploymentStatus.COMPLETED).first():
+            raise HTTPException(409, "Reopen the completed internship before revoking its document approval")
+        winner = current_approved(db, document.uploaded_by, year, semester, document.type)
+        if winner is None or winner.id != document.id:
+            raise HTTPException(409, "Only the current approved version can be revoked")
+        stamp = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.add(DocumentReview(document_id=document.id, reviewer_id=current_user.id,
+            previous_status='verified', decision='revoked', notes=reason, created_at=stamp))
+        document._approval_revoked = True
+        document.verification_status = 'rejected'
+        document.review_notes = 'Approval revoked: ' + reason
+        document.reviewed_by = current_user.id
+        document.reviewed_at = stamp
+        db.commit()
+        db.refresh(document)
+    except Exception:
+        db.rollback()
+        raise
+    DocumentService._fire_document_notification(db, document.uploaded_by, document.id, 'revoked', document.type)
+    return {'message': 'Approval revoked. Older versions will not become active automatically.',
+        'document': DocumentService._serialize_document(document)}

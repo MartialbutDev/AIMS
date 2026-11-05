@@ -6,6 +6,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Alert,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -15,7 +17,8 @@ import {
   Image,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as SecureStore from "expo-secure-store";
+import { AccountHeader, AccountHero, ActionButton } from "../../../src/components/account/AccountUI";
+import { APP_VERSION } from "../../../src/constants/app";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import { authService } from "../../../src/services/auth.service";
@@ -46,6 +49,9 @@ interface Document {
   type: string;
   description: string;
   verification_status: string;
+  version_status?: string;
+  version_label?: string;
+  is_current_approved?: boolean;
   created_at: string;
   file_path?: string;
 }
@@ -156,6 +162,10 @@ export default function ProfileScreen() {
 
   const handleSave = async () => {
     if (!profile) return;
+    if (!editFirstName.trim() || !editLastName.trim()) {
+      Alert.alert("Name required", "Enter your first and last name before saving.");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -289,7 +299,7 @@ export default function ProfileScreen() {
 
   // ✅ Render Documents Section
   const renderDocumentsSection = () => {
-    const verifiedCount = documents.filter(d => d.verification_status === 'verified').length;
+    const verifiedCount = documents.filter(d => d.is_current_approved).length;
     const pendingCount = documents.filter(d => d.verification_status === 'pending').length;
     const rejectedCount = documents.filter(d => d.verification_status === 'rejected').length;
 
@@ -306,7 +316,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
           {loadingDocs ? (
             // Loading state
             <View style={styles.docLoadingContainer}>
@@ -347,7 +357,7 @@ export default function ProfileScreen() {
                     {verifiedCount}
                   </Text>
                   <Text style={[styles.docStatLabel, { color: colors.textSecondary }]}>
-                    Verified
+                    Approved
                   </Text>
                 </View>
                 <View style={[styles.docStatDivider, { backgroundColor: colors.border }]} />
@@ -372,7 +382,7 @@ export default function ProfileScreen() {
 
               {/* Document List (Recent 3) */}
               {documents.slice(0, 3).map((doc, index) => {
-                const statusColor = getStatusColor(doc.verification_status);
+                const statusColor = doc.version_status === "superseded" ? colors.textSecondary : getStatusColor(doc.version_status?.startsWith("pending") ? "pending" : doc.verification_status);
                 return (
                   <TouchableOpacity
                     key={doc.id}
@@ -387,7 +397,7 @@ export default function ProfileScreen() {
                       <View style={[styles.docIcon, { backgroundColor: `${colors.primary}10` }]}>
                         <Ionicons name="document-text-outline" size={20} color={colors.accent} />
                       </View>
-                      <View>
+                      <View style={{ flex: 1 }}>
                         <Text style={[styles.docName, { color: colors.textPrimary }]}>
                           {getDocumentDisplayName(doc.type)}
                         </Text>
@@ -404,7 +414,7 @@ export default function ProfileScreen() {
                         styles.docStatusText,
                         { color: statusColor }
                       ]}>
-                        {getStatusLabel(doc.verification_status)}
+                        {doc.version_label || getStatusLabel(doc.verification_status)}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -462,7 +472,7 @@ export default function ProfileScreen() {
           Internship Information
         </Text>
 
-        <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
           {loadingOnboarding ? (
             <View style={styles.internshipLoading}>
               <ActivityIndicator size="small" color={colors.accent} />
@@ -582,16 +592,12 @@ export default function ProfileScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
 
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Profile</Text>
-        <View style={styles.headerRight} />
-      </View>
+      <AccountHeader title={editing ? "Edit profile" : "My profile"} />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={styles.avatarSection}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+        {editing && <View style={{ marginBottom: 20 }}><AccountHero icon="create-outline" title="Your details, up to date." description="Update your name, contact number and profile photo. Your student ID and email are managed by the school." label="PERSONAL INFORMATION" /></View>}
+        <View style={[styles.avatarSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity 
             style={styles.avatarContainer} 
             onPress={handlePickImage}
@@ -630,56 +636,19 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        <View style={styles.actionButtons}>
-          {editing ? (
-            <>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.cancelButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => {
-                  setEditing(false);
-                  setEditFirstName(profile.first_name);
-                  setEditLastName(profile.last_name);
-                  setEditPhone(profile.phone || "");
-                }}
-                disabled={saving}
-              >
-                <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.saveButton, { backgroundColor: colors.primary }]}
-                onPress={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <>
-                    <Ionicons name="save-outline" size={20} color="#FFFFFF" />
-                    <Text style={styles.saveButtonText}>Save</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </>
-          ) : (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.editButton, { backgroundColor: colors.primary }]}
-              onPress={() => setEditing(true)}
-            >
-              <Ionicons name="create-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.editButtonText}>Edit Profile</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {!editing && <View style={styles.actionButtons}><ActionButton title="Edit profile" onPress={() => setEditing(true)} /></View>}
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Personal Information</Text>
-          <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
             {editing ? (
               <>
                 <View style={styles.fieldContainer}>
                   <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>First Name</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
+                    accessibilityLabel="First name"
+                    editable={!saving}
                     value={editFirstName}
                     onChangeText={setEditFirstName}
                     placeholder="First name"
@@ -690,6 +659,8 @@ export default function ProfileScreen() {
                   <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Last Name</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
+                    accessibilityLabel="Last name"
+                    editable={!saving}
                     value={editLastName}
                     onChangeText={setEditLastName}
                     placeholder="Last name"
@@ -700,6 +671,8 @@ export default function ProfileScreen() {
                   <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Phone</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
+                    accessibilityLabel="Phone number"
+                    editable={!saving}
                     value={editPhone}
                     onChangeText={setEditPhone}
                     placeholder="Phone number"
@@ -718,9 +691,15 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {editing && <View style={{ gap: 10, marginBottom: 20 }}>
+          <ActionButton title={saving ? "Saving changes…" : "Save changes"} busy={saving} onPress={() => void handleSave()} />
+          <ActionButton title="Cancel" secondary disabled={saving} onPress={() => { setEditing(false); setEditFirstName(profile.first_name); setEditLastName(profile.last_name); setEditPhone(profile.phone || ""); }} />
+        </View>}
+
+        {!editing && <>
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Account Information</Text>
-          <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
             {renderReadOnlyField("Student ID", profile.student_id)}
             {renderReadOnlyField("Email", profile.email)}
             {renderReadOnlyField(
@@ -738,7 +717,7 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Internship Records</Text>
-          <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Completion and archive"
@@ -767,7 +746,7 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Account Settings</Text>
-          <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
             <TouchableOpacity style={styles.menuItem} onPress={handleChangePassword}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name="key-outline" size={22} color={colors.accent} />
@@ -778,7 +757,7 @@ export default function ProfileScreen() {
 
             <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
 
-            <TouchableOpacity style={styles.menuItem} onPress={() => console.log("Privacy Settings")}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/(student)/settings/privacy-security")}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name="shield-outline" size={22} color={colors.accent} />
                 <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>Privacy Settings</Text>
@@ -788,7 +767,7 @@ export default function ProfileScreen() {
 
             <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
 
-            <TouchableOpacity style={styles.menuItem} onPress={() => console.log("Notification Settings")}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/(student)/notifications/preferences")}>
               <View style={styles.menuItemLeft}>
                 <Ionicons name="notifications-outline" size={22} color={colors.accent} />
                 <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>Notification Settings</Text>
@@ -806,8 +785,10 @@ export default function ProfileScreen() {
           <Text style={[styles.logoutButtonText, { color: colors.error }]}>Logout</Text>
         </TouchableOpacity>
 
-        <Text style={[styles.versionText, { color: colors.textSecondary }]}>Version 1.0.0</Text>
+        <Text style={[styles.versionText, { color: colors.textSecondary }]}>{APP_VERSION}</Text>
+        </>}
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -860,9 +841,15 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 40,
+    maxWidth: 680,
+    width: "100%",
+    alignSelf: "center",
   },
   avatarSection: {
+    padding: 22,
+    borderRadius: 24,
+    borderWidth: 1,
     alignItems: "center",
     marginBottom: 20,
   },
@@ -931,7 +918,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   actionButtons: {
-    flexDirection: "row",
+    flexDirection: "column",
     gap: 12,
     marginBottom: 20,
   },
@@ -987,8 +974,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   sectionCard: {
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
     shadowColor: "#000000",
     shadowOpacity: 0.04,
     shadowRadius: 12,
@@ -1008,8 +995,10 @@ const styles = StyleSheet.create({
   },
   input: {
     fontSize: 15,
-    padding: 8,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    minHeight: 52,
+    borderRadius: 14,
     borderWidth: 1,
   },
   menuItem: {
@@ -1180,6 +1169,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   docItemLeft: {
+    flex: 1,
+    marginRight: 8,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -1200,6 +1191,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   docStatus: {
+    maxWidth: "46%",
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 10,

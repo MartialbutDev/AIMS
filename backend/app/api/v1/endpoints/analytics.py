@@ -1,3 +1,4 @@
+from app.services.document_version_service import effective_documents
 
 """Role-aware analytics for AIMS."""
 
@@ -103,7 +104,7 @@ async def get_dean_analytics(
     documents = reporting.term(db.query(Document),Document,year,semester).filter(Document.uploaded_by.in_(assigned_ids),
         Document.type.in_(required_types)).order_by(Document.created_at.desc(),Document.id.desc()).all()
     latest = {}
-    for document in documents: latest.setdefault(document.uploaded_by,{}).setdefault(document.type,document.verification_status)
+    for document in effective_documents(db, documents): latest.setdefault(document.uploaded_by,{}).setdefault(document.type,document.verification_status)
     hours = reporting.approved_hours(db,assigned_ids,year,semester)
     deps = reporting.deployments(db,current_user,year,semester)
     official = set()

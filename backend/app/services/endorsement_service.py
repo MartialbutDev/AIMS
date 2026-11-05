@@ -1,18 +1,21 @@
 """A coordinator content review is required; OCR never authenticates signatures."""
 from fastapi import HTTPException
+from app.services.document_version_service import current_approved
 from app.models.document import Document, DocumentType
 
 
 def endorsement_state(db, student_id, academic_year, semester):
-    document = db.query(Document).filter(
+    approved = current_approved(db, student_id, academic_year, semester, DocumentType.ENDORSEMENT_LETTER)
+    document = approved or db.query(Document).filter(
         Document.uploaded_by == student_id,
         Document.academic_year == academic_year, Document.semester == semester,
         Document.type == DocumentType.ENDORSEMENT_LETTER,
     ).populate_existing().order_by(Document.created_at.desc(), Document.id.desc()).first()
     reviewed = bool(document and document.reviewed_by and document.reviewed_at)
-    ready = bool(document and document.verification_status == 'verified' and reviewed)
+    ready = bool(approved and reviewed)
     status = document.verification_status if document else 'missing'
     if document and status == 'verified' and not reviewed: status = 'needs_coordinator_review'
+    elif document and status == 'verified' and not approved: status = 'approval_revoked'
     return {'ready': ready, 'status': status, 'document_id': document.id if document else None,
             'message': ('Coordinator content review recorded. Signatures are not authenticated.' if ready else
                         'Upload the endorsement letter and obtain coordinator content review before forwarding to the company. OCR does not authenticate signatures.')}

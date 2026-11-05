@@ -48,6 +48,7 @@ class ApplicationResponse(BaseModel):
     id: str
     student_id: str
     student_name: Optional[str] = None
+    student_email: Optional[str] = None
     company_id: str
     company_name: Optional[str] = None
     position: str

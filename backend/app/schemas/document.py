@@ -50,6 +50,10 @@ class DocumentCreate(DocumentBase):
 
 
 class DocumentResponse(BaseModel):
+    version_status: Optional[str] = None
+    version_label: Optional[str] = None
+    is_current_approved: bool = False
+    current_approved_id: Optional[str] = None
     id: str
     type: str
 

@@ -75,7 +75,7 @@ class DeanOversightTests(unittest.TestCase):
         self.db.commit()
         self.assertEqual(self.snapshot()['overview']['students_in_oversight'], 1)
 
-    def test_latest_requirement_drives_missing_and_review_counts(self):
+    def test_pending_replacement_counts_as_review_but_preserves_approved_requirement(self):
         self.f.deployment.status = DeploymentStatus.PRE_DEPLOYMENT
         self.db.add(Document(id='new-waiver', uploaded_by='s1', type=DocumentType.WAIVER, file_path='private.pdf', academic_year='2026-2027', semester='1', verification_status='pending', created_at=datetime.now()+timedelta(seconds=2)))
         self.db.commit()
@@ -83,7 +83,7 @@ class DeanOversightTests(unittest.TestCase):
         self.assertEqual(data['overview']['awaiting_deployment'], 1)
         self.assertEqual(data['workloads'][0]['document_reviews'], 1)
         detail = service.attention_details(self.db, self.actor, '2026-2027', '1', 'missing_requirements', None, 1, 20)
-        self.assertEqual(detail['items'][0]['details'], ['Waiver: pending'])
+        self.assertEqual(detail['items'], [])
         self.assertNotIn('private.pdf', str(detail))
 
     def test_only_submitted_dtr_and_submitted_or_reviewing_journals_count(self):

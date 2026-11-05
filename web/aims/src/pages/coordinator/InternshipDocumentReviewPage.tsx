@@ -6,12 +6,13 @@ import {
   getCoordinatorAllInternshipDocuments,
   getCoordinatorInternshipDocumentFile,
   reviewCoordinatorInternshipDocument,
+  revokeCoordinatorInternshipDocument,
   type CoordinatorInternshipDocument,
 } from '../../services/coordinatorService'
 
 import './document-verification.css'
 
-type ReviewAction = 'verified' | 'rejected'
+type ReviewAction = 'verified' | 'rejected' | 'revoked'
 type ViewMode = 'pending' | 'all'
 
 type Preview = {
@@ -125,6 +126,7 @@ export function InternshipDocumentReviewPage() {
         document.original_filename,
         documentName(document.type),
         document.verification_status,
+        document.version_label,
       ]
         .join(' ')
         .toLowerCase()
@@ -178,10 +180,10 @@ export function InternshipDocumentReviewPage() {
     const cleanNotes = notes.trim()
 
     if (
-      decision.action === 'rejected' &&
+      decision.action !== 'verified' &&
       !cleanNotes
     ) {
-      setError('A rejection reason is required.')
+      setError('A rejection or revocation reason is required.')
       return
     }
 
@@ -189,11 +191,8 @@ export function InternshipDocumentReviewPage() {
     setError('')
 
     try {
-      await reviewCoordinatorInternshipDocument(
-        decision.document.id,
-        decision.action,
-        cleanNotes,
-      )
+      if (decision.action === 'revoked') await revokeCoordinatorInternshipDocument(decision.document.id, cleanNotes)
+      else await reviewCoordinatorInternshipDocument(decision.document.id, decision.action, cleanNotes)
 
       setNotice(
         `${documentName(decision.document.type)} for ${
@@ -201,7 +200,7 @@ export function InternshipDocumentReviewPage() {
         } ${
           decision.action === 'verified'
             ? 'approved'
-            : 'rejected'
+            : decision.action === 'revoked' ? 'approval revoked' : 'rejected'
         }.`,
       )
 
@@ -328,7 +327,7 @@ export function InternshipDocumentReviewPage() {
                   <h3>{document.student.name}</h3>
 
                   <span className="dv-status">
-                    {document.type === 'endorsement_letter' && document.verification_status === 'verified' && !(document.reviewed_by && document.reviewed_at) ? 'Needs coordinator content review' : statusName(document.verification_status)}
+                    {document.type === 'endorsement_letter' && document.verification_status === 'verified' && !(document.reviewed_by && document.reviewed_at) ? 'Needs coordinator content review' : (document.version_label || statusName(document.verification_status))}
                   </span>
                 </div>
 
@@ -373,9 +372,7 @@ export function InternshipDocumentReviewPage() {
 
                     <p>
                       Decision:{' '}
-                      {statusName(
-                        document.verification_status,
-                      )}
+                      {document.version_label || statusName(document.verification_status)}
                     </p>
 
                     {document.review_notes && (
@@ -399,6 +396,7 @@ export function InternshipDocumentReviewPage() {
                   Preview document
                 </button>
 
+                {document.is_current_approved && <button type="button" className="dv-button dv-reject" disabled={busy} onClick={() => openDecision(document, 'revoked')}>Revoke approval</button>}
                 {(document.verification_status === 'pending' || (document.type === 'endorsement_letter' && document.verification_status === 'verified' && !(document.reviewed_by && document.reviewed_at))) && (
                   <>
                     <button
@@ -457,7 +455,7 @@ export function InternshipDocumentReviewPage() {
             <h2 id="internship-review-title">
               {decision.action === 'verified'
                 ? 'Approve'
-                : 'Reject'}{' '}
+                : decision.action === 'revoked' ? 'Revoke approval for' : 'Reject'}{' '}
               {documentName(decision.document.type)}?
             </h2>
 
@@ -476,9 +474,10 @@ export function InternshipDocumentReviewPage() {
               {' '}Tesseract OCR does not authenticate signatures. For endorsement letters, check the student details, intended company and school-issued content against the original letter.
             </p>
 
+            {decision.action === 'revoked' && <p role="note">Revoking removes this approval and prevents older versions from becoming active automatically. Existing application attachments and review history are retained.</p>}
             <label htmlFor="internship-review-notes">
               Review notes{' '}
-              {decision.action === 'rejected'
+              {decision.action !== 'verified'
                 ? '(required)'
                 : '(optional)'}
             </label>
@@ -521,7 +520,7 @@ export function InternshipDocumentReviewPage() {
                   : `Confirm ${
                       decision.action === 'verified'
                         ? 'approval'
-                        : 'rejection'
+                        : decision.action === 'revoked' ? 'revocation' : 'rejection'
                     }`}
               </button>
             </div>

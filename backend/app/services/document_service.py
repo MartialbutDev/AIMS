@@ -20,13 +20,16 @@ import os
 import re
 import uuid
 import logging
+from datetime import datetime, timezone
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 from fastapi import UploadFile, HTTPException
 
 from app.models.document import Document, DocumentType
+from app.models.document_review import DocumentReview
 from app.models.user import User
 from app.services.ocr_service import OCRService
+from app.services.document_identification import inspect_upload
 from app.services.notification_service import NotificationService
 from app.core.config import settings
 from app.core.assignment_access import get_current_academic_term
@@ -426,6 +429,10 @@ class DocumentService:
         name_info: dict,
     ) -> bool:
 
+        identification = validation_result.get('identification')
+        if identification and identification.get('status') != 'matched':
+            return False
+
         if document_type not in cls.AUTO_VERIFY_TYPES:
             return False
 
@@ -462,6 +469,10 @@ class DocumentService:
         name_info: dict,
     ) -> tuple[str, str]:
 
+        identification = validation_result.get('identification') or {}
+        if identification.get('status') == 'mismatch':
+            return ('rejected', identification['message'])
+
         if (
             document_type in cls.AUTO_VERIFY_TYPES
             and name_info.get("identity_status") == "mismatched"
@@ -473,6 +484,24 @@ class DocumentService:
                 "own document or contact the coordinator if "
                 "this is incorrect.",
             )
+
+        anchors = {
+            'resume': {'education', 'skills', 'personal'},
+            'application_letter': {'purpose', 'internship'},
+            'endorsement_letter': {'endorsement'},
+            'acceptance_letter': {'acceptance', 'internship'},
+            'medical_certificate': {'medical', 'provider'},
+            'waiver': {'consent'},
+            'internship_plan': {'plan', 'objectives', 'activities'},
+            'insurance': {'insurance', 'policy'},
+            'certificate_of_completion': {'certificate', 'training'},
+        }
+        found = set(validation_result.get('found_sections') or [])
+        if (document_type in anchors and len((extracted_text or '').strip()) >= 120
+            and 'found_sections' in validation_result
+            and int(validation_result.get('confidence', 0)) < REJECT_THRESHOLD
+            and not (anchors[document_type] & found)):
+            return ('rejected', 'The readable text does not match the selected document type. Upload the correct file. Any current approved version remains active.')
 
         if document_type == 'endorsement_letter':
             return ('pending', 'OCR extracts text only; it does not authenticate signatures. Coordinator content review of the endorsement letter is required before forwarding an application to the company.')
@@ -568,6 +597,7 @@ class DocumentService:
     def _serialize_document(
         cls,
         document: Document,
+        version: dict | None = None,
     ) -> dict:
 
         type_value = (
@@ -576,7 +606,15 @@ class DocumentService:
             else str(document.type)
         )
 
+        if version is None:
+            from app.services.document_version_service import annotate
+            session = object_session(document)
+            version = annotate(session, [document]).get(document.id, {}) if session else {}
         return {
+            **version,
+            "reviewed_by": document.reviewed_by,
+            "reviewed_at": document.reviewed_at,
+            "review_notes": document.review_notes,
             "id": document.id,
             "type": type_value,
             "description": document.description,
@@ -647,37 +685,22 @@ class DocumentService:
             # STEP 2: OCR EXTRACTION
             # --------------------------------------------
 
-            ocr_error = None
-
-            try:
-                extracted_text = (
-                    OCRService.extract_text(
-                        saved_path,
-                        file_type,
-                    )
-                    or ""
-                )
-
-            except Exception as exc:
-                extracted_text = ""
-                ocr_error = (
-                    "OCR extraction failed; manual review required."
-                )
-
-                logger.warning(
-                    "OCR failed for %s: %s",
-                    relative_path,
-                    exc,
-                )
+            inspection = inspect_upload(saved_path, file_type, type_key)
+            extracted_text = inspection['text']
+            ocr_error = inspection['ocr_error']
 
             # --------------------------------------------
             # STEP 3: RULE-BASED VALIDATION
             # --------------------------------------------
 
-            validation_result = cls.verify_document(
-                type_key,
-                extracted_text,
+            validation_result = (
+                {'is_valid': False, 'confidence': 0, 'message': '', 'found_sections': []}
+                if inspection['identification']['status'] == 'mismatch'
+                else cls.verify_document(type_key, extracted_text)
             )
+
+            validation_result['identification'] = inspection['identification']
+            validation_result['full_content_checked'] = inspection['full_content_checked']
 
             confidence = int(
                 validation_result.get("confidence", 0)
@@ -787,6 +810,8 @@ class DocumentService:
                     "Student name not confirmed by OCR."
                 )
 
+            if inspection['identification']['message'] != decision_message:
+                message_parts.append(inspection['identification']['message'])
             message_parts.append(decision_message)
 
             final_message = " ".join(
@@ -824,6 +849,12 @@ class DocumentService:
             )
 
             db.add(document)
+            if status == 'verified':
+                # Record a machine decision, never a fabricated human review.
+                db.add(DocumentReview(document_id=document.id, reviewer_id='system',
+                    previous_status='pending', decision='auto_verified',
+                    notes='Automatic content validation; no signature authentication.',
+                    created_at=datetime.now(timezone.utc).replace(tzinfo=None)))
             db.commit()
 
             committed = True
@@ -861,7 +892,7 @@ class DocumentService:
                     "message": final_message,
                     "requires_manual_review": status == "pending",
                     "automatically_verified": status == "verified",
-                    "validation_method": "ocr_rule_based",
+                    "validation_method": "header_first_ocr_rules",
                     "ocr_error": ocr_error,
                 },
             }

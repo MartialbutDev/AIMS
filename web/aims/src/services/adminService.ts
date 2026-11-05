@@ -20,6 +20,8 @@ interface BackendUser {
   email: string
   first_name: string
   last_name: string
+  middle_name?: string | null
+  phone?: string | null
   role: string
   is_active: boolean
 }
@@ -44,6 +46,8 @@ function toAdminUser(user: BackendUser): AdminUser {
     id: user.id,
     firstName: user.first_name,
     lastName: user.last_name,
+    middleName: user.middle_name,
+    phone: user.phone,
     email: user.email,
     role,
     isActive: user.is_active,
@@ -172,4 +176,21 @@ export function filterAndSortAdminUsers(
           return byName
       }
     })
+}
+
+export interface UpdateAdminUserInput {
+  firstName: string
+  middleName: string | null
+  lastName: string
+  email: string
+  phone: string | null
+  isActive: boolean
+}
+export async function updateAdminUser(id: string, input: UpdateAdminUserInput): Promise<AdminUser> {
+  return toAdminUser(await apiRequest<BackendUser>(`/api/v1/users/${encodeURIComponent(id)}`, {
+    method: 'PUT', body: JSON.stringify({ first_name: input.firstName, middle_name: input.middleName, last_name: input.lastName, email: input.email, phone: input.phone, is_active: input.isActive }),
+  }))
+}
+export async function deleteAdminUser(id: string): Promise<void> {
+  await apiRequest(`/api/v1/users/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }

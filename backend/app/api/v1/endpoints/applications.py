@@ -1,3 +1,4 @@
+from app.services.document_version_service import current_approved
 from app.services import direct_placement_service as direct_service
 
 import math
@@ -49,7 +50,7 @@ def _to_response(
     return ApplicationResponse.model_validate(
         application
     ).model_copy(
-        update={"company_name": company_name, "student_name": f"{application.student.first_name} {application.student.last_name}" if application.student else None}
+        update={"student_email": application.student.email if application.student else None, "company_name": company_name, "student_name": f"{application.student.first_name} {application.student.last_name}" if application.student else None}
     )
 
 
@@ -189,6 +190,10 @@ def _validate_document_ownership(
             status_code=400,
             detail=f"{field_label}: document belongs to another term",
         )
+
+    current = current_approved(db, student_id, academic_year, semester, doc.type)
+    if current is None or current.id != doc.id:
+        raise HTTPException(status_code=400, detail=f"Select the current approved {field_label.lower()} version for a new application.")
 
     if doc.verification_status != "verified":
         raise HTTPException(

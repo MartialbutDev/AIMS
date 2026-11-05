@@ -51,10 +51,10 @@ class DocumentDeletionTests(unittest.TestCase):
         self.assertFalse(self.file.exists())
         self.assertEqual(self.delete().status_code, 404)
 
-    def test_auto_verified_unused_upload_can_be_deleted(self):
+    def test_approved_versions_are_retained_for_history(self):
         self.doc.verification_status = 'verified'
         self.db.commit()
-        self.assertEqual(self.delete().status_code, 204)
+        self.assertEqual(self.delete().status_code, 409)
 
     def test_other_student_and_staff_cannot_delete(self):
         self.f.as_user('s2', UserRole.STUDENT)

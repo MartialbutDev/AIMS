@@ -1,26 +1,13 @@
-// app/(student)/profile/change-password.tsx
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { authService } from "../../../src/services/auth.service";
-import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
-import { useTheme } from "../../../src/context/ThemeContext";
-import { profileService } from "../../../src/services/profile.service";
-
+import { useState } from 'react';
+import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useTheme } from '../../../src/context/ThemeContext';
+import { authService } from '../../../src/services/auth.service';
+import { profileService } from '../../../src/services/profile.service';
+import { AccountPage, AccountHero, Panel, ActionButton, ui } from '../../../src/components/account/AccountUI';
 export default function ChangePasswordScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -96,231 +83,24 @@ export default function ChangePasswordScreen() {
     }
   };
 
-  return (
-    <SafeAreaView edges={['bottom']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
 
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Change Password</Text>
-        <View style={styles.headerRight} />
+  const fields = [
+    { label: 'Current password', value: currentPassword, set: setCurrentPassword, visible: showCurrentPassword, toggle: () => setShowCurrentPassword(!showCurrentPassword), error: currentError, clear: () => setCurrentError('') },
+    { label: 'New password', value: newPassword, set: setNewPassword, visible: showNewPassword, toggle: () => setShowNewPassword(!showNewPassword), error: newError, clear: () => setNewError('') },
+    { label: 'Confirm new password', value: confirmPassword, set: setConfirmPassword, visible: showConfirmPassword, toggle: () => setShowConfirmPassword(!showConfirmPassword), error: confirmError, clear: () => setConfirmError('') },
+  ];
+  return <AccountPage title="Change password">
+    <AccountHero icon="key-outline" title="A fresh layer of protection." description="Choose a password you haven’t used for this account before." label="ACCOUNT SECURITY" />
+    <Panel>{fields.map((field, index) => <View key={field.label} style={{ marginBottom: 8 }}>
+      <Text style={[ui.label, { color: colors.textPrimary }]}>{field.label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 54, borderRadius: 14, borderWidth: 1, borderColor: field.error ? colors.error : colors.border, backgroundColor: colors.inputBackground, paddingLeft: 14 }}>
+        <Ionicons name={index === 0 ? 'lock-closed-outline' : 'key-outline'} size={19} color={colors.textSecondary} />
+        <TextInput accessibilityLabel={field.label} editable={!loading} value={field.value} onChangeText={value => { field.set(value); field.clear(); }} secureTextEntry={!field.visible} autoCapitalize="none" autoCorrect={false} textContentType={index === 0 ? 'password' : 'newPassword'} autoComplete={index === 0 ? 'current-password' : 'new-password'} placeholder={field.label} placeholderTextColor={colors.textTertiary} style={{ flex: 1, minHeight: 54, paddingHorizontal: 10, color: colors.textPrimary, fontSize: 14 }} />
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${field.visible ? 'Hide' : 'Show'} ${field.label.toLowerCase()}`} onPress={field.toggle} style={{ minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' }}><Ionicons name={field.visible ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textSecondary} /></TouchableOpacity>
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <View style={[styles.infoCard, { backgroundColor: `${colors.primary}10`, borderColor: `${colors.primary}20` }]}>
-          <Ionicons name="information-circle-outline" size={24} color={colors.accent} />
-          <Text style={[styles.infoText, { color: colors.textPrimary }]}>
-            Password must be at least 6 characters long
-          </Text>
-        </View>
-
-        <View style={styles.fieldWrapper}>
-          <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Current Password</Text>
-          <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }, currentError && styles.inputWrapperError]}>
-            <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.textPrimary }]}
-              placeholder="Enter current password"
-              placeholderTextColor={colors.textSecondary}
-              value={currentPassword}
-              onChangeText={(text) => {
-                setCurrentPassword(text);
-                if (currentError) setCurrentError("");
-              }}
-              secureTextEntry={!showCurrentPassword}
-            />
-            <TouchableOpacity
-              onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={showCurrentPassword ? "eye-off-outline" : "eye-outline"}
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-          {currentError ? <Text style={[styles.errorText, { color: colors.error }]}>{currentError}</Text> : null}
-        </View>
-
-        <View style={styles.fieldWrapper}>
-          <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>New Password</Text>
-          <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }, newError && styles.inputWrapperError]}>
-            <Ionicons name="key-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.textPrimary }]}
-              placeholder="Enter new password"
-              placeholderTextColor={colors.textSecondary}
-              value={newPassword}
-              onChangeText={(text) => {
-                setNewPassword(text);
-                if (newError) setNewError("");
-              }}
-              secureTextEntry={!showNewPassword}
-            />
-            <TouchableOpacity
-              onPress={() => setShowNewPassword(!showNewPassword)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={showNewPassword ? "eye-off-outline" : "eye-outline"}
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-          {newError ? <Text style={[styles.errorText, { color: colors.error }]}>{newError}</Text> : null}
-        </View>
-
-        <View style={styles.fieldWrapper}>
-          <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Confirm Password</Text>
-          <View style={[styles.inputWrapper, { backgroundColor: colors.card, borderColor: colors.border }, confirmError && styles.inputWrapperError]}>
-            <Ionicons name="shield-checkmark-outline" size={20} color={colors.textSecondary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.textPrimary }]}
-              placeholder="Confirm new password"
-              placeholderTextColor={colors.textSecondary}
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                if (confirmError) setConfirmError("");
-              }}
-              secureTextEntry={!showConfirmPassword}
-            />
-            <TouchableOpacity
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-          {confirmError ? <Text style={[styles.errorText, { color: colors.error }]}>{confirmError}</Text> : null}
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.changeButton,
-            { backgroundColor: colors.primary },
-            loading && styles.changeButtonDisabled,
-          ]}
-          onPress={handleChangePassword}
-          disabled={loading}
-          activeOpacity={0.8}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <Ionicons name="save-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.changeButtonText}>Change Password</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-  );
+      {!!field.error && <Text accessibilityRole="alert" style={{ color: colors.error, fontSize: 12, marginTop: 7 }}>{field.error}</Text>}
+    </View>)}</Panel>
+    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: 4 }}><Ionicons name="information-circle-outline" size={18} color={colors.accent} /><Text style={[ui.description, { flex: 1, color: colors.textSecondary }]}>Use at least 6 characters. After changing your password, sign in again with the new one.</Text></View>
+    <ActionButton title={loading ? 'Updating password…' : 'Update password'} busy={loading} onPress={() => void handleChangePassword()} />
+  </AccountPage>;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 0,
-    paddingBottom: 12,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  headerRight: {
-    width: 32,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
-  infoCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-  },
-  infoText: {
-    fontSize: 13,
-    marginLeft: 10,
-    flex: 1,
-  },
-  fieldWrapper: {
-    marginBottom: 18,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 50,
-  },
-  inputWrapperError: {
-    borderColor: "#EF4444",
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-  },
-  errorText: {
-    fontSize: 12,
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  changeButton: {
-    flexDirection: "row",
-    paddingVertical: 16,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-    marginTop: 8,
-  },
-  changeButtonDisabled: {
-    opacity: 0.6,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  changeButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-});

@@ -1,5 +1,7 @@
 
 from typing import List
+from datetime import datetime, timezone, timedelta
+from app.services.direct_placement_service import moa_state
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
@@ -214,6 +216,39 @@ async def get_all_companies_admin(
 # ============================================================
 # COMPANY DETAILS — PRIVACY PROTECTION
 # ============================================================
+
+@router.get("/dean-directory")
+async def get_dean_partner_directory(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("dean")),
+):
+    """Dean-only read access; includes inactive records without granting management."""
+    today = datetime.now(timezone(timedelta(hours=8))).date()
+    query = db.query(Company)
+    total = query.count()
+    items = []
+    for company in query.order_by(Company.name.asc(), Company.id.asc()).offset(skip).limit(limit).all():
+        state = moa_state(company)
+        days = (company.moa_expires_at - today).days if company.moa_expires_at else None
+        if not company.is_active:
+            status = 'inactive'
+        elif not company.is_moa_signed:
+            status = 'unsigned'
+        elif days is not None and days < 0:
+            status = 'expired'
+        elif company.moa_effective_at and company.moa_effective_at > today:
+            status = 'upcoming'
+        elif state['ready']:
+            status = 'expiring' if days <= 30 else 'current'
+        else:
+            status = 'incomplete'
+        items.append({**CompanyResponse.model_validate(company).model_dump(mode='json'),
+                      'moa_status': status, 'moa_ready': state['ready'],
+                      'days_to_expiry': days, 'checks': state['checks']})
+    return {'items': items, 'total': total, 'as_of': today.isoformat()}
+
 
 @router.get("/{company_id}", response_model=CompanyResponse)
 async def get_company(

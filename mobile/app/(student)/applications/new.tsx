@@ -1,8 +1,8 @@
 // app/(student)/applications/new.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +33,7 @@ interface Document {
   type: string;
   description: string;
   verification_status: string;
+  is_current_approved?: boolean;
   file_path?: string;
   created_at: string;
 }
@@ -52,6 +53,7 @@ const normalizeDoc = (raw: any): Document => ({
   type: String(raw.type ?? "document").toLowerCase(),
   description: String(raw.description ?? ""),
   verification_status: String(raw.verification_status ?? "pending").toLowerCase(),
+  is_current_approved: raw.is_current_approved === true,
   file_path: raw.file_path,
   created_at: raw.created_at ?? new Date().toISOString(),
 });
@@ -81,14 +83,9 @@ export default function NewApplicationScreen() {
   const [showResumeDropdown, setShowResumeDropdown] = useState(false);
   const [showAppLetterDropdown, setShowAppLetterDropdown] = useState(false);
 
-  useEffect(() => {
-    fetchCompanies();
-    fetchDocuments();
-  }, []);
-
   // -------- fetch --------
 
-  const fetchCompanies = async () => {
+  const fetchCompanies = useCallback(async () => {
     try {
       const response = await api.get("/companies/");
       setCompanies(toArray<Company>(response.data));
@@ -98,14 +95,16 @@ export default function NewApplicationScreen() {
     } finally {
       setLoadingCompanies(false);
     }
-  };
+  }, []);
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       setLoadingDocs(true);
-      const response = await api.get("/documents/");
+      const response = await api.get("/documents/?current_term_only=true");
       const normalized = toArray<any>(response.data).map(normalizeDoc);
       setDocuments(normalized);
+      setSelectedResume(current => current && normalized.some(doc => doc.id === current.id && doc.is_current_approved) ? current : null);
+      setSelectedAppLetter(current => current && normalized.some(doc => doc.id === current.id && doc.is_current_approved) ? current : null);
     } catch (error) {
       console.error("Error fetching documents:", error);
       Alert.alert(
@@ -115,7 +114,9 @@ export default function NewApplicationScreen() {
     } finally {
       setLoadingDocs(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(useCallback(() => { void fetchCompanies(); void fetchDocuments(); }, [fetchCompanies, fetchDocuments]));
 
   // -------- helpers --------
 
@@ -133,7 +134,7 @@ export default function NewApplicationScreen() {
   const getVerifiedDocuments = (type?: string) => {
     const wanted = type?.toLowerCase();
     return documents.filter((d) => {
-      const statusOk = d.verification_status === "verified";
+      const statusOk = d.verification_status === "verified" && d.is_current_approved === true;
       const typeOk = !wanted || d.type === wanted;
       return statusOk && typeOk;
     });
@@ -672,7 +673,7 @@ export default function NewApplicationScreen() {
                   { color: colors.textTertiary },
                 ]}
               >
-                Select from your verified documents
+                Select from your current approved documents
               </Text>
 
               {loadingDocs ? (

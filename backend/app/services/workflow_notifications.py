@@ -70,9 +70,10 @@ def capture(db, flush_context, instances):
             sid = obj.uploaded_by
             if not obj.id: obj.id = str(uuid.uuid4())
             status = value(obj.verification_status) or 'pending'
-            emit({sid} | scope.coordinators[sid], 'document', f'Document: {status}',
-                 'A student document was uploaded or reviewed. Open Documents to see the result and any feedback.',
-                 document_id=obj.id, status=status, student_id=sid)
+            revoked = bool(getattr(obj, '_approval_revoked', False))
+            emit({sid} | scope.coordinators[sid], 'document', 'Document approval revoked' if revoked else f'Document: {status}',
+                 'A document approval was revoked. Open Documents to read the reason. Older versions will not become active automatically.' if revoked else 'A student document was uploaded or reviewed. Open Documents to see the result and any feedback.',
+                 document_id=obj.id, status=status, student_id=sid, action='approval_revoked' if revoked else 'document_update')
         elif name == 'StudentOnboardingSubmission':
             if not changed('review_status'): continue
             status = obj.review_status or 'pending_review'

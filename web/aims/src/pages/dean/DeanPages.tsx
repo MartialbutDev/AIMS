@@ -1,3 +1,4 @@
+import { DeanPartnersPage } from './DeanPartnersPage'
 import { CompletionPage } from '../shared/CompletionPage'
 import { DirectPlacementsPage } from '../shared/DirectPlacementsPage'
 
@@ -31,6 +32,9 @@ export function DeanPages({
   onLogout,
 }: DeanPagesProps) {
   switch (section) {
+    case 'moa-partners':
+      return <DeanPartnersPage />
+
     case 'completion':
       return <CompletionPage role="dean" />
 

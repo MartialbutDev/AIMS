@@ -26,6 +26,8 @@ interface DocumentDetail {
   description: string;
   original_filename?: string;
   verification_status: string;
+  version_status?: string;
+  version_label?: string;
   created_at: string;
   file_path?: string;
   extracted_text?: string;
@@ -159,21 +161,22 @@ export default function DocumentDetailScreen() {
     );
   }
 
-  const statusColor = getStatusColor(document.verification_status);
+  const displayStatus = document.version_status?.startsWith("pending") ? "pending" : document.verification_status;
+  const statusColor = document.version_status === "superseded" ? colors.textSecondary : getStatusColor(displayStatus);
   const displayName = document.type.replace(/_/g, " ").toUpperCase();
   const confidence = document.validation_confidence ?? 0;
 
-  const statusLabel =
+  const statusLabel = document.version_label || (
     document.verification_status === "verified"
       ? "Verified"
       : document.verification_status === "pending"
       ? "Pending Review"
-      : "Rejected";
+      : "Rejected");
 
-  const statusIconName: keyof typeof Ionicons.glyphMap =
-    document.verification_status === "verified"
+  const statusIconName: keyof typeof Ionicons.glyphMap = document.version_status === "superseded" ? "archive-outline" :
+    displayStatus === "verified"
       ? "checkmark-circle"
-      : document.verification_status === "pending"
+      : displayStatus === "pending"
       ? "time-outline"
       : "close-circle";
 

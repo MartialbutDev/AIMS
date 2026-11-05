@@ -25,6 +25,7 @@ from app.models.company import Company
 from app.models.internship_deployment import InternshipDeployment
 from app.models.application import Application, ApplicationStatus
 from app.models.document import Document, DocumentType
+from app.models.document_review import DocumentReview
 from app.models.dtr import DTR, DTRStatus
 from app.models.journal import Journal, JournalStatus
 from app.api.v1.endpoints import coordinator_reminders as reminder
@@ -34,7 +35,7 @@ from app.api.v1.endpoints import coordinator
 class StudentReminderTests(unittest.TestCase):
     def setUp(self):
         self.engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-        tables = [User, Notification, CoordinatorStudentAssignment, DeanCoordinatorDesignation, CoordinatorEvaluation, Company, Application, Document, DTR, Journal, InternshipDeployment]
+        tables = [User, Notification, CoordinatorStudentAssignment, DeanCoordinatorDesignation, CoordinatorEvaluation, Company, Application, Document, DocumentReview, DTR, Journal, InternshipDeployment]
         Base.metadata.create_all(self.engine, tables=[model.__table__ for model in tables])
         self.db = Session(self.engine)
         self.actor = SimpleNamespace(id="c1", role=UserRole.COORDINATOR)

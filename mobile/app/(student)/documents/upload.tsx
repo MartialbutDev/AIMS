@@ -2,7 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -63,7 +63,39 @@ export default function UploadDocumentScreen() {
   const [description, setDescription] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [ocrResult, setOcrResult] = useState<string | null>(null);
+  const [versionLabel, setVersionLabel] = useState("");
   const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+
+  const [identifying, setIdentifying] = useState(false);
+  const [suggestion, setSuggestion] = useState<{ fileUri: string; type: string | null; message: string } | null>(null);
+  const [identifyAttempt, setIdentifyAttempt] = useState(0);
+  const currentSuggestion = suggestion?.fileUri === selectedFile?.uri ? suggestion : null;
+  const suggestedType = DOCUMENT_TYPES.find((type) => type.value === currentSuggestion?.type);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!selectedFile) {
+      setIdentifying(false);
+      setSuggestion(null);
+      return () => controller.abort();
+    }
+    const file = selectedFile;
+    setIdentifying(true);
+    setSuggestion(null);
+    const form = new FormData();
+    form.append("file", { uri: file.uri, name: file.name, type: file.type || "application/octet-stream" } as any);
+    api.post<{ suggested_type: string | null; message: string }>("/documents/identify", form, {
+      headers: { "Content-Type": "multipart/form-data" }, signal: controller.signal, timeout: 35000,
+    }).then(({ data }) => {
+      if (!controller.signal.aborted) setSuggestion({ fileUri: file.uri, type: data.suggested_type, message: data.message });
+    }).catch((error) => {
+      if (!controller.signal.aborted) {
+        const detail = error.response?.data?.detail;
+        setSuggestion({ fileUri: file.uri, type: null, message: typeof detail === "string" ? detail : "Type suggestion is unavailable. You can select the type manually and continue." });
+      }
+    }).finally(() => { if (!controller.signal.aborted) setIdentifying(false); });
+    return () => controller.abort();
+  }, [selectedFile, identifyAttempt]);
 
   // Dropdown state
   const [dropdownVisible, setDropdownVisible] = useState(false);
@@ -177,6 +209,7 @@ export default function UploadDocumentScreen() {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        timeout: 120000,
         onUploadProgress: (progressEvent: any) => {
           if (progressEvent.total) {
             const percentCompleted = Math.round(
@@ -191,6 +224,7 @@ export default function UploadDocumentScreen() {
         setOcrResult(response.data.extracted_text);
       }
       setVerificationStatus(response.data.status);
+      setVersionLabel(response.data.document?.version_label || "");
 
       // ✅ Safe navigation — only navigate if the backend returned a document ID
       const docId: string | undefined = response.data?.document?.id;
@@ -222,6 +256,7 @@ export default function UploadDocumentScreen() {
       setDescription("");
       setOcrResult(null);
       setVerificationStatus(null);
+      setVersionLabel("");
     } catch (error: any) {
       console.error("Upload error:", error);
       Alert.alert(
@@ -243,6 +278,7 @@ export default function UploadDocumentScreen() {
           <Image source={{ uri: selectedFile.uri }} style={styles.previewImage} />
           <TouchableOpacity
             style={[styles.removeFileButton, { backgroundColor: colors.card }]}
+            disabled={uploading}
             onPress={resetFile}
           >
             <Ionicons name="close-circle" size={24} color={colors.error} />
@@ -263,6 +299,7 @@ export default function UploadDocumentScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.removeFileButton, { backgroundColor: colors.card }]}
+            disabled={uploading}
             onPress={resetFile}
           >
             <Ionicons name="close-circle" size={24} color={colors.error} />
@@ -296,9 +333,13 @@ export default function UploadDocumentScreen() {
             styles.typeChip,
             {
               backgroundColor: selectedType === type.value ? colors.primary : colors.card,
-              borderColor: selectedType === type.value ? colors.primary : colors.border,
+              borderColor: selectedType === type.value ? colors.primary : suggestedType?.value === type.value ? "#FFC629" : colors.border,
+              borderWidth: suggestedType?.value === type.value ? 2 : 1,
             },
           ]}
+          disabled={uploading}
+          accessibilityLabel={`${type.label}${suggestedType?.value === type.value ? ", suggested from header" : ""}`}
+          accessibilityState={{ selected: selectedType === type.value, disabled: uploading }}
           onPress={() => setSelectedType(type.value)}
           activeOpacity={0.7}
         >
@@ -312,6 +353,7 @@ export default function UploadDocumentScreen() {
           >
             {type.label}
           </Text>
+          {suggestedType?.value === type.value && <Text style={{ color: selectedType === type.value ? "#FFFFFF" : colors.textPrimary, fontSize: 10, marginTop: 3 }}>Suggested</Text>}
         </TouchableOpacity>
       ))}
     </View>
@@ -417,6 +459,7 @@ export default function UploadDocumentScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
             Select Document
           </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>Choose a file to get a suggested type. It is submitted only when you tap Upload.</Text>
 
           {selectedFile ? (
             renderFilePreview()
@@ -467,7 +510,16 @@ export default function UploadDocumentScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
             Document Type
           </Text>
-          <DocumentTypeSelector />
+          {selectedFile && <View accessibilityLiveRegion="polite" style={{ padding: 15, marginBottom: 16, borderRadius: 12, borderWidth: 1, borderColor: suggestedType ? "#FFC629" : colors.border, backgroundColor: colors.card }}>
+          {identifying ? <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}><ActivityIndicator size="small" color={colors.accent} /><Text style={{ color: colors.textPrimary, flex: 1 }}>Reading the header to suggest a type…</Text></View> : <>
+            <Text style={{ color: colors.textPrimary, fontWeight: "700", marginBottom: 6 }}>{suggestedType ? `Suggested: ${suggestedType.label}` : "Choose the document type"}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>{currentSuggestion?.message || "You can choose the document type manually."}</Text>
+            {suggestedType && selectedType !== suggestedType.value && <TouchableOpacity accessibilityRole="button" disabled={uploading} onPress={() => setSelectedType(suggestedType.value)} style={{ alignSelf: "flex-start", backgroundColor: colors.primary, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginTop: 12 }}><Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Use {suggestedType.label}</Text></TouchableOpacity>}
+            {suggestedType && selectedType === suggestedType.value && <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>Suggested type selected. You can change it below.</Text>}
+            {!suggestedType && <TouchableOpacity accessibilityRole="button" disabled={uploading} onPress={() => setIdentifyAttempt((value) => value + 1)} style={{ alignSelf: "flex-start", paddingVertical: 10 }}><Text style={{ color: colors.accent, fontWeight: "600" }}>Check again</Text></TouchableOpacity>}
+          </>}
+        </View>}
+        <DocumentTypeSelector />
         </View>
 
         <View style={styles.section}>
@@ -532,11 +584,11 @@ export default function UploadDocumentScreen() {
                       : [styles.rejectedText, { color: colors.error }],
                   ]}
                 >
-                  {verificationStatus === "verified"
-                    ? "✅ Verified"
+                  {versionLabel || (verificationStatus === "verified"
+                    ? "Current approved"
                     : verificationStatus === "pending"
                     ? "⏳ Pending Review"
-                    : "⚠️ Review Needed"}
+                    : "Rejected")}
                 </Text>
               </View>
             </View>

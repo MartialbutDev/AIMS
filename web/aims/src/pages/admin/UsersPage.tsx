@@ -1,3 +1,5 @@
+import { ManageUserDialog } from './ManageUserDialog'
+import { updateAdminUser, deleteAdminUser, type UpdateAdminUserInput } from '../../services/adminService'
 
 import {
   useMemo,
@@ -41,6 +43,9 @@ const adminRoleLabels: Record<AdminUserRole, string> = {
 
 interface UsersPageProps {
   users: AdminUser[]
+  currentEmail: string
+  onUserUpdated: (user: AdminUser) => void
+  onUserDeleted: (id: string) => void
   usersLoading: boolean
   usersError: string
   onAddUser: () => void
@@ -55,6 +60,9 @@ interface UsersPageProps {
 
 export function UsersPage({
   users,
+  currentEmail,
+  onUserUpdated,
+  onUserDeleted,
   usersLoading,
   usersError,
   onAddUser,
@@ -66,6 +74,25 @@ export function UsersPage({
   // STATE
   // ========================================
 
+  const [selected, setSelected] = useState<{ user: AdminUser; mode: 'edit' | 'delete' } | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const [success, setSuccess] = useState('')
+  function openAction(user: AdminUser, mode: 'edit' | 'delete') { setSelected({ user, mode }); setActionError(''); setSuccess('') }
+  async function saveUser(input: UpdateAdminUserInput) {
+    if (!selected || actionBusy) return
+    setActionBusy(true); setActionError('')
+    try { const updated = await updateAdminUser(selected.user.id, input); onUserUpdated(updated); setSelected(null); setSuccess('User account updated successfully.') }
+    catch (error) { setActionError(error instanceof Error ? error.message : 'Unable to update this account.') }
+    finally { setActionBusy(false) }
+  }
+  async function removeUser() {
+    if (!selected || actionBusy) return
+    setActionBusy(true); setActionError('')
+    try { await deleteAdminUser(selected.user.id); onUserDeleted(selected.user.id); setSelected(null); setSuccess('User account deleted successfully.') }
+    catch (error) { setActionError(error instanceof Error ? error.message : 'Unable to delete this account.') }
+    finally { setActionBusy(false) }
+  }
   const csvInputRef = useRef<HTMLInputElement>(null)
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -520,6 +547,7 @@ export function UsersPage({
             USERS TABLE
         ======================================== */}
 
+        {success && <p role="status" className="admin-users-feedback">{success}</p>}
         <div className="user-table-scroll">
           <table className="user-table">
             <thead>
@@ -527,6 +555,7 @@ export function UsersPage({
                 <th>USER</th>
                 <th>ROLE</th>
                 <th>STATUS</th>
+                <th>ACTIONS</th>
               </tr>
             </thead>
 
@@ -581,6 +610,7 @@ export function UsersPage({
                           : 'Inactive'}
                       </span>
                     </td>
+                    <td><div className="admin-user-row-actions"><button type="button" aria-label={`Edit ${user.firstName} ${user.lastName}`} onClick={() => openAction(user, 'edit')}>Edit</button><button type="button" disabled={user.email.toLowerCase() === currentEmail.toLowerCase()} title={user.email.toLowerCase() === currentEmail.toLowerCase() ? 'You cannot delete your own account' : 'Delete unused account'} aria-label={`Delete ${user.firstName} ${user.lastName}`} onClick={() => openAction(user, 'delete')}>Delete</button></div></td>
                   </tr>
                 ))}
 
@@ -589,7 +619,7 @@ export function UsersPage({
               {usersLoading && (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={4}
                     className="user-directory-empty"
                   >
                     Loading users...
@@ -603,7 +633,7 @@ export function UsersPage({
                 filteredUsers.length === 0 && (
                   <tr>
                     <td
-                      colSpan={3}
+                      colSpan={4}
                       className="user-directory-empty"
                     >
                       {users.length === 0
@@ -640,6 +670,7 @@ export function UsersPage({
           use HTTPS in production.
         </p>
       </div>
+      {selected && <ManageUserDialog key={`${selected.user.id}-${selected.mode}`} user={selected.user} mode={selected.mode} ownAccount={selected.user.email.toLowerCase() === currentEmail.toLowerCase()} busy={actionBusy} error={actionError} onClose={() => { if (!actionBusy) setSelected(null) }} onEdit={() => openAction(selected.user, 'edit')} onSave={saveUser} onDelete={removeUser} />}
     </section>
   )
 }

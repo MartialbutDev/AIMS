@@ -1,8 +1,8 @@
 // app/(student)/documents/index.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Linking from "expo-linking";
 
 import { useTheme } from "../../../src/context/ThemeContext";
@@ -32,6 +33,12 @@ interface Document {
   description: string;
   original_filename?: string;
   verification_status: string;
+  academic_year?: string | null;
+  semester?: string | null;
+  version_status?: string;
+  version_label?: string;
+  is_current_approved?: boolean;
+  current_approved_id?: string | null;
   created_at: string;
   file_path?: string;
   validation_confidence?: number;
@@ -58,9 +65,13 @@ const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 // ✅ Three-tier status: All / Verified / Pending / Rejected
 const FILTERS = [
   { value: "all", label: "All" },
-  { value: "verified", label: "Verified" },
+  { value: "current_approved", label: "Approved" },
   { value: "pending", label: "Pending" },
+  { value: "pending_replacement", label: "Replacements" },
+  { value: "superseded", label: "History" },
+  { value: "revoked", label: "Revoked" },
   { value: "rejected", label: "Rejected" },
+  { value: "hidden", label: "Hidden" },
 ];
 
 // ✅ Status → color mapping
@@ -89,22 +100,39 @@ export default function DocumentsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+  const [hiddenStorageKey, setHiddenStorageKey] = useState<string | null>(null);
+  const [savingVisibility, setSavingVisibility] = useState(false);
+  const retainedVersion = actionDocument?.verification_status === 'verified' || actionDocument?.version_status === 'revoked';
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     try {
       const response = await api.get("/documents/");
       setDocuments(response.data);
+      setHiddenStorageKey(null);
+      setHiddenIds([]);
+      try {
+        const storedUser = await SecureStore.getItemAsync("user");
+        const userId = storedUser ? JSON.parse(storedUser)?.id : null;
+        if (typeof userId === "string" && userId) {
+          const key = `aims:hidden-documents:${BASE_URL}:${userId}`;
+          const saved = await AsyncStorage.getItem(key);
+          const ids: unknown = saved ? JSON.parse(saved) : [];
+          setHiddenIds(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : []);
+          setHiddenStorageKey(key);
+        }
+      } catch (error) {
+        console.error("Could not load hidden document preferences:", error);
+      }
     } catch (error) {
       console.error("Error fetching documents:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    fetchDocuments();
   }, []);
+
+  useFocusEffect(useCallback(() => { void fetchDocuments(); }, [fetchDocuments]));
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -117,10 +145,40 @@ export default function DocumentsScreen() {
     (a, b) => parseDate(b.created_at) - parseDate(a.created_at)
   );
 
-  const filteredDocuments =
-    selectedFilter === "all"
-      ? sortedDocuments
-      : sortedDocuments.filter((d) => d.verification_status === selectedFilter);
+  const visibleDocuments = sortedDocuments.filter((document) => !hiddenIds.includes(document.id));
+  const hiddenDocuments = sortedDocuments.filter((document) => hiddenIds.includes(document.id));
+  const filteredDocuments = selectedFilter === "hidden"
+    ? hiddenDocuments
+    : selectedFilter === "all"
+      ? visibleDocuments
+      : visibleDocuments.filter((d) => (d.version_status || d.verification_status) === selectedFilter);
+
+  const changeVisibility = async (document: Document) => {
+    if (!hiddenStorageKey || savingVisibility) return;
+    const isHidden = hiddenIds.includes(document.id);
+    const next = isHidden ? hiddenIds.filter((id) => id !== document.id) : [...hiddenIds, document.id];
+    setSavingVisibility(true);
+    try {
+      await AsyncStorage.setItem(hiddenStorageKey, JSON.stringify(next));
+      setHiddenIds(next);
+      setActionDocument(null);
+    } catch {
+      Alert.alert("Could not save preference", "Please try again. Your document has not changed.");
+    } finally {
+      setSavingVisibility(false);
+    }
+  };
+
+  const confirmVisibility = (document: Document) => {
+    if (hiddenIds.includes(document.id)) {
+      void changeVisibility(document);
+      return;
+    }
+    Alert.alert("Hide document?", "This hides the file from your document list on this device. Approvals, application attachments, and coordinator access stay unchanged. Restore it anytime from the Hidden filter.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Hide", onPress: () => void changeVisibility(document) },
+    ]);
+  };
 
   const getStatusColor = (status: string) => {
     if (isDark) return ({ verified: colors.approved, pending: colors.pending, rejected: colors.rejected } as Record<string, string>)[status] || colors.pending;
@@ -210,7 +268,8 @@ export default function DocumentsScreen() {
   }
 
   const renderDocument = ({ item }: { item: Document }) => {
-    const statusColor = getStatusColor(item.verification_status);
+    const displayStatus = item.version_status?.startsWith("pending") ? "pending" : item.verification_status;
+    const statusColor = item.version_status === "superseded" ? colors.textSecondary : getStatusColor(displayStatus);
     const displayName = item.type.replace(/_/g, " ").toUpperCase();
     const subtitle = item.original_filename || item.description || null;
     const typeIcon = getTypeIcon(item.type);
@@ -259,6 +318,22 @@ export default function DocumentsScreen() {
           <Text style={[styles.documentDate, { color: colors.textSecondary }]}>
             {new Date(item.created_at).toLocaleDateString()}
           </Text>
+          {item.academic_year && <Text style={[styles.documentDate, { color: colors.textSecondary }]}>AY {item.academic_year}{item.semester ? ` · Semester ${item.semester}` : ''}</Text>}
+          <View
+            style={[styles.statusBadge, { alignSelf: "flex-start", marginTop: 7 }, { backgroundColor: `${statusColor}15` }]}
+          >
+            <Ionicons
+              name={item.version_status === "superseded" ? "archive-outline" : getStatusIcon(displayStatus)}
+              size={12}
+              color={statusColor}
+              style={styles.statusIcon}
+            />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {item.version_label || item.verification_status}
+            </Text>
+          </View>
+
+
         </View>
 
         <View style={styles.documentActions}>
@@ -273,21 +348,6 @@ export default function DocumentsScreen() {
             {deletingId === item.id ? <ActivityIndicator size="small" color={colors.accent} />
               : <Ionicons name="ellipsis-vertical" size={22} color={colors.textSecondary} />}
           </TouchableOpacity>
-
-          <View
-            style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}
-          >
-            <Ionicons
-              name={getStatusIcon(item.verification_status)}
-              size={12}
-              color={statusColor}
-              style={styles.statusIcon}
-            />
-            <Text style={[styles.statusText, { color: statusColor }]}>
-              {item.verification_status.charAt(0).toUpperCase() +
-                item.verification_status.slice(1)}
-            </Text>
-          </View>
 
           {item.validation_confidence !== null &&
             item.validation_confidence !== undefined && (
@@ -323,9 +383,9 @@ export default function DocumentsScreen() {
   const renderFilterChip = (filter: { value: string; label: string }) => {
     const isActive = selectedFilter === filter.value;
     const count =
-      filter.value === "all"
-        ? documents.length
-        : documents.filter((d) => d.verification_status === filter.value).length;
+      filter.value === "hidden" ? hiddenDocuments.length
+        : filter.value === "all" ? visibleDocuments.length
+        : visibleDocuments.filter((d) => (d.version_status || d.verification_status) === filter.value).length;
 
     return (
       <TouchableOpacity
@@ -398,6 +458,7 @@ export default function DocumentsScreen() {
         <Ionicons name="chevron-forward" size={18} color="#ffc629" />
       </TouchableOpacity>
 
+      <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 19, marginHorizontal: 20, marginBottom: 14 }}>Your approved file stays active while a replacement is checked. Submitted applications keep their original attachments.</Text>
       {/* Filter chips */}
       {documents.length > 0 && (
         <View style={styles.filtersWrapper}>
@@ -433,14 +494,15 @@ export default function DocumentsScreen() {
               color={colors.border}
             />
             <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-              {selectedFilter === "all"
-                ? "No Documents"
-                : `No ${selectedFilter} Documents`}
+              {selectedFilter === "hidden" ? "No hidden documents"
+                : selectedFilter === "all" ? "No visible documents"
+                : `No ${FILTERS.find((filter) => filter.value === selectedFilter)?.label.toLowerCase()} documents`}
             </Text>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {selectedFilter === "all"
-                ? "Upload your internship documents to get started"
-                : `Try a different filter or upload a new document`}
+              {selectedFilter === "hidden" ? "Documents you hide appear here. Use their options to restore them."
+                : selectedFilter === "all" && documents.length > 0 ? "Check the Hidden filter to restore your documents."
+                : selectedFilter === "all" ? "Upload your internship documents to get started"
+                : "Try a different filter or upload a new document"}
             </Text>
             {selectedFilter === "all" && (
               <TouchableOpacity
@@ -482,6 +544,7 @@ export default function DocumentsScreen() {
                   <Text numberOfLines={2} style={[styles.menuFilename, { color: colors.textSecondary }]}>
                     {actionDocument?.original_filename || actionDocument?.type.replace(/_/g, " ")}
                   </Text>
+                  {retainedVersion && <Text style={[styles.menuFilename, { color: colors.textSecondary }]}>This version is retained for review history.</Text>}
                 </View>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close document options" style={styles.optionsButton} onPress={() => setActionDocument(null)}>
                   <Ionicons name="close" size={22} color={colors.textSecondary} />
@@ -513,7 +576,21 @@ export default function DocumentsScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 accessibilityRole="button"
-                style={[styles.menuOption, { borderTopWidth: 1, borderTopColor: colors.border }]}
+                disabled={!hiddenStorageKey || savingVisibility}
+                accessibilityState={{ disabled: !hiddenStorageKey || savingVisibility }}
+                style={[styles.menuOption, { opacity: !hiddenStorageKey || savingVisibility ? 0.45 : 1 }]}
+                onPress={() => { if (actionDocument) confirmVisibility(actionDocument); }}
+              >
+                <Ionicons name={actionDocument && hiddenIds.includes(actionDocument.id) ? "refresh-outline" : "eye-off-outline"} size={22} color={colors.accent} />
+                <Text style={[styles.menuOptionText, { color: colors.textPrimary }]}>
+                  {savingVisibility ? "Saving…" : actionDocument && hiddenIds.includes(actionDocument.id) ? "Restore to list" : "Hide from my list"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityState={{ disabled: retainedVersion }}
+                disabled={retainedVersion}
+                style={[styles.menuOption, { borderTopWidth: 1, borderTopColor: colors.border, opacity: retainedVersion ? 0.45 : 1 }]}
                 onPress={() => {
                   const document = actionDocument;
                   setActionDocument(null);

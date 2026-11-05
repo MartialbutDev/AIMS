@@ -79,16 +79,16 @@ class DeploymentApprovalTests(unittest.TestCase):
         self.regular()
         with self.assertRaises(HTTPException): DeploymentService.require_active_deployment(self.db, 's1')
 
-    def test_latest_document_replacement_revokes_readiness(self):
+    def test_pending_replacement_does_not_revoke_existing_approval(self):
         deployment = self.regular(); self.f.documents()
         self.assertTrue(self.snapshot().json()['items'][0]['approval']['ready'])
         self.db.add(Document(id='replacement', uploaded_by='s1', type=DocumentType.WAIVER,
             file_path='test.pdf', verification_status='pending', academic_year='2026-2027', semester='1',
             created_at=datetime.now(timezone.utc).replace(tzinfo=None)+timedelta(seconds=5)))
         self.db.commit()
-        self.assertFalse(self.snapshot().json()['items'][0]['approval']['ready'])
-        self.assertEqual(self.confirm(deployment).status_code, 409)
-        self.assertIsNone(deployment.confirmed_at)
+        self.assertTrue(self.snapshot().json()['items'][0]['approval']['ready'])
+        self.assertEqual(self.confirm(deployment).status_code, 200)
+        self.assertIsNotNone(deployment.confirmed_at)
 
     def test_other_term_documents_never_satisfy_checklist(self):
         self.regular(); self.f.documents()

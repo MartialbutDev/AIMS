@@ -3,6 +3,7 @@ import { apiRequest } from './apiClient'
 export interface CompanyIntern {
   deployment_id: string
   student_name: string
+  student_email?: string | null
   student_number: string | null
   company_name: string
   status: 'deployed' | 'completed'

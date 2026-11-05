@@ -2,7 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import { MotiView } from "moti";
-import { StyleSheet, Text, TouchableOpacity, View, Animated } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Animated, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../context/ThemeContext";
@@ -38,6 +38,7 @@ export default function FloatingBottomTabBar({
 }: FloatingBottomTabBarProps) {
   const { colors, isDark } = useTheme();
   const pathname = usePathname();
+  const { width } = useWindowDimensions();
 
   // ✅ Choose active color based on theme
   const activeColor = isDark ? DARK_MODE_ACTIVE : LIGHT_MODE_ACTIVE;
@@ -72,11 +73,12 @@ export default function FloatingBottomTabBar({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["bottom", "left", "right"]}>
       <Animated.View
         style={[
           styles.container,
           {
+            marginHorizontal: width < 360 ? 8 : 16,
             backgroundColor: isDark ? colors.tabBackground : 'rgba(255,255,255,0.95)',
             borderColor: isDark ? colors.border : 'rgba(0,0,0,0.06)',
           },
@@ -119,6 +121,11 @@ export default function FloatingBottomTabBar({
                   ) : null}
                 </MotiView>
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  maxFontSizeMultiplier={1.2}
+                  ellipsizeMode="tail"
                   style={[
                     styles.tabLabel,
                     { color: tabColor },
@@ -175,6 +182,9 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
@@ -183,10 +193,14 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   tabLabel: {
+    width: '100%',
+    flexShrink: 1,
+    textAlign: 'center',
+    minHeight: 14,
     fontSize: 10,
     fontWeight: '500',
     marginTop: 2,
-    letterSpacing: 0.2,
+    letterSpacing: 0,
   },
   tabLabelActive: {
     fontWeight: '600',

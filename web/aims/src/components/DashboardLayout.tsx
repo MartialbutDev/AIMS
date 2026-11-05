@@ -56,6 +56,7 @@ const NAV_BY_ROLE = {
 
   dean: [
     { label: 'Program overview', slug: 'dashboard', icon: 'grid' },
+    { label: 'MOA partners', slug: 'moa-partners', icon: 'briefcase' },
     { label: 'Completion & archive', slug: 'completion', icon: 'check' },
     { label: 'Direct placements', slug: 'direct-placements', icon: 'briefcase' },
   ],
@@ -135,6 +136,7 @@ export function DashboardLayout({
     'direct-placements': session.role === 'career_center' ? 'Partnership review' : 'Direct placements',
     'document-templates': 'Approved forms',
     companies: 'Companies',
+    'moa-partners': 'MOA partners',
     applications: 'Applications',
     notifications: 'Notifications',
     announcements: 'Announcements',

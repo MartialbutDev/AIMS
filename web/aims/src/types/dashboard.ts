@@ -43,6 +43,8 @@ export type AdminUserRole =
   | 'admin'
 
 export interface AdminUser {
+  middleName?: string | null
+  phone?: string | null
   id: string
   firstName: string
   lastName: string

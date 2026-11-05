@@ -148,6 +148,24 @@ class UserUpdate(BaseModel):
     avatar_url: Optional[str] = None
 
 
+class AdminUserUpdate(BaseModel):
+    """Administrative details; role and student identity are deliberately immutable."""
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    first_name: str | None = Field(default=None, min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, min_length=1, max_length=100)
+    email: EmailStr | None = None
+    phone: str | None = Field(default=None, max_length=20)
+    is_active: bool | None = None
+
+    @field_validator("first_name", "last_name", "email", "is_active")
+    @classmethod
+    def required_when_supplied(cls, value):
+        if value is None:
+            raise ValueError("This field cannot be null")
+        return value
+
+
 class ChangePassword(BaseModel):
     current_password: str
 

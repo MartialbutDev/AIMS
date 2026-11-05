@@ -1,5 +1,7 @@
 # backend/app/api/v1/endpoints/users.py
 import csv
+import logging
+from pathlib import Path
 import io
 import uuid
 from typing import List, Literal
@@ -10,8 +12,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 import os
 import shutil
-from datetime import datetime
-from sqlalchemy import func
+from datetime import datetime, timezone
+from sqlalchemy import func, select, or_
+from app.core.database import Base
+from app.models.auth_session import AuthSession, AuthSessionCutoff
+from app.models.push import PushDevice
+from app.models.password_reset import PasswordResetChallenge
 
 from app.core.database import get_db
 from app.core.assignment_access import get_current_academic_term
@@ -23,7 +29,7 @@ from app.schemas.user import (
     AdminUserCreate,
     UserImportResponse,
     UserResponse,
-    UserUpdate,
+    AdminUserUpdate,
 )
 from app.core.config import settings
 
@@ -352,50 +358,109 @@ async def get_user_by_id(
     return user
 
 
+def _managed_user(db: Session, user_id: str) -> User:
+    # Lock administrators in a consistent order so concurrent access changes
+    # cannot remove the last active administrator.
+    db.query(User).filter(User.role == UserRole.ADMIN).order_by(User.id).with_for_update().all()
+    user = db.query(User).filter(User.id == user_id).with_for_update().first()
+    if user is None:
+        raise HTTPException(404, "User not found")
+    return user
+
+
+def _protect_admin_access(db: Session, user: User, actor: User) -> None:
+    if user.id == actor.id:
+        raise HTTPException(409, "You cannot deactivate or delete your own account.")
+    if user.role == UserRole.ADMIN and user.is_active:
+        count = db.query(User).filter(User.role == UserRole.ADMIN, User.is_active.is_(True)).count()
+        if count <= 1:
+            raise HTTPException(409, "At least one active administrator must remain.")
+
+
 @router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
     user_id: str,
-    user_data: UserUpdate,
+    user_data: AdminUserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin"))
+    current_user: User = Depends(require_role("admin")),
 ):
-    """
-    Update user.
-    Admin only.
-    """
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    update_data = user_data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(user, key, value)
-    db.commit()
-    db.refresh(user)
-    return user
+    try:
+        user = _managed_user(db, user_id)
+        changes = user_data.model_dump(exclude_unset=True)
+        if changes.get("is_active") is False:
+            _protect_admin_access(db, user, current_user)
+        if "email" in changes:
+            changes["email"] = str(changes["email"]).lower()
+            if db.query(User.id).filter(func.lower(User.email) == changes["email"], User.id != user.id).first():
+                raise HTTPException(409, "Email already registered.")
+        email_changed = "email" in changes and changes["email"] != user.email.lower()
+        if email_changed and user.id == current_user.id:
+            raise HTTPException(409, "Your signed-in email cannot be changed from User Management.")
+        for key, value in changes.items():
+            setattr(user, key, value)
+        if email_changed:
+            user.is_verified = False
+        if email_changed or changes.get("is_active") is False:
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.query(PasswordResetChallenge).filter(PasswordResetChallenge.user_id == user.id).delete(synchronize_session=False)
+            db.query(AuthSession).filter(AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None)).update({"revoked_at": now}, synchronize_session=False)
+            cutoff = db.get(AuthSessionCutoff, user.id)
+            if cutoff is None:
+                cutoff = AuthSessionCutoff(user_id=user.id); db.add(cutoff)
+            cutoff.revoked_before = now
+            db.query(PushDevice).filter(PushDevice.user_id == user.id).update({"active": False}, synchronize_session=False)
+        db.commit()
+        db.refresh(user)
+        return user
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(409, "These details conflict with another account.") from exc
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.delete("/{user_id}")
 async def delete_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin"))
+    current_user: User = Depends(require_role("admin")),
 ):
-    """
-    Delete user.
-    Admin only.
-    """
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    db.delete(user)
-    db.commit()
-    return {"message": "User deleted successfully"}
+    """Delete unused accounts, retaining all academic and administrative history."""
+    disposable = {"auth_sessions", "auth_session_cutoffs", "password_reset_challenges", "password_reset_revocations", "notification_settings", "notification_delivery_preferences"}
+    try:
+        user = _managed_user(db, user_id)
+        _protect_admin_access(db, user, current_user)
+        for table in Base.metadata.sorted_tables:
+            if table.name == "users" or table.name in disposable:
+                continue
+            # Include legacy ownership fields that predate foreign keys.
+            references = [column for column in table.columns if
+                any(fk.target_fullname == "users.id" for fk in column.foreign_keys)
+                or column.name in {"uploaded_by", "reviewer_id", "user_id", "student_id", "coordinator_id", "actor_id"}
+                or column.name.endswith("_by")]
+            if references and db.execute(select(table).where(or_(*(column == user.id for column in references))).limit(1)).first():
+                raise HTTPException(409, "This account has linked records and cannot be deleted. Edit the account and set it to Inactive to remove access while preserving history.")
+        for table in reversed(Base.metadata.sorted_tables):
+            if table.name in disposable:
+                db.execute(table.delete().where(table.c.user_id == user.id))
+        avatar_root = (Path(settings.ASSET_DIR) / "avatars").resolve()
+        avatar = (Path(settings.ASSET_DIR) / user.avatar_url).resolve() if user.avatar_url else None
+        shared_avatar = user.avatar_url and db.query(User.id).filter(User.id != user.id, User.avatar_url == user.avatar_url).first()
+        db.delete(user)
+        db.commit()
+        if avatar and not shared_avatar and avatar.parent == avatar_root and avatar.name.startswith(f"avatar_{user_id}_"):
+            try:
+                avatar.unlink(missing_ok=True)
+            except OSError:
+                logging.getLogger(__name__).exception("Unable to clean up deleted account avatar")
+        return {"message": "User deleted successfully"}
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(409, "This account has linked records. Set it to Inactive instead.") from exc
+    except Exception:
+        db.rollback()
+        raise
 
 
 # ✅ Upload Avatar - Any authenticated user

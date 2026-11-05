@@ -54,11 +54,16 @@ export interface CoordinatorStudentDetail {
   journey: CoordinatorJourney
 
   document_statuses: Array<{
+    document_id?: string | null
+    version_label?: string
     type: string
     status: string
   }>
 
   documents: Array<{
+    version_status?: string
+    version_label?: string
+    is_current_approved?: boolean
     id: string
     type: string
     filename: string | null
@@ -483,6 +488,9 @@ export interface CoordinatorInternshipDocumentStudent {
 }
 
 export interface CoordinatorInternshipDocument {
+  version_status?: string
+  version_label?: string
+  is_current_approved?: boolean
   id: string
 
   student: CoordinatorInternshipDocumentStudent
@@ -608,4 +616,8 @@ export function reviewCoordinatorInternshipDocument(
       }),
     },
   )
+}
+
+export function revokeCoordinatorInternshipDocument(documentId: string, reason: string): Promise<unknown> {
+  return apiRequest(`/api/v1/documents/${encodeURIComponent(documentId)}/revoke`, { method: 'POST', body: JSON.stringify({ reason: reason.trim() }) })
 }

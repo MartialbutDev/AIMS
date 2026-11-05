@@ -1,36 +1,39 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Alert, ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useTheme } from '../../../src/context/ThemeContext';
 import { APP_VERSION, APP_BUILD } from '../../../src/constants/app';
+import { AccountPage, AccountHero, Panel, SectionLabel, MenuRow, ActionButton, ui } from '../../../src/components/account/AccountUI';
 
 export default function AppSettingsScreen() {
-  const { colors } = useTheme();
+  const { colors, mode, setMode } = useTheme();
   const [clearing, setClearing] = useState(false);
-  const card = { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, padding: 20, borderRadius: 16, gap: 12 } as const;
-  const text = { color: colors.textPrimary }, muted = { color: colors.textSecondary, lineHeight: 22 };
   async function clearCache() {
     setClearing(true);
     try {
       const root = FileSystem.cacheDirectory;
-      if (!root) throw new Error('Temporary storage is unavailable on this device.');
-      const files = await FileSystem.readDirectoryAsync(root);
-      for (const file of files) await FileSystem.deleteAsync(root + file, { idempotent: true });
-      Alert.alert('Cache cleared', 'Temporary app files were cleared. Your sign-in, settings and submitted records are unchanged.');
+      if (!root) throw new Error('Temporary storage unavailable');
+      for (const file of await FileSystem.readDirectoryAsync(root)) await FileSystem.deleteAsync(root + file, { idempotent: true });
+      Alert.alert('Cache cleared', 'Temporary files were removed. Your sign-in, preferences and submitted records are unchanged.');
     } catch { Alert.alert('Unable to clear cache', 'Some temporary files could not be removed. Please try again.'); }
     finally { setClearing(false); }
   }
-  const link = (label: string, action: () => void) => <TouchableOpacity accessibilityRole="button" onPress={action} style={{ paddingVertical: 12 }}><Text style={{ color: colors.accent, fontWeight: '700' }}>{label}</Text></TouchableOpacity>;
-  return <SafeAreaView edges={['bottom']} style={{ flex: 1, backgroundColor: colors.background }}>
-    <View style={{ paddingHorizontal: 20, paddingTop: 0, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 18 }}>{link('Back', () => router.back())}<Text style={{ ...text, fontWeight: '800', fontSize: 23 }}>App settings</Text></View>
-    <ScrollView contentContainerStyle={{ padding: 18, gap: 18 }}>
-      <View style={card}><Text style={{ ...text, fontWeight: '700', fontSize: 18 }}>Language</Text><Text style={text}>English</Text></View>
-      <View style={card}><Text style={{ ...text, fontWeight: '700', fontSize: 18 }}>Temporary files</Text><Text style={muted}>Remove cached images and downloaded temporary files from this phone. Files can be downloaded again when needed.</Text>
-        <TouchableOpacity accessibilityRole="button" disabled={clearing} onPress={() => Alert.alert('Clear temporary files?', 'Your account, sign-in, theme and server records will stay available.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clear cache', onPress: () => void clearCache() }])} style={{ paddingVertical: 12, opacity: clearing ? .5 : 1 }}><Text style={{ color: colors.accent, fontWeight: '700' }}>{clearing ? 'Clearing…' : 'Clear cache'}</Text></TouchableOpacity>{clearing && <ActivityIndicator color={colors.accent} />}
-      </View>
-      <View style={card}><Text style={{ ...text, fontWeight: '700', fontSize: 18 }}>Information</Text>{link('Help & guides', () => router.push('/(student)/settings/help-support'))}{link('Privacy policy', () => router.push('/(student)/settings/privacy-policy'))}{link('Terms & conditions', () => router.push('/(student)/settings/terms'))}{link('About AIMS', () => router.push('/(student)/about'))}<Text style={muted}>{APP_VERSION} · Build {APP_BUILD}</Text></View>
-    </ScrollView>
-  </SafeAreaView>;
+  return <AccountPage title="App settings">
+    <AccountHero icon="options-outline" title="Make AIMS feel like you." description="Choose your appearance and manage this app on your phone." label="APP PREFERENCES" />
+    <SectionLabel title="Appearance" hint="Choose the display that feels most comfortable." />
+    <View style={{ flexDirection: 'row', gap: 12 }}>
+      {(['light', 'dark'] as const).map(value => <TouchableOpacity key={value} accessibilityRole="radio" accessibilityState={{ selected: mode === value }} accessibilityLabel={`${value} theme`} onPress={() => setMode(value)} style={{ flex: 1, padding: 16, borderRadius: 18, borderWidth: 2, borderColor: mode === value ? colors.accent : colors.border, backgroundColor: colors.card, gap: 12 }}>
+        <View style={{ backgroundColor: value === 'dark' ? '#0B0D1B' : '#EDF0F8', height: 64, borderRadius: 10, padding: 10, gap: 7 }}><View style={{ width: 30, height: 7, borderRadius: 3, backgroundColor: '#FFC629' }} /><View style={{ height: 24, borderRadius: 5, backgroundColor: value === 'dark' ? '#27324B' : '#FFFFFF' }} /></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Text style={{ color: colors.textPrimary, fontWeight: '600', flex: 1 }}>{value === 'dark' ? 'Dark' : 'Light'}</Text><Ionicons name={mode === value ? 'radio-button-on' : 'radio-button-off'} color={colors.accent} size={20} /></View>
+      </TouchableOpacity>)}
+    </View>
+    <Panel><MenuRow icon="language-outline" title="Language" detail="English" /></Panel>
+    <SectionLabel title="Storage" />
+    <Panel><MenuRow icon="folder-open-outline" title="Temporary files" detail="Clear cached images and temporary downloads. Your account and submitted records stay available." /><ActionButton title={clearing ? 'Clearing temporary files…' : 'Clear cache'} secondary busy={clearing} onPress={() => Alert.alert('Clear temporary files?', 'Downloaded files can be downloaded again. Your account and server records will stay available.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clear cache', onPress: () => void clearCache() }])} /></Panel>
+    <SectionLabel title="Resources & information" />
+    <Panel><MenuRow icon="help-buoy-outline" title="Help & support" onPress={() => router.push('/(student)/settings/help-support')} /><MenuRow icon="shield-checkmark-outline" title="Privacy policy" onPress={() => router.push('/(student)/settings/privacy-policy')} /><MenuRow icon="document-text-outline" title="Terms & conditions" onPress={() => router.push('/(student)/settings/terms')} /><MenuRow icon="information-circle-outline" title="About AIMS" onPress={() => router.push('/(student)/about')} /></Panel>
+    <Text style={[ui.description, { color: colors.textTertiary, textAlign: 'center' }]}>{APP_VERSION} · Build {APP_BUILD}</Text>
+  </AccountPage>;
 }

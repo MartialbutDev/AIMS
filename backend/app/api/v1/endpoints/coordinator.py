@@ -1,3 +1,4 @@
+from app.services.document_version_service import effective_documents, annotate
 
 """Coordinator endpoints with assignment-based access control."""
 
@@ -360,7 +361,7 @@ async def list_students(
     for student in students:
         latest: dict[str, Document] = {}
 
-        for document in docs_by_student.get(student.id, []):
+        for document in effective_documents(db, docs_by_student.get(student.id, [])):
             latest.setdefault(
                 document.type.value,
                 document,
@@ -522,12 +523,13 @@ async def get_student_detail(
 
     latest: dict[str, Document] = {}
 
-    for document in documents:
+    for document in effective_documents(db, documents):
         latest.setdefault(
             document.type.value,
             document,
         )
 
+    versions = annotate(db, documents)
     return {
         "academic_year": _current_term()[0],
         "semester": _current_term()[1],
@@ -544,6 +546,8 @@ async def get_student_detail(
         "journey": _hours_summary(dtrs),
         "document_statuses": [
             {
+                "document_id": latest[kind.value].id if kind.value in latest else None,
+                "version_label": versions[latest[kind.value].id]['version_label'] if kind.value in latest else 'Missing',
                 "type": kind.value,
                 "status": (
                     latest[kind.value].verification_status
@@ -555,6 +559,7 @@ async def get_student_detail(
         ],
         "documents": [
             {
+                **versions[document.id],
                 "id": document.id,
                 "type": document.type.value,
                 "filename": document.original_filename,

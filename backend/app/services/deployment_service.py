@@ -1,3 +1,4 @@
+from app.services.document_version_service import effective_documents
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -48,13 +49,7 @@ class DeploymentService:
             .all()
         )
 
-        # The latest submission determines the status of each
-        # requirement. Older verified files cannot silently
-        # override a newer pending or rejected replacement.
-        latest = {}
-        for document in documents:
-            if document.type not in latest:
-                latest[document.type] = document
+        latest = {document.type: document for document in effective_documents(db, documents)}
 
         checklist = []
 

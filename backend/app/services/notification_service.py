@@ -269,6 +269,7 @@ class NotificationService:
 
         status_messages = {
             "uploaded": f"Your {doc_type} has been uploaded successfully.",
+            "revoked": f"Approval for your {doc_type} was revoked. Open Documents to read the reason. Older versions will not become active automatically.",
             "pending": (
                 f"⏳ Your {doc_type} is queued for manual review. "
                 f"We'll notify you once it's verified."
