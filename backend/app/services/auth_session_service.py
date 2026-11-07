@@ -19,6 +19,16 @@ def ready(db, required=False):
 
 
 def track(db, user, token, claims, agent=''):
+    # Authentication may fail before a response dependency can close its session.
+    # Release row locks immediately so concurrent requests cannot wait on it.
+    try:
+        return _track(db, user, token, claims, agent)
+    except BaseException:
+        db.rollback()
+        raise
+
+
+def _track(db, user, token, claims, agent=''):
     if not ready(db): return None  # Compatibility while the migration is being deployed.
     db.query(User).filter_by(id=user.id).populate_existing().with_for_update().first()
     if claims.get('pwd') is not None and claims['pwd'] != fingerprint(user):
@@ -46,6 +56,14 @@ def track(db, user, token, claims, agent=''):
 
 
 def revoke(db, user, current_id, target=None, others=False):
+    try:
+        return _revoke(db, user, current_id, target, others)
+    except BaseException:
+        db.rollback()
+        raise
+
+
+def _revoke(db, user, current_id, target=None, others=False):
     db.query(User).filter_by(id=user.id).with_for_update().first()
     current=now()
     query=db.query(AuthSession).filter_by(user_id=user.id)

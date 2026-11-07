@@ -3,13 +3,13 @@ import unittest
 from pathlib import Path
 from datetime import timedelta
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from app.core.database import Base, get_db
-from app.core.security import create_access_token, get_password_hash
+from app.core.security import create_access_token, get_password_hash, decode_token
 from app.models.user import User, UserRole
 from app.models.auth_session import AuthSession
 from app.api.v1.endpoints import auth
@@ -110,3 +110,55 @@ class SessionTests(unittest.TestCase):
         current=self.token();self.call(current)
         self.call(current,'/sessions/revoke-others','post')
         self.assertEqual(self.call(token).status_code,401)
+
+    def test_revoked_session_releases_transaction_before_dependency_cleanup(self):
+        token = self.token()
+        user = self.db.get(User, 'one')
+        service.track(self.db, user, token, decode_token(token))
+        row = self.db.get(AuthSession, service.digest(token))
+        row.revoked_at = service.now()
+        self.db.commit()
+        with self.assertRaises(HTTPException) as error:
+            service.track(self.db, user, token, decode_token(token))
+        self.assertEqual(error.exception.status_code, 401)
+        self.assertFalse(self.db.in_transaction())
+        # A rejected old token must not prevent a new valid session from signing in.
+        fresh = self.token()
+        self.assertEqual(service.track(self.db, user, fresh, decode_token(fresh)), service.digest(fresh))
+
+    def test_expired_session_releases_transaction_immediately(self):
+        token = self.token()
+        user = self.db.get(User, 'one')
+        service.track(self.db, user, token, decode_token(token))
+        self.db.get(AuthSession, service.digest(token)).expires_at = service.now() - timedelta(seconds=1)
+        self.db.commit()
+        with self.assertRaises(HTTPException) as error:
+            service.track(self.db, user, token, decode_token(token))
+        self.assertEqual(error.exception.status_code, 401)
+        self.assertFalse(self.db.in_transaction())
+
+    def test_password_race_releases_authentication_lock(self):
+        token = self.token()
+        claims = decode_token(token)
+        claims['pwd'] = 'changed-after-password-verification'
+        with self.assertRaises(HTTPException) as error:
+            service.track(self.db, self.db.get(User, 'one'), token, claims)
+        self.assertEqual(error.exception.status_code, 401)
+        self.assertFalse(self.db.in_transaction())
+
+    def test_unseen_revoked_token_releases_authentication_lock(self):
+        from app.models.auth_session import AuthSessionCutoff
+        token = self.token()
+        self.db.add(AuthSessionCutoff(user_id='one', revoked_before=service.now() + timedelta(seconds=1)))
+        self.db.commit()
+        with self.assertRaises(HTTPException) as error:
+            service.track(self.db, self.db.get(User, 'one'), token, decode_token(token))
+        self.assertEqual(error.exception.status_code, 401)
+        self.assertFalse(self.db.in_transaction())
+
+    def test_missing_revocation_target_releases_user_lock(self):
+        token = self.token()
+        with self.assertRaises(HTTPException) as error:
+            service.revoke(self.db, self.db.get(User, 'one'), service.digest(token), target='missing')
+        self.assertEqual(error.exception.status_code, 404)
+        self.assertFalse(self.db.in_transaction())

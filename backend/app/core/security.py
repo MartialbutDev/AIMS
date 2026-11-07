@@ -135,7 +135,7 @@ def _user_from_access_token(
     return user
 
 
-async def get_current_user(
+def get_current_user(
     request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
@@ -143,7 +143,7 @@ async def get_current_user(
     return _user_from_access_token(token, db, request.headers.get("user-agent", ""))
 
 
-async def get_current_user_from_token(
+def get_current_user_from_token(
     request: Request,
     token: Optional[str] = Query(default=None),
     header_token: Optional[str] = Depends(

@@ -242,7 +242,7 @@ async def register_student(
     "/login/student",
     response_model=LoginResponse,
 )
-async def login_student(
+def login_student(
     login_data: LoginRequest,
     request: Request = None,
     db: Session = Depends(get_db),
@@ -314,7 +314,7 @@ async def register_web_user(
     "/login/web",
     response_model=LoginResponse,
 )
-async def login_web_user(
+def login_web_user(
     login_data: LoginRequest,
     request: Request = None,
     db: Session = Depends(get_db),
@@ -329,7 +329,7 @@ async def login_web_user(
 
 
 @router.post("/login/form")
-async def login_user_form(
+def login_user_form(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
