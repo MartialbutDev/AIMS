@@ -5,7 +5,7 @@ import type { UserRole } from '../types/auth'
 
 interface RoleSelectorProps { onSelectRole: (role: UserRole) => void }
 const roleIcons: Record<UserRole, 'users' | 'briefcase' | 'chart' | 'settings'> = {
-  coordinator: 'users', dean: 'chart', career_center: 'briefcase', company: 'briefcase', admin: 'settings',
+  student: 'users', coordinator: 'users', dean: 'chart', career_center: 'briefcase', company: 'briefcase', admin: 'settings',
 }
 
 export function RoleSelector({ onSelectRole }: RoleSelectorProps) {
@@ -27,7 +27,7 @@ export function RoleSelector({ onSelectRole }: RoleSelectorProps) {
               </button>
             ))}
           </div>
-          <p className="citc-student-note"><Icon name="users" size={18} /><span>Student intern? Access your internship through the <strong>AIMS mobile app.</strong></span></p>
+          <p className="citc-student-note"><Icon name="users" size={18} /><span>Students can use <strong>web or mobile</strong> with the same account. <a href="/student-signup">Create a student account</a>.</span></p>
         </div>
         <footer className="citc-auth-footer"><span>© {new Date().getFullYear()} USTP · CITC</span><span>Academic Internship Management System</span></footer>
       </section>

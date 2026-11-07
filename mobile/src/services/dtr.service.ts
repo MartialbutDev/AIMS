@@ -73,19 +73,7 @@ export const dtrService = {
       return response.data;
     } catch (error: any) {
       console.error('❌ Get DTR summary error:', error.response?.data || error.message);
-      return {
-        total_entries: 0,
-        pending: 0,
-        submitted: 0,
-        approved: 0,
-        rejected: 0,
-        total_hours: 0,
-        // ✅ NEW fallbacks
-        required_hours: 486,
-        remaining_hours: 486,
-        progress_percent: 0,
-        current_company: null,
-      };
+      throw error;
     }
   },
 
@@ -123,12 +111,13 @@ export const dtrService = {
     }
   },
 
-  async exportDTRToExcel(): Promise<void> {
+  async exportDTRToExcel(term?: { academic_year: string; semester: string }, approvedOnly = false): Promise<void> {
     try {
       console.log('📊 Exporting DTR to Excel...');
 
       const response = await api.get('/excel/export/dtr', {
         responseType: 'blob',
+        params: { ...term, approved_only: approvedOnly },
       });
 
       const blob = new Blob([response.data], {

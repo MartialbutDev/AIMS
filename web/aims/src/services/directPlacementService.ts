@@ -32,3 +32,4 @@ export const directPlacementService = {
   cancel: (id: string, reason: string) => apiRequest<DirectPlacement>(`${root}/${encodeURIComponent(id)}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
   confirm: (id: string, deployment_date: string) => apiRequest(`/api/v1/deployments/${encodeURIComponent(id)}/confirm`, { method: 'POST', body: JSON.stringify({ deployment_date }) }),
 }
+

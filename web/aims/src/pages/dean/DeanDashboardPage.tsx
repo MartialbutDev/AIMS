@@ -1,3 +1,4 @@
+import { ActivityBadges } from '../../components/ActivityIndicators'
 import { useEffect, useRef, useState } from 'react'
 import { getDeanAnalytics, getDeanAttention, getDeanTerms, termLabel, type AcademicTerm, type AttentionCategory, type AttentionDetails, type DeanAnalytics } from '../../services/deanAnalyticsService'
 import './dean-dashboard.css'
@@ -104,7 +105,7 @@ export function DeanDashboardPage() {
     {data && <>
       <div className="dean-oversight__caption"><span>{termLabel(data)}</span><span>Updated {new Date(data.generated_at).toLocaleString()}</span></div>
       <section className="dean-oversight__cards" aria-label="Internship overview">
-        {cards.map((card, index) => <article key={card.key} className={`dean-oversight__metric${index === 0 ? ' dean-oversight__metric--primary' : ''}`}><span>{card.label}</span><strong>{data.overview[card.key].toLocaleString()}</strong><small>{card.caption}</small></article>)}
+        {cards.map((card, index) => <article key={card.key} className={`dean-oversight__metric${index === 0 ? ' dean-oversight__metric--primary' : ''}`}><span>{card.label}</span>{card.key === 'pending_completion' && <ActivityBadges categories={['completion']} academicYear={term?.academic_year} semester={term?.semester} />}<strong>{data.overview[card.key].toLocaleString()}</strong><small>{card.caption}</small></article>)}
       </section>
       {!data.overview.students_in_oversight && <p className="dean-oversight__notice">No assigned students are available in your oversight scope for this term. Coordinator designations are managed by the administrator.</p>}
       <section className="dean-oversight__panel" aria-labelledby="dean-stage-heading">

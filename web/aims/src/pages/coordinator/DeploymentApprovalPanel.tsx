@@ -1,3 +1,4 @@
+import { ActivityViewed, ActivityBadges } from '../../components/ActivityIndicators'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { deploymentApprovalService as service, type DeploymentApprovalRecord, type StudentDeploymentApproval } from '../../services/deploymentApprovalService'
 import { notificationChanged } from '../../hooks/useNotificationCount'
@@ -79,7 +80,7 @@ export function DeploymentApprovalPanel({ studentId, studentName }: { studentId:
   }
 
   return <section className="panel da-panel" aria-labelledby="deployment-approval-heading">
-    <div className="panel-heading"><div><h2 id="deployment-approval-heading">Deployment approval</h2><p>Company acceptance prepares the placement. Your confirmation authorizes the internship to start.</p></div><button type="button" className="da-secondary" onClick={() => void refresh()} disabled={busy || loading}>Refresh eligibility</button></div>
+    <div className="panel-heading"><div><h2 id="deployment-approval-heading">Deployment approval <ActivityBadges categories={['deployment']} studentId={studentId} /></h2><ActivityViewed categories={['deployment']} studentId={studentId} ready={Boolean(data) && !loading && !error} recordIds={data?.items.map(item => item.id) || []} /><p>Company acceptance prepares the placement. Your confirmation authorizes the internship to start.</p></div><button type="button" className="da-secondary" onClick={() => void refresh()} disabled={busy || loading}>Refresh eligibility</button></div>
     {notice && <p className="da-notice" role="status">{notice}</p>}
     {error && <p className="da-error" role="alert">{error} Use Refresh eligibility to try again.</p>}
     {loading && <p role="status">Checking current deployment requirements…</p>}

@@ -54,6 +54,8 @@ export async function apiRequest<T>(
     throw new Error(message)
   }
 
+  if (options.method && !['GET', 'HEAD'].includes(options.method.toUpperCase()) && !path.startsWith('/api/v1/notifications/')) window.dispatchEvent(new Event('aims-workflow-changed'))
+
   return response.json() as Promise<T>
 }
 

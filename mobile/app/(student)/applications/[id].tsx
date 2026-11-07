@@ -1,8 +1,8 @@
 // app/(student)/applications/[id].tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -11,19 +11,19 @@ import {
   TouchableOpacity,
   View,
   Alert,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import api from "../../../src/services/api";
+import { ApplicationJourney } from "../../../src/components/ApplicationJourney";
 
 interface ApplicationDetail {
   id: string;
   company_id: string;
   company_name: string;
   position: string;
-  status: "pending" | "reviewing" | "interview" | "accepted" | "rejected" | "withdrawn";
+  status: "pending" | "reviewing" | "endorsed" | "interview" | "accepted" | "rejected" | "withdrawn";
   applied_date: string;
   cover_letter?: string;
   feedback?: string;
@@ -35,11 +35,7 @@ export default function ApplicationDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState<ApplicationDetail | null>(null);
 
-  useEffect(() => {
-    fetchApplicationDetail();
-  }, [id]);
-
-  const fetchApplicationDetail = async () => {
+  const fetchApplicationDetail = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/applications/${id}`);
@@ -50,12 +46,15 @@ export default function ApplicationDetailScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useFocusEffect(useCallback(() => { void fetchApplicationDetail(); }, [fetchApplicationDetail]));
 
   const getStatusColor = (status: string) => {
     const statusColors: Record<string, string> = {
       pending: "#F59E0B",
       reviewing: "#3B82F6",
+      endorsed: "#3B82F6",
       interview: "#8B5CF6",
       accepted: "#10B981",
       rejected: "#EF4444",
@@ -68,6 +67,7 @@ export default function ApplicationDetailScreen() {
     const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
       pending: "time-outline",
       reviewing: "sync-outline",
+      endorsed: "send-outline",
       interview: "people-outline",
       accepted: "checkmark-circle-outline",
       rejected: "close-circle-outline",
@@ -94,7 +94,7 @@ export default function ApplicationDetailScreen() {
               await api.post(`/applications/${id}/withdraw`);
               Alert.alert("Success", "Application withdrawn successfully");
               router.back();
-            } catch (error) {
+            } catch {
               Alert.alert("Error", "Failed to withdraw application");
             }
           },
@@ -157,7 +157,7 @@ export default function ApplicationDetailScreen() {
             <View style={[styles.companyAvatar, { backgroundColor: `${colors.primary}10` }]}>
               <Text style={[styles.companyInitial, { color: colors.accent }]}>{application.company_name.charAt(0)}</Text>
             </View>
-            <View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[styles.companyName, { color: colors.textPrimary }]}>{application.company_name}</Text>
               <Text style={[styles.positionName, { color: colors.textSecondary }]}>{application.position}</Text>
             </View>
@@ -181,6 +181,8 @@ export default function ApplicationDetailScreen() {
             <Text style={[styles.infoText, { color: colors.textSecondary }]}>Applied on {formatDate(application.applied_date)}</Text>
           </View>
         </View>
+
+        <ApplicationJourney applicationId={application.id} />
 
         {application.cover_letter && (
           <View style={styles.section}>

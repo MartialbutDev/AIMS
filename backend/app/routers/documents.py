@@ -44,7 +44,8 @@ from app.models.coordinator_assignment import (
 )
 from app.services.document_service import DocumentService
 from app.services.ocr_service import OCRService
-from app.services.document_identification import identify_header
+from app.services.document_identification import identify_header, identify_from_body
+from app.utils.official_document_evidence import OFFICIAL_TYPES, official_evidence
 from app.services.document_version_service import annotate, current_approved, review_times
 
 
@@ -162,6 +163,8 @@ def _coordinator_document_payload(
         "verification_status": document.verification_status,
         "validation_confidence": document.validation_confidence,
         "validation_message": document.validation_message,
+        "supporting_wording": (official_evidence(document.extracted_text).get(_document_type(document))
+                               if _document_type(document) in OFFICIAL_TYPES else None),
         "academic_year": document.academic_year,
         "semester": document.semester,
         "review_notes": document.review_notes,
@@ -367,13 +370,19 @@ async def identify_document_type(
                         'message': 'Could not read the header. Choose the document type manually.',
                         'method': 'header_first_rules'}
             result = identify_header(header, 'document')
+            if not result['candidates']:
+                try:
+                    body = await run_in_threadpool(OCRService.extract_text, str(path), file_type)
+                    result = identify_from_body(result, body or '')
+                except Exception:
+                    pass  # The user can still choose a type manually.
             detected = result['detected_type']
             supported = {'resume', 'application_letter', 'waiver', 'medical_certificate',
                          'internship_plan', 'insurance', 'endorsement_letter',
                          'acceptance_letter', 'certificate_of_completion'}
             if detected in supported:
                 return {'status': 'suggested', 'suggested_type': detected,
-                        'message': 'Suggested from the document header. Confirm the type before uploading; content checks still apply.',
+                        'message': 'Suggested from the document. Confirm the type before uploading.',
                         'method': result['method']}
             if detected in {'cor', 'orientation'}:
                 message = 'This appears to be a registration or orientation document. Submit it through the onboarding requirements screen.'

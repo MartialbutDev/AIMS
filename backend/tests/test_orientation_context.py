@@ -69,7 +69,7 @@ class OrientationContextTests(unittest.TestCase):
         self.assertEqual(result['identification']['status'],'uncertain');self.assertIsNotNone(result['ocr_error'])
 
     def test_onboarding_stores_automatic_content_match_for_generic_orientation_certificate(self):
-        f=fixtures.DocumentVersionTests();f.setUp()
+        f=fixtures.DocumentVersionTests();f.setUp(approved_onboarding=False)
         try:
             path=Path(f.tmp.name)/'orientation.pdf';path.write_bytes(b'fixture')
             with patch.object(onboarding,'ASSET_ROOT',Path(f.tmp.name)),patch.object(onboarding,'_save_private_upload',new=AsyncMock(return_value=(path,'application/pdf'))),patch.object(OCRService,'extract_header',return_value=HEADER),patch.object(OCRService,'extract_text',return_value=BODY):

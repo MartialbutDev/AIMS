@@ -63,6 +63,10 @@
 .citc-auth button:disabled, .citc-auth input:disabled { opacity: .6; cursor: wait; }
 .citc-login-error { margin: 15px 0 0; padding: 12px; border-left: 3px solid #b32e38; background: #fff0f1; color: #94232c; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .citc-account-note { border-top: 1px solid #ededf2; margin: 26px 0 0; padding-top: 19px; color: #747487; font-size: 11px; line-height: 1.8; }
+.citc-account-note a, .citc-student-note a { color: #48486d; font-weight: 700; text-decoration: underline; text-decoration-color: #8f8fa9; text-decoration-thickness: 1px; text-underline-offset: 3px; border-radius: 3px; }
+.citc-account-note a:hover, .citc-student-note a:hover { color: #343453; background: #fff5d6; text-decoration-color: currentColor; }
+.citc-account-note a:focus-visible, .citc-student-note a:focus-visible { outline: 2px solid #77779a; outline-offset: 3px; border-radius: 3px; background: #fff5d6; }
+
 @media (min-width: 1500px) { .citc-auth { grid-template-columns: minmax(500px, .9fr) minmax(600px, 1.1fr); } }
 @media (max-width: 1000px) { .citc-auth { grid-template-columns: minmax(310px, .8fr) minmax(420px, 1fr); } .citc-identity { padding-inline: 28px; } .citc-workspace { padding-inline: 30px; } .citc-journey { gap: 7px; } .citc-journey i { width: 9px; } }
 @media (max-width: 760px) {

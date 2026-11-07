@@ -124,8 +124,6 @@
 .breadcrumbs svg { color: #b0bac7; }
 .breadcrumbs strong { color: #455469; font-weight: 600; }
 .topbar-actions { display: flex; align-items: center; gap: 18px; }
-.today-label { display: flex; align-items: center; gap: 7px; color: #7f8c9d; font-size: 10px; }
-.today-label svg { color: #9ca8b7; }
 .topbar-avatar { width: 30px; height: 30px; cursor: pointer; }
 .mobile-menu { display: none; border: 0; background: none; }
 .dashboard-content { max-width: 1360px; margin: 0 auto; padding: 34px 36px 20px; }
@@ -474,8 +472,6 @@
   .mobile-menu { display: grid; place-items: center; color: #65758a; }
   .breadcrumbs { margin-right: auto; margin-left: 9px; }
   .topbar-actions { gap: 9px; }
-  .today-label { font-size: 0; gap: 0; }
-  .today-label svg { width: 17px; height: 17px; }
   .dashboard-content { padding: 25px 15px 18px; }
   .welcome-row { align-items: flex-start; margin-bottom: 18px; }
   .welcome-row h1 { font-size: 22px; }

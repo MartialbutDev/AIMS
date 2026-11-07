@@ -396,6 +396,9 @@ async def delete_company(
     company = get_company_or_404(db, company_id)
 
     try:
+        from app.models.moa_file import MoaFile
+        if db.query(MoaFile.id).filter_by(company_id=company_id).first():
+            raise HTTPException(409, "Companies with retained MOA files cannot be deleted. Deactivate the company instead.")
         db.delete(company)
         db.commit()
     except Exception:

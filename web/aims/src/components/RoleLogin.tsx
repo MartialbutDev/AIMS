@@ -37,14 +37,14 @@ export function RoleLogin({ role, isSigningIn, onBack, onLogin }: RoleLoginProps
           <h1 id="login-heading">Welcome back<span>.</span></h1>
           <p className="citc-intro">{roleDescriptions[role]}</p>
           <form className="citc-login-form" onSubmit={handleSubmit} aria-busy={isSigningIn}>
-            <label htmlFor="login-identifier">Email or username</label>
+            <label htmlFor="login-identifier">{role === 'student' ? 'Email or student number' : 'Email or username'}</label>
             <input id="login-identifier" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder={role === 'company' ? 'Your company email or username' : 'Your email or username'} value={loginIdentifier} onChange={(event) => setLoginIdentifier(event.target.value)} required disabled={isSigningIn} />
-            <div className="citc-password-label"><label htmlFor="login-password">Password</label><a href="/forgot-password">Forgot password?</a></div>
+            <div className="citc-password-label"><label htmlFor="login-password">Password</label><a href={role === 'student' ? '/student-forgot-password' : '/forgot-password'}>Forgot password?</a></div>
             <div className="citc-password-input"><input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="Enter your password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} disabled={isSigningIn} /><button type="button" aria-controls="login-password" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div>
             {error && <p className="citc-login-error" role="alert">{error}</p>}
             <button className="citc-sign-in" type="submit" disabled={isSigningIn}><span>{isSigningIn ? 'Signing in…' : `Sign in as ${roleLabels[role]}`}</span><Icon name="arrow" size={19} /></button>
           </form>
-          <p className="citc-account-note">Use the account assigned to your role. For account access assistance, contact your AIMS administrator.</p>
+          <p className="citc-account-note">{role === 'student' ? <>New to AIMS? <a href="/student-signup">Create your student account</a>. Already using mobile? Sign in with the same account.</> : 'Use the account assigned to your role. For account access assistance, contact your AIMS administrator.'}</p>
         </div>
         <footer className="citc-auth-footer"><span>© {new Date().getFullYear()} USTP · CITC</span><span>Academic Internship Management System</span></footer>
       </section>

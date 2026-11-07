@@ -16,9 +16,11 @@ import { useAuthSession } from './hooks/useAuthSession'
 import type { UserRole, UserSession } from './types/auth'
 
 import './App.css'
+import { StudentAccess } from './pages/student/StudentAccess'
 import { EmailActionPage } from './pages/shared/EmailActionPage'
 
 const ROLE_PATHS: Record<UserRole, string> = {
+  student: 'student',
   admin: 'admin',
   coordinator: 'coordinator',
   dean: 'dean',
@@ -27,11 +29,13 @@ const ROLE_PATHS: Record<UserRole, string> = {
 }
 
 const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
+  student: ['dashboard', 'onboarding', 'companies', 'applications', 'direct-placements', 'documents', 'forms', 'pre-deployment', 'attendance', 'journals', 'reports', 'completion', 'profile', 'settings', 'help-center'],
   admin: [
     'dashboard',
     'completion',
     'users',
     'company-access',
+    'activity-history',
     'coordinators',
     'assignments',
     'document-verification',
@@ -43,6 +47,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
   ],
 
   coordinator: [
+    'dtr-corrections',
     'dashboard',
     'completion',
     'students',
@@ -79,6 +84,7 @@ const ALLOWED_SECTIONS: Record<UserRole, string[]> = {
   ],
 
   company: [
+    'dtr-corrections',
     'dashboard',
     'completion',
     'interns',
@@ -218,6 +224,8 @@ function App() {
 
   return (
     <Routes>
+      <Route path="/student-signup" element={session ? <Navigate to={dashboardPath} replace /> : <StudentAccess mode="signup" />} />
+      <Route path="/student-forgot-password" element={<StudentAccess mode="reset" />} />
       <Route path="/forgot-password" element={<EmailActionPage mode="forgot" />} />
       <Route path="/reset-password" element={<EmailActionPage mode="reset" />} />
       <Route path="/verify-email" element={<EmailActionPage mode="verify" />} />

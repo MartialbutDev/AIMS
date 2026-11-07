@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from fastapi import Query, APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
@@ -166,6 +167,27 @@ async def get_notification_count(
     unread = NotificationService.get_unread_count(db=db, user_id=current_user.id)
     
     return NotificationCountResponse(total=total, unread=unread)
+
+
+class ActivityReadRequest(BaseModel):
+    notification_ids: List[str] = Field(max_length=1000)
+
+
+@router.get('/activity-summary')
+def activity_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from app.services.activity_indicators import summary
+    return summary(db, current_user)
+
+
+@router.put('/activity-read')
+def activity_read(payload: ActivityReadRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Only IDs captured when the actual records were opened are acknowledged.
+    # New arrivals and other people's notifications are never swept into this update.
+    count = db.query(Notification).filter(Notification.user_id == current_user.id,
+        Notification.id.in_(set(payload.notification_ids)), Notification.is_read.is_(False)).update(
+        {'is_read': True, 'read_at': datetime.now(timezone.utc).replace(tzinfo=None)}, synchronize_session=False)
+    db.commit()
+    return {'marked_read': count}
 
 
 @router.put("/{notification_id}/read", response_model=NotificationResponse)

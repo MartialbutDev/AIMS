@@ -246,3 +246,4 @@ def cancel(placement_id: str, payload: Cancellation, db: Session = Depends(get_d
     service.notify_student(db,placement,'Direct placement cancelled',payload.reason)
     db.commit()
     return service.serialize(db,placement,actor,history=True)
+

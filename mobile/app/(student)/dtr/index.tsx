@@ -4,6 +4,8 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState, useEffect } from "react";
 import {
+  Modal,
+  Switch,
   Dimensions,
   FlatList,
   RefreshControl,
@@ -52,6 +54,10 @@ export default function DTRScreen() {
   const [summary, setSummary] = useState<DTRSummary | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [exporting, setExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportTerms, setExportTerms] = useState<{ academic_year: string; semester: string }[]>([]);
+  const [exportTerm, setExportTerm] = useState<{ academic_year: string; semester: string } | null>(null);
+  const [approvedOnly, setApprovedOnly] = useState(false);
 
   const filters = ["all", "pending", "submitted", "approved", "rejected"];
 
@@ -94,34 +100,31 @@ export default function DTRScreen() {
   };
 
   const handleExport = async () => {
-    if (dtrs.length === 0) {
-      Alert.alert(
-        "No Records",
-        "You don't have any DTR records to export yet. Please submit your Time-In first."
-      );
-      return;
+    setExporting(true);
+    try {
+      const { data } = await api.get('/excel/export/dtr/terms');
+      setExportTerms(data.items);
+      setExportTerm(data.items.find((item: { academic_year: string; semester: string }) =>
+        item.academic_year === data.current.academic_year && item.semester === data.current.semester) ?? data.items[0] ?? null);
+      setExportOpen(true);
+    } catch {
+      Alert.alert('Could not load semesters', 'Please check your connection and try again.');
+    } finally {
+      setExporting(false);
     }
+  };
 
-    Alert.alert(
-      "Export DTR Report",
-      `This will export all ${dtrs.length} DTR records to an Excel file (.xlsx).\n\nFile will include:\n• Student Information\n• Summary Statistics\n• All DTR Records\n• Color-coded Statuses`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Export",
-          onPress: async () => {
-            setExporting(true);
-            try {
-              await dtrService.exportDTRToExcel();
-            } catch (error) {
-              // Error handled in service
-            } finally {
-              setExporting(false);
-            }
-          },
-        },
-      ]
-    );
+  const downloadExport = async () => {
+    if (!exportTerm) return;
+    setExporting(true);
+    try {
+      await dtrService.exportDTRToExcel(exportTerm, approvedOnly);
+      setExportOpen(false);
+    } catch {
+      // The service displays the export error.
+    } finally {
+      setExporting(false);
+    }
   };
 
   const filteredDTRs = dtrs.filter((dtr) => {
@@ -291,6 +294,30 @@ export default function DTRScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Modal visible={exportOpen} transparent animationType="fade" onRequestClose={() => { if (!exporting) setExportOpen(false); }}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }}>
+          <View accessibilityViewIsModal style={{ backgroundColor: colors.background, borderRadius: 20, padding: 20, maxHeight: '80%' }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '700', marginBottom: 12 }}>Export DTR report</Text>
+            <Text style={{ color: colors.textSecondary, marginBottom: 12 }}>Select a semester. Approved hours match Internship Progress.</Text>
+            <ScrollView>
+              {exportTerms.map(term => <TouchableOpacity key={`${term.academic_year}-${term.semester}`} accessibilityRole="radio"
+                accessibilityState={{ checked: exportTerm?.academic_year === term.academic_year && exportTerm?.semester === term.semester }}
+                disabled={exporting} onPress={() => setExportTerm(term)} style={{ paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name={exportTerm?.academic_year === term.academic_year && exportTerm?.semester === term.semester ? 'radio-button-on' : 'radio-button-off'} size={22} color={colors.accent} />
+                <Text style={{ color: colors.textPrimary, flexShrink: 1 }}>AY {term.academic_year} · Semester {term.semester}</Text>
+              </TouchableOpacity>)}
+            </ScrollView>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 12 }}>
+              <Text style={{ flex: 1, color: colors.textPrimary }}>Approved entries only</Text>
+              <Switch accessibilityLabel="Approved entries only" value={approvedOnly} onValueChange={setApprovedOnly} disabled={exporting} />
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 24 }}>
+              <TouchableOpacity disabled={exporting} onPress={() => setExportOpen(false)} style={{ paddingVertical: 14 }}><Text style={{ color: colors.textPrimary }}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity disabled={exporting || !exportTerm} onPress={downloadExport} style={{ paddingVertical: 14 }}><Text style={{ color: colors.accent, fontWeight: '700' }}>{exporting ? 'Exporting…' : 'Export Excel'}</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <StatusBar
         style={isDark ? "light" : "dark"}
         backgroundColor={colors.background}
@@ -311,7 +338,7 @@ export default function DTRScreen() {
           <TouchableOpacity
             style={styles.exportButton}
             onPress={handleExport}
-            disabled={exporting || dtrs.length === 0}
+            disabled={exporting}
             activeOpacity={0.7}
           >
             {exporting ? (

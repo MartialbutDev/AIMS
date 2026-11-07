@@ -1,3 +1,4 @@
+import { MoaFiles } from '../../components/MoaFiles'
 import { useEffect, useRef, useState } from 'react'
 import { getDeanPartners, type DeanPartner, type MoaStatus } from '../../services/deanPartnersService'
 import './dean-partners.css'
@@ -54,7 +55,7 @@ export function DeanPartnersPage() {
         {website(selected.website) && <a href={website(selected.website)!} target="_blank" rel="noopener noreferrer">Visit company website ↗</a>}
         <h3>Partnership readiness</h3><ul>{selected.checks.map(check => <li key={check.label}><span>{check.passed ? '✓ Met' : 'Needs attention'}</span> {check.label}</li>)}</ul>
         <p className="dean-partners__notice">{selected.moa_ready ? 'This partnership meets the recorded MOA checks. Student requirements and deployment approval are still required.' : 'Contact the Career Center to review this partnership record before placement.'}</p>
-        <p>These are recorded agreement details; no signed MOA file is available from this directory.</p>
+        <MoaFiles key={selected.id} companyId={selected.id} />
       </>}
     </dialog>
   </div>

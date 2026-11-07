@@ -1,3 +1,4 @@
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 """Current-term recipient relationships for internship workflow alerts."""
 from collections import defaultdict
 from app.core.config import settings
@@ -21,7 +22,8 @@ class NotificationScope:
         self.coordinators = defaultdict(set)
         self.deans = defaultdict(set)
         self.supervisors = defaultdict(set)
-        year, semester = settings.CURRENT_ACADEMIC_YEAR, settings.CURRENT_SEMESTER
+        policy = academic_rules(db)
+        year, semester = policy["academic_year"], policy["semester"]
         self.term = (str(year), str(semester))
         designations = db.query(DeanCoordinatorDesignation).filter_by(
             academic_year=year, semester=semester, is_active=True).all()

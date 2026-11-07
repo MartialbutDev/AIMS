@@ -1,3 +1,4 @@
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 
 """
 AIMS — Admin Coordinator Designation API
@@ -102,19 +103,8 @@ def _designation_response(
 
 
 def _practicum_codes() -> list[str]:
-    configured = str(
-        getattr(
-            settings,
-            "PRACTICUM_SUBJECT_CODES",
-            "IT421",
-        ) or "IT421"
-    )
+    return academic_rules()["practicum_subject_codes"]
 
-    return [
-        code.strip().upper()
-        for code in configured.split(",")
-        if code.strip()
-    ] or ["IT421"]
 
 
 # ============================================================
@@ -178,7 +168,7 @@ def _recover_cor_faculty(
     try:
         layout = extract_cor_course_layout(
             pdf_path,
-            _practicum_codes(),
+            details.get("configured_subject_codes") or _practicum_codes(),
         )
 
     except Exception:

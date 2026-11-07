@@ -13,6 +13,7 @@ for automatic verification or requires coordinator review.
 
 import re
 from typing import Any, Dict, List, Optional, Set
+from app.utils.untitled_documents import has_plan_structure
 
 
 REJECT_THRESHOLD = 55
@@ -341,9 +342,10 @@ def validate_resume(text: str) -> Dict[str, Any]:
     if has_email or has_phone:
         found.add("contact")
 
+    project_heading = re.search(r"^\s*(?:(?:academic|personal)\s+)?projects\s*:?\s*$", text, re.I | re.M)
     required = {
         "education",
-        "skills",
+        "projects" if project_heading and "skills" not in found else "skills",
         "contact",
     }
 
@@ -773,7 +775,7 @@ def validate_internship_plan(
         text=text,
         label="Internship Plan",
         sections={
-            "plan": INTERNSHIP_PLAN_KEYWORDS,
+            "plan": INTERNSHIP_PLAN_KEYWORDS + (["INTERNSHIP", "OJT", "PRACTICUM", "ON THE JOB TRAINING"] if has_plan_structure(text) else []),
             "objectives": [
                 "OBJECTIVES",
                 "LEARNING OBJECTIVES",
@@ -792,6 +794,7 @@ def validate_internship_plan(
                 "DURATION",
                 "HOURS",
                 "WEEKS",
+                "WEEK",
                 "TIMELINE",
             ],
             "supervisor": [

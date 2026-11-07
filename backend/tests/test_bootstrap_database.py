@@ -1,5 +1,9 @@
 """Verify clean bootstrap and grade-preserving migration without PostgreSQL writes."""
 import sys,unittest,importlib.util
+import os
+import subprocess
+import tempfile
+import textwrap
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
@@ -10,11 +14,56 @@ from bootstrap_database import bootstrap
 
 
 class BootstrapTests(unittest.TestCase):
+    def test_fresh_process_bootstrap_includes_all_models_without_loading_api(self):
+        # A shared test process may have imported missing models through API
+        # routes already, masking an incomplete app.models registry.
+        root = Path(__file__).resolve().parents[1]
+        script = textwrap.dedent('''
+            import importlib
+            import pkgutil
+            import runpy
+            import sys
+            from sqlalchemy import inspect
+
+            runpy.run_path('bootstrap_database.py', run_name='__main__')
+            from app.core.database import Base, engine
+            import app.models
+            assert 'app.main' not in sys.modules
+            assert not any(name.startswith('app.api.') for name in sys.modules)
+            actual_tables = set(inspect(engine).get_table_names())
+            for module in pkgutil.iter_modules(app.models.__path__):
+                importlib.import_module('app.models.' + module.name)
+            missing = set(Base.metadata.tables) - actual_tables
+            assert not missing, f'Bootstrap omitted model tables: {sorted(missing)}'
+            engine.dispose()
+        ''')
+        with tempfile.TemporaryDirectory() as folder:
+            url = 'sqlite:///' + (Path(folder) / 'bootstrap.sqlite3').as_posix()
+            env = {**os.environ, 'DATABASE_URL': url, 'PYTHONIOENCODING': 'utf-8'}
+            result = subprocess.run([sys.executable, '-c', script], cwd=root,
+                env=env, capture_output=True, text=True, encoding='utf-8', timeout=60)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            engine = create_engine(url)
+            try:
+                inspector = inspect(engine)
+                table = 'hte_supervisor_companies'
+                columns = {row['name']: row for row in inspector.get_columns(table)}
+                self.assertFalse(columns['supervisor_id']['nullable'])
+                self.assertFalse(columns['company_id']['nullable'])
+                self.assertEqual({key['referred_table'] for key in inspector.get_foreign_keys(table)}, {'users', 'companies'})
+                self.assertIn(('supervisor_id', 'company_id'),
+                    [tuple(key['column_names']) for key in inspector.get_unique_constraints(table)])
+                indexed = {tuple(index['column_names']) for index in inspector.get_indexes(table)}
+                self.assertTrue({('supervisor_id',), ('company_id',)} <= indexed)
+            finally:
+                engine.dispose()
+
     def test_empty_database_registers_all_models_and_is_stamped_at_head(self):
         e=create_engine('sqlite://')
         with e.begin() as c:
             bootstrap(c);self.assertTrue({'internship_deployments','internship_completion_cases','auth_sessions'}<=set(inspect(c).get_table_names()))
-            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'j60f24b71c95')
+            self.assertTrue({'academic_requirements','academic_requirement_events'}<=set(inspect(c).get_table_names()))
+            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'m93c57ea4fc8')
         e.dispose()
     def test_existing_database_is_refused_without_stamping_or_changing_records(self):
         e=create_engine('sqlite://')
@@ -67,4 +116,6 @@ class BootstrapTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
 

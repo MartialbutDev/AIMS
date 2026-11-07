@@ -23,6 +23,7 @@ from app.models.notification_settings import NotificationSettings
 from app.models.push import PushDevice, PushDelivery
 from app.api.v1.endpoints import applications, dtr, auth, push
 from app.services import deployment_service, push_service
+from onboarding_fixtures import approve_onboarding
 
 class FeatureCompletionTests(unittest.TestCase):
     @classmethod
@@ -40,6 +41,8 @@ class FeatureCompletionTests(unittest.TestCase):
         self.application=Application(id='a1',student_id='s1',company_id='co1',position='IT intern',status=ApplicationStatus.ENDORSED,academic_year='2026-2027',semester='1',resume_id='resume')
         self.db.add(self.application)
         self.db.add(DTR(id='d1',student_id='s1',date=datetime(2026,10,23),time_in=time(8),status=DTRStatus.PENDING,image_in_path='dtr_uploads/in.jpg',academic_year='2026-2027',semester='1'))
+        self.db.flush()
+        approve_onboarding(self.db, self.student.id)
         self.db.commit()
         for file in ['dtr_uploads/in.jpg','documents/resume.pdf']:
             location=Path(self.temp.name)/file;location.parent.mkdir(exist_ok=True);location.write_bytes(b'test-file')

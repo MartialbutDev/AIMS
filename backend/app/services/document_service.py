@@ -762,6 +762,41 @@ class DocumentService:
                 name_info=name_info,
             )
 
+            if status == "pending":
+                identification = inspection["identification"]
+                generic = type_key in {"requirements", "document", "user_id"}
+                found = set(validation_result.get("found_sections") or [])
+                signals = {
+                    "resume": {"education", "projects", "experience", "skills", "contact"},
+                    "application_letter": {"greeting", "purpose", "closing"},
+                    "waiver": {"consent", "acknowledgment"},
+                    "medical_certificate": {"medical", "provider"},
+                    "internship_plan": {"objectives", "activities", "schedule"},
+                    "insurance": {"insurance", "policy", "coverage"},
+                    "endorsement_letter": {"endorsement", "student"},
+                    "acceptance_letter": {"acceptance", "internship"},
+                    "certificate_of_completion": {"certificate", "training"},
+                }
+                plausible = (
+                    identification["status"] == "matched"
+                    or type_key in identification["candidates"]
+                    or len(found & signals.get(type_key, set())) >= 2
+                    or (generic and (len(extracted_text.strip()) >= 120
+                                     or bool(identification["detected_type"])))
+                )
+                if identification["detected_type"] == "unrelated_receipt":
+                    status = "rejected"
+                    decision_message = "This appears to be a receipt or invoice. Upload the requested internship document."
+                elif not plausible:
+                    if ocr_error:
+                        raise HTTPException(503, "Text recognition was unavailable. Please retry this upload.")
+                    label = type_key.replace("_", " ")
+                    raise HTTPException(
+                        422,
+                        f"Re-upload required: We could not identify the selected document ({label}). "
+                        "Choose a clear photo showing the complete page or upload the original PDF.",
+                    )
+
             # --------------------------------------------
             # STEP 6: VALIDATION MESSAGE
             # --------------------------------------------

@@ -1,3 +1,5 @@
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
+from app.services.academic_requirements import guard_cor_approval
 
 """AIMS onboarding with OCR validation and coordinator matching.
 
@@ -55,6 +57,7 @@ from app.services.cor_faculty_extraction import (
 )
 
 from app.services.ocr_service import OCRService
+from app.services.onboarding_eligibility import onboarding_complete, submissions_complete
 from app.services.document_identification import inspect_upload
 
 from app.services.onboarding_validation import (
@@ -186,23 +189,7 @@ def _is_complete(
 
     if not record:
         return False
-
-    orientation = _submission(
-        db,
-        record.orientation_submission_id,
-    )
-
-    cor = _submission(
-        db,
-        record.cor_submission_id,
-    )
-
-    return bool(
-        orientation
-        and orientation.review_status == "verified"
-        and cor
-        and cor.review_status == "verified"
-    )
+    return onboarding_complete(db, record.student_id)
 
 
 def _maybe_assign(
@@ -264,12 +251,7 @@ def _status(
         else None
     )
 
-    complete = bool(
-        orientation
-        and orientation.review_status == "verified"
-        and cor
-        and cor.review_status == "verified"
-    )
+    complete = submissions_complete(student.id, orientation, cor)
 
     if complete:
         next_step = "completed"
@@ -346,6 +328,7 @@ def _status(
     return {
         "student_id": student.id,
         "eligible": complete or dev_bypass,
+        "onboarding_approved": complete,
         "next_step": next_step,
         "orientation": _submission_data(orientation),
         "cor": _submission_data(cor),
@@ -596,17 +579,7 @@ async def _upload(
             and not ocr_error
         ):
             try:
-                codes = [
-                    code.strip()
-                    for code in str(
-                        getattr(
-                            settings,
-                            "PRACTICUM_SUBJECT_CODES",
-                            "IT421",
-                        ) or "IT421"
-                    ).split(",")
-                    if code.strip()
-                ]
+                codes = academic_rules()["practicum_subject_codes"]
 
                 layout = await asyncio.to_thread(
                     extract_cor_course_layout,
@@ -648,6 +621,9 @@ async def _upload(
         outcome = validation.get(
             "automatic_result"
         )
+
+        if kind == "cor":
+            guard_cor_approval(db)
 
         if outcome == "mismatch":
             reasons = (
@@ -1025,6 +1001,9 @@ def review_submission(
             "Explain why a document with OCR warnings "
             "was approved",
         )
+
+    if submission.document_kind == "cor" and payload.decision == "verified":
+        guard_cor_approval(db, submission.validation_result or {})
 
     submission.review_status = (
         payload.decision

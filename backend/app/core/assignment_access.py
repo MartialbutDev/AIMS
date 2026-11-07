@@ -1,3 +1,4 @@
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 
 """Semester-aware coordinator authorization for AIMS."""
 
@@ -20,13 +21,13 @@ from app.models.user import User, UserRole
 AccessMode = Literal["read", "write"]
 
 
-def get_current_academic_term() -> tuple[str, str]:
+def get_current_academic_term(db=None) -> tuple[str, str]:
     year = str(
-        settings.CURRENT_ACADEMIC_YEAR or ""
+        academic_rules(db)["academic_year"] or ""
     ).strip()
 
     semester = str(
-        settings.CURRENT_SEMESTER or ""
+        academic_rules(db)["semester"] or ""
     ).strip()
 
     if not re.fullmatch(r"\d{4}-\d{4}", year):

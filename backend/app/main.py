@@ -29,7 +29,7 @@ def ensure_database_schema() -> None:
     from app.models.password_reset import PASSWORD_RESET_TABLES
     from app.models.internship_completion import COMPLETION_TABLES
     from app.models.auth_session import SESSION_TABLES
-    Base.metadata.create_all(bind=engine, tables=[t for t in Base.metadata.sorted_tables if t.name not in (TEMPLATE_TABLES | DIRECT_PLACEMENT_TABLES | DELIVERY_TABLES | PASSWORD_RESET_TABLES | COMPLETION_TABLES | SESSION_TABLES)])
+    Base.metadata.create_all(bind=engine, tables=[t for t in Base.metadata.sorted_tables if t.name not in (TEMPLATE_TABLES | DIRECT_PLACEMENT_TABLES | DELIVERY_TABLES | PASSWORD_RESET_TABLES | COMPLETION_TABLES | SESSION_TABLES | {'academic_requirements', 'academic_requirement_events', 'company_moa_files', 'dtr_corrections'})])
 
     inspector = inspect(engine)
 
@@ -193,3 +193,4 @@ if __name__ == "__main__":
         port=8000,
         reload=True,
     )
+

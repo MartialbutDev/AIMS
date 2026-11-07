@@ -1021,3 +1021,49 @@
     flex: 1;
   }
 }
+
+/* Application records need room for full student and company names. */
+.cc-application-records .cc-section-header { flex-wrap: wrap; }
+.cc-application-records .activity-list { margin-top: 0; }
+.cc-application-records .activity-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) minmax(0, 160px);
+  align-items: start;
+  gap: 14px;
+  min-height: 76px;
+  padding: 18px 24px;
+}
+.cc-application-records .activity-avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 11px;
+}
+.cc-application-records .activity-copy { gap: 6px; min-width: 0; }
+.cc-application-records .activity-copy :is(strong, small) {
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  line-height: 1.6;
+}
+.cc-application-records .activity-copy strong { color: #0b0b2f; font-size: 13px; }
+.cc-application-records .activity-copy small { color: #566078; font-size: 12px; }
+.cc-application-records .activity-row time {
+  min-width: 0;
+  color: #68738a;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+@media (max-width: 620px) {
+  .cc-application-records .activity-row {
+    grid-template-columns: 36px minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 8px;
+    padding: 16px;
+  }
+  .cc-application-records .activity-row time { grid-column: 2; text-align: left; }
+}

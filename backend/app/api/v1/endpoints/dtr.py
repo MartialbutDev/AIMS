@@ -1,3 +1,4 @@
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 
 from fastapi import (
     APIRouter,
@@ -737,7 +738,7 @@ async def get_dtr_summary(
             else None
         )
 
-    required_hours = settings.REQUIRED_INTERNSHIP_HOURS
+    required_hours = academic_hours(db, academic_year, semester)
 
     from app.services.reporting_scope import approved_hours
     total_hours = approved_hours(db,{current_user.id},academic_year,semester)[current_user.id]

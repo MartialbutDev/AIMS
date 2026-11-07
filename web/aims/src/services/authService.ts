@@ -15,7 +15,7 @@ export async function signIn(
       last_name: string
       role: string
     }
-  }>('/api/v1/auth/login/web', {
+  }>(role === 'student' ? '/api/v1/auth/login/student' : '/api/v1/auth/login/web', {
     method: 'POST',
     body: JSON.stringify({ email: loginIdentifier, password }),
   })
@@ -41,7 +41,7 @@ export async function getCurrentUserSession(accessToken: string): Promise<UserSe
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   const role = user.role === 'hte_supervisor' ? 'company' : user.role
-  if (!['coordinator', 'dean', 'career_center', 'company', 'admin'].includes(role)) {
+  if (!['student', 'coordinator', 'dean', 'career_center', 'company', 'admin'].includes(role)) {
     throw new Error('This account cannot sign in to the web workspace.')
   }
   return {

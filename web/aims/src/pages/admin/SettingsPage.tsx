@@ -1,3 +1,4 @@
+import { AcademicRequirements } from './AcademicRequirements'
 import { useState } from 'react'
 import type { UserSession } from '../../types/auth'
 import type { AdminUser } from '../../types/dashboard'
@@ -18,9 +19,9 @@ export function SettingsPage({ session }: SettingsPageProps) {
   const [landing, setLanding] = useState(readAdminLandingPage)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
-  return <section className="panel aims-settings-panel"><h2>Default landing page</h2><p>Choose where your administrator workspace opens in this browser, {session.name}.</p><label className="account-form">Landing page<select value={landing} onChange={event => {
+  return <><section className="panel aims-settings-panel"><h2>Default landing page</h2><p>Choose where your administrator workspace opens in this browser, {session.name}.</p><label className="account-form">Landing page<select value={landing} onChange={event => {
     const next = event.target.value as AdminLandingSection
     try { saveAdminLandingPage(next); setLanding(next); setMessage('Landing page saved.'); setError('') }
     catch { setError('Your browser is blocking preference storage.') }
-  }}><option value="dashboard">Overview</option><option value="users">Users</option><option value="assignments">Assignments</option><option value="announcements">Announcements</option></select></label>{message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}</section>
+  }}><option value="dashboard">Overview</option><option value="users">Users</option><option value="assignments">Assignments</option><option value="announcements">Announcements</option></select></label>{message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}</section><AcademicRequirements /></>
 }

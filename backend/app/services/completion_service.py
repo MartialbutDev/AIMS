@@ -1,3 +1,4 @@
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 """Completion transitions share student locks with record writes and deployment."""
 import hashlib
 import json
@@ -96,7 +97,7 @@ def checklist(db, obj, case=None):
                                        Journal.semester == obj.semester).all()
     valid = [r for r in records if start and valid_approved_record(r,start,today())]
     hours = round(sum(r.total_hours for r in valid), 2)
-    required = int(settings.REQUIRED_INTERNSHIP_HOURS)
+    required = academic_hours(db,obj.academic_year,obj.semester)
     docs = DeploymentService.get_checklist(db, obj)
     count = db.query(Deployment).filter(Deployment.student_id == obj.student_id, Deployment.academic_year == obj.academic_year,
         Deployment.semester == obj.semester, Deployment.status.in_([DeploymentStatus.DEPLOYED, DeploymentStatus.COMPLETED])).count()

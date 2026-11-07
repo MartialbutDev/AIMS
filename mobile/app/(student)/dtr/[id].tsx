@@ -1,3 +1,4 @@
+import DTRCorrectionForm from '../../../src/components/DTRCorrectionForm';
 // app/(student)/dtr/[id].tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
@@ -378,7 +379,7 @@ export default function DTRDetailScreen() {
             )}
           </View>
         </View>
-      </ScrollView>
+      <DTRCorrectionForm dtrId={dtr.id} /></ScrollView>
 
       {/* ----- bottom action (only when a Time-Out is possible) ----- */}
       {canTimeOut && (

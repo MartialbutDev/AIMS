@@ -1,3 +1,4 @@
+import { ActivityViewed } from '../../components/ActivityIndicators'
 
 import { useCallback, useEffect, useState } from 'react'
 
@@ -218,7 +219,7 @@ export function InternshipDocumentReviewPage() {
   }
 
   return (
-    <main className="co-page dv-page">
+    <main className="co-page dv-page"><ActivityViewed categories={['documents']} ready={!loading && !error} recordIds={documents.filter(item => !search || JSON.stringify(item).toLowerCase().includes(search.toLowerCase())).map(item => item.id)} />
       <header className="dv-header">
         <div>
           <span className="co-overline">
@@ -346,6 +347,12 @@ export function InternshipDocumentReviewPage() {
 
                 <div className="dv-ocr">
                   <strong>OCR validation</strong>
+                  {document.supporting_wording && (
+                    <div>
+                      <strong>Supporting wording from the upload</strong>
+                      <blockquote>{document.supporting_wording}</blockquote>
+                    </div>
+                  )}
 
                   <p>
                     {document.validation_message ??

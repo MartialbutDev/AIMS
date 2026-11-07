@@ -1,0 +1,17 @@
+.aims-account-menu{position:relative;flex:none;color:#0b0b2f;text-align:left;font-family:inherit}
+.aims-account-trigger{display:flex;align-items:center;justify-content:center;gap:5px;min-width:48px;min-height:44px;padding:3px;border:1px solid #e1e5ee;border-radius:24px;background:#fff;cursor:pointer;color:#0b0b2f;font:inherit}
+.aims-account-trigger:hover,.aims-account-trigger[aria-expanded=true]{border-color:#dfb22b;background:#fff9e6}
+.aims-account-initial{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#fff3cc;color:#0b0b2f;font-size:15px;font-weight:800}
+.aims-account-chevron{display:flex;padding-right:4px;transform:rotate(90deg)}
+.aims-account-panel{position:absolute;right:0;top:calc(100% + 10px);z-index:70;width:min(290px,calc(100vw - 32px));max-height:calc(100dvh - 100px);overflow-y:auto;background:#fff;border:1px solid #e1e5ee;border-radius:16px;box-shadow:0 16px 46px #0b0b2f24;padding:8px;isolation:isolate}
+.aims-account-identity{display:grid;gap:5px;padding:13px 12px 16px;margin-bottom:5px;border-bottom:1px solid #edf0f5;overflow-wrap:anywhere}
+.aims-account-identity strong{font-size:14px;line-height:1.5;color:#0b0b2f}
+.aims-account-identity span{font-size:12px;line-height:1.5;color:#566078}
+.aims-account-identity small{font-size:11px;font-weight:700;color:#775500}
+.aims-account-panel :is(a,button)[role=menuitem]{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:11px 12px;border:0;border-radius:9px;text-decoration:none;background:transparent;color:#0b0b2f;font:inherit;font-size:13px;line-height:1.5;text-align:left;cursor:pointer}
+.aims-account-panel [role=menuitem] svg{flex:none}
+.aims-account-panel :is(a,button)[role=menuitem]:hover{background:#f1f3f9}
+.aims-account-menu :is(button,a):focus-visible{outline:2px solid #000080;outline-offset:2px}
+.aims-account-divider{height:1px;background:#edf0f5;margin:6px 4px}
+.aims-account-panel button.aims-account-logout{color:#b42318}
+.aims-account-panel button.aims-account-logout:hover{background:#fff0ee}

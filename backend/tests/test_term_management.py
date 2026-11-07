@@ -28,6 +28,10 @@ class TermManagementTests(unittest.TestCase):
         self.client=TestClient(app)
         self.patches=[patch.object(settings,'CURRENT_ACADEMIC_YEAR','2026-2027'),patch.object(settings,'CURRENT_SEMESTER','1')]
         for p in self.patches:p.start()
+        # This scenario changes terms; do not inherit the placement fixture's fixed-term mock.
+        from app.core import assignment_access
+        dynamic_term=patch.object(assignment_access,'get_current_academic_term',side_effect=lambda:(settings.CURRENT_ACADEMIC_YEAR,settings.CURRENT_SEMESTER))
+        dynamic_term.start();self.patches.append(dynamic_term)
     def tearDown(self):
         self.client.close()
         for p in reversed(self.patches):p.stop()

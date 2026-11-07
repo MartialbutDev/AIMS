@@ -10,7 +10,7 @@ import logging
 import uuid
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -97,7 +97,7 @@ def _clean_middle_name(value: str | None) -> str | None:
     return value.strip() or None
 
 
-def _token_response(user: User) -> LoginResponse:
+def _token_response(user: User, user_agent: str | None = None) -> LoginResponse:
     from sqlalchemy.orm import object_session
     from app.services.auth_session_service import track
     token = create_access_token({
@@ -105,7 +105,12 @@ def _token_response(user: User) -> LoginResponse:
         "pwd":hashlib.sha256(user.hashed_password.encode()).hexdigest(),
     })
     db=object_session(user)
-    if db is not None: track(db,user,token,decode_token(token),'Android' if user.role==UserRole.STUDENT else 'Mozilla')
+    if db is not None:
+        # Native Android requests may identify only as okhttp. Browser agents
+        # include Mozilla; preserve the native label for existing mobile clients.
+        fallback_agent = 'Android' if user.role == UserRole.STUDENT else 'Mozilla'
+        agent = user_agent if user_agent and any(name in user_agent for name in ('Mozilla', 'Android', 'iPhone', 'iPad')) else fallback_agent
+        track(db, user, token, decode_token(token), agent)
     return LoginResponse(access_token=token,token_type="bearer",user=user)
 
 
@@ -163,7 +168,7 @@ def _authenticate(
     if not mobile and user.role == UserRole.STUDENT:
         raise HTTPException(
             status_code=403,
-            detail="Please use the mobile application",
+            detail="Please use the student workspace or mobile application",
         )
 
     return user
@@ -239,6 +244,7 @@ async def register_student(
 )
 async def login_student(
     login_data: LoginRequest,
+    request: Request = None,
     db: Session = Depends(get_db),
 ):
     user = _authenticate(
@@ -247,7 +253,7 @@ async def login_student(
         login_data.password,
         mobile=True,
     )
-    return _token_response(user)
+    return _token_response(user, request.headers.get("user-agent") if request else None)
 
 
 @router.post(
@@ -310,6 +316,7 @@ async def register_web_user(
 )
 async def login_web_user(
     login_data: LoginRequest,
+    request: Request = None,
     db: Session = Depends(get_db),
 ):
     user = _authenticate(
@@ -318,7 +325,7 @@ async def login_web_user(
         login_data.password,
         mobile=False,
     )
-    return _token_response(user)
+    return _token_response(user, request.headers.get("user-agent") if request else None)
 
 
 @router.post("/login/form")

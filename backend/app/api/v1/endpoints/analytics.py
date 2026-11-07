@@ -1,3 +1,4 @@
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 from app.services.document_version_service import effective_documents
 
 """Role-aware analytics for AIMS."""
@@ -113,7 +114,7 @@ async def get_dean_analytics(
         official={id for (id,) in deps.join(InternshipCompletionCase,InternshipCompletionCase.deployment_id==InternshipDeployment.id).filter(
             InternshipDeployment.status==DeploymentStatus.COMPLETED,InternshipCompletionCase.status=='completed',
             InternshipCompletionCase.approved_at.isnot(None),InternshipCompletionCase.approved_by.isnot(None)).with_entities(InternshipDeployment.student_id)}
-    required_hours = max(0,settings.REQUIRED_INTERNSHIP_HOURS)
+    required_hours = academic_hours(db,year,semester)
     def summary(students):
         count=len(students)
         docs=sum(sum(latest.get(id,{}).get(kind)=='verified' for kind in required_types)/len(required_types)*100 for id in students)

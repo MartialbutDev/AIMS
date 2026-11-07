@@ -1,6 +1,6 @@
 // app/(student)/documents/upload.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useState, useRef, useEffect } from "react";
 import {
@@ -48,6 +48,9 @@ const DOCUMENT_TYPES: DocumentType[] = [
 
 export default function UploadDocumentScreen() {
   const { colors, isDark } = useTheme();
+  const { type, applicationId } = useLocalSearchParams<{ type?: string; applicationId?: string }>();
+  const presetType = typeof type === 'string' && DOCUMENT_TYPES.some(item => item.value === type) ? type : '';
+
   const {
     selectedFile,
     pickImage,
@@ -59,7 +62,7 @@ export default function UploadDocumentScreen() {
   } = useDocumentPicker();
 
   const [uploading, setUploading] = useState(false);
-  const [selectedType, setSelectedType] = useState<string>("");
+  const [selectedType, setSelectedType] = useState<string>(presetType);
   const [description, setDescription] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [ocrResult, setOcrResult] = useState<string | null>(null);
@@ -230,6 +233,9 @@ export default function UploadDocumentScreen() {
       const docId: string | undefined = response.data?.document?.id;
 
       const buttons: any[] = [];
+      if (typeof applicationId === 'string' && applicationId) {
+        buttons.push({ text: 'Return to application steps', onPress: () => router.dismissTo({ pathname: '/(student)/applications/[id]', params: { id: applicationId } }) });
+      }
       if (docId) {
         buttons.push({
           text: "View Document",
@@ -252,16 +258,18 @@ export default function UploadDocumentScreen() {
       Alert.alert(statusTitle, statusBody, buttons);
 
       resetFile();
-      setSelectedType("");
+      setSelectedType(presetType);
       setDescription("");
       setOcrResult(null);
       setVerificationStatus(null);
       setVersionLabel("");
     } catch (error: any) {
-      console.error("Upload error:", error);
+      const detail = error.response?.data?.detail;
+      const reupload = typeof detail === "string" && detail.startsWith("Re-upload required: ");
       Alert.alert(
-        "Upload Failed",
-        error.response?.data?.detail || "Failed to upload document. Please try again."
+        reupload ? "Re-upload required" : "Upload failed",
+        reupload ? detail.slice("Re-upload required: ".length) :
+          typeof detail === "string" ? detail : "Failed to upload document. Please try again."
       );
     } finally {
       setUploading(false);

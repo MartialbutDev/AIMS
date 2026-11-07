@@ -1,3 +1,4 @@
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 """Read-only workplace monitoring for explicitly assigned HTE supervisors."""
 import math
 from datetime import date, datetime, time
@@ -160,7 +161,7 @@ def get_intern(
         # Same response for unknown and out-of-company records.
         raise HTTPException(status_code=404, detail="Intern deployment not found")
     deployment, student, company = row
-    required_hours = settings.REQUIRED_INTERNSHIP_HOURS
+    required_hours = academic_hours(db, deployment.academic_year, deployment.semester)
     result = MonitoringDetail(
         intern=intern_response(*row), records_available=False, required_hours=required_hours,
         approved_hours=None, remaining_hours=None, progress_percent=None,

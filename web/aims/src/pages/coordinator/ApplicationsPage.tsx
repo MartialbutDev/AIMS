@@ -1,3 +1,4 @@
+import { ActivityBadges, ActivityViewed } from '../../components/ActivityIndicators'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../components/Icons'
 import {
@@ -110,6 +111,8 @@ export function ApplicationsPage() {
     })
   }, [queue, tab, filter, search])
 
+  const activityCategory = tab === 'dtrs' ? 'attendance' : tab
+
   function requestDecision(kind: ReviewTab, item: ReviewItem, status: string) {
     setDecision({ kind, id: item.id, status, name: item.student_name })
     setError('')
@@ -164,7 +167,7 @@ export function ApplicationsPage() {
       <header className="co-review-header">
         <div>
           <span className="co-overline">COORDINATOR WORKSPACE · REVIEW CENTER</span>
-          <h1>Internship review center</h1>
+          <h1>Internship review center</h1><ActivityViewed categories={[activityCategory]} ready={!loading && !error} recordIds={records.map(item => item.id)} revision={lastUpdated?.getTime()} />
           <p>Review applications, verify daily time records, and assess weekly journals for your assigned students.</p>
           {lastUpdated && <span className="co-review-updated">Last refreshed {lastUpdated.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>}
         </div>
@@ -189,7 +192,7 @@ export function ApplicationsPage() {
             {(['applications', 'dtrs', 'journals'] as const).map((value) => (
               <button key={value} type="button" className={tab === value ? 'is-active' : ''} aria-pressed={tab === value}
                 onClick={() => { setTab(value); setFilter('pending'); setExpandedId(null) }}>
-                {TAB_LABELS[value]} <span>{counts[value]}</span>
+                {TAB_LABELS[value]} <span>{counts[value]}</span><ActivityBadges compact categories={[value === 'dtrs' ? 'attendance' : value]} />
               </button>
             ))}
           </div>

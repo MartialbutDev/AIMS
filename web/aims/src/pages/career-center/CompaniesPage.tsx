@@ -1,3 +1,4 @@
+import { MoaFiles } from '../../components/MoaFiles'
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Icon } from '../../components/Icons'
@@ -886,6 +887,7 @@ export function CompaniesPage({
                   ))}
                 </div>
 
+                <MoaFiles key={selected.id} companyId={selected.id} canUpload />
                 {selected.description && (
                   <div className="cc-detail-description">
                     <strong>Description</strong>

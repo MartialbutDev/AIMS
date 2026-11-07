@@ -22,6 +22,7 @@ from app.models.user import User
 from app.models.internship_completion import InternshipCompletionCase, InternshipCompletionEvent
 from app.models.internship_deployment import InternshipDeployment
 from app.models.company import Company
+from app.models.hte_supervisor_company import HTESupervisorCompany
 from app.models.application import Application
 from app.models.document import Document
 from app.models.dtr import DTR
@@ -76,3 +77,10 @@ from app.models.notification_delivery import NotificationDeliveryPreference, Not
 from app.models.password_reset import PasswordResetChallenge, PasswordResetLimit, PasswordResetRevocation
 
 from app.models.auth_session import AuthSession, AuthSessionCutoff
+
+from app.models.academic_requirement import AcademicRequirement, AcademicRequirementEvent
+
+from app.models.moa_file import MoaFile
+
+from app.models.dtr_correction import DTRCorrection
+

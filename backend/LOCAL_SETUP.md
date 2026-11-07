@@ -29,6 +29,7 @@ The bootstrap registers all current models, creates current tables, and stamps t
 - Coordinator internal assessments are separate from official completion-grade release. Save in two terms and confirm neither overwrites the other or a legacy NULL-term grade.
 - Current-term DTR/journal reviews work even when the student has history. Historical/unclassified records remain locked in the current-term review endpoint.
 - Check the normal endorsement, company acceptance, deployment, monitoring and completion flow. Confirm returned/pending documents still block the relevant action.
+- Applications, forwarding (including school-arranged placements), company interview/acceptance and deployment confirmation require approved orientation and COR onboarding records. Missing, pending or rejected current submissions block advancement with HTTP 409. The development onboarding UI bypass does not authorize these writes; rejection and withdrawal remain available.
 
 ## Deployment boundary
 

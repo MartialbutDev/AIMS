@@ -17,9 +17,14 @@ class DocumentTypeSuggestionTests(unittest.TestCase):
         self.f=fixtures.DocumentVersionTests();self.f.setUp()
         self.client,self.db=self.f.client,self.f.db
     def tearDown(self): self.f.doCleanups()
-    def preview(self,header='CURRICULUM VITAE',name='file.pdf',data=b'preview fixture'):
-        with patch.object(documents.OCRService,'extract_header',return_value=header):
+    def preview(self,header='CURRICULUM VITAE',name='file.pdf',data=b'preview fixture',body=''):
+        with patch.object(documents.OCRService,'extract_header',return_value=header), patch.object(documents.OCRService,'extract_text',return_value=body):
             return self.client.post('/documents/identify',files={'file':(name,data,'application/pdf')})
+
+    def test_suggests_untitled_letter_from_body(self):
+        result = self.preview('March 3', body='Dear HR Manager,\nI am writing to apply for an internship at your company.').json()
+        self.assertEqual(result['suggested_type'], 'application_letter')
+        self.assertEqual(result['method'], 'content_structure')
 
     def test_clear_titles_suggest_supported_types(self):
         for title,kind in [('CURRICULUM VITAE','resume'),('APPLICATION LETTER','application_letter'),('WAIVER','waiver'),('MEDICAL CERTIFICATE','medical_certificate'),('INTERNSHIP PLAN','internship_plan'),('INSURANCE POLICY','insurance'),('ENDORSEMENT LETTER','endorsement_letter'),('ACCEPTANCE LETTER','acceptance_letter'),('CERTIFICATE OF COMPLETION','certificate_of_completion')]:

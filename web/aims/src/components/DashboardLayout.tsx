@@ -1,3 +1,7 @@
+import { AccountMenu } from './AccountMenu'
+import { sectionCategories } from '../services/activitySections'
+import { ActivityProvider, ActivityBadges, PageActivity } from './ActivityIndicators'
+import { DTRCorrectionsPage } from '../pages/shared/DTRCorrectionsPage'
 import { NotificationCenter } from './NotificationCenter'
 import { WorkspaceSettings } from '../pages/shared/WorkspaceSettings'
 
@@ -28,10 +32,12 @@ interface DashboardLayoutProps {
 }
 
 const NAV_BY_ROLE = {
+  student: [],
   admin: [
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Users', slug: 'users', icon: 'users' },
     { label: 'Company access', slug: 'company-access', icon: 'briefcase' },
+    { label: 'Activity history', slug: 'activity-history', icon: 'clock' },
     { label: 'Coordinator designations', slug: 'coordinators', icon: 'users' },
     { label: 'Onboarding review', slug: 'document-verification', icon: 'check' },
     { label: 'Assignments', slug: 'assignments', icon: 'file' },
@@ -40,6 +46,7 @@ const NAV_BY_ROLE = {
   ],
 
   coordinator: [
+    { label: 'DTR corrections', slug: 'dtr-corrections', icon: 'clock' },
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Students', slug: 'students', icon: 'users' },
     { label: 'Document review', slug: 'document-verification', icon: 'check' },
@@ -70,6 +77,7 @@ const NAV_BY_ROLE = {
   ],
 
   company: [
+    { label: 'DTR corrections', slug: 'dtr-corrections', icon: 'clock' },
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Intern monitoring', slug: 'interns', icon: 'briefcase' },
     { label: 'Applications', slug: 'applications', icon: 'users' },
@@ -78,6 +86,7 @@ const NAV_BY_ROLE = {
 } as const
 
 const WORKSPACE_SLUGS: Record<UserRole, string> = {
+  student: 'student',
   admin: 'admin',
   coordinator: 'coordinator',
   dean: 'dean',
@@ -85,7 +94,11 @@ const WORKSPACE_SLUGS: Record<UserRole, string> = {
   company: 'company',
 }
 
-export function DashboardLayout({
+export function DashboardLayout(props: DashboardLayoutProps) {
+  return <ActivityProvider key={props.session.accessToken} session={props.session}><DashboardWorkspace {...props} /></ActivityProvider>
+}
+
+function DashboardWorkspace({
   session,
   data,
   onLogout,
@@ -130,6 +143,7 @@ export function DashboardLayout({
     dashboard: 'Overview',
     users: 'Users',
     'company-access': 'Company access',
+    'activity-history': 'Activity history',
     assignments: 'Assignments',
     students: 'Students',
     'historical-students': 'History',
@@ -304,7 +318,7 @@ export function DashboardLayout({
               onClick={() => goTo(item.slug)}
             >
               <Icon name={item.icon} size={18} />
-              <span>{item.label}</span>
+              <span>{item.label}</span><ActivityBadges compact categories={sectionCategories[item.slug] || []} />
             </button>
           ))}
         </nav>
@@ -401,25 +415,14 @@ export function DashboardLayout({
           <div className="topbar-actions">
             <span className="citc-topbar-campus">CITC / USTP Cagayan de Oro</span>
             <NotificationCenter key={session.accessToken} session={session} open={notificationsOpen} onOpenChange={changeNotificationsOpen} onSettings={() => navigate(`/${WORKSPACE_SLUGS[session.role]}/settings`, { state: { settingsTab: 'notifications' } })} />
-            <span className="today-label">
-              <Icon name="clock" size={15} />
-              Today
-            </span>
-
-            <button
-              type="button"
-              className="topbar-avatar"
-              title="Open account settings"
-              onClick={() => goTo('settings')}
-            >
-              {firstName.slice(0, 1).toUpperCase()}
-            </button>
+            <AccountMenu session={session} onLogout={onLogout} notificationsOpen={notificationsOpen} onOpen={() => { setNotificationsOpen(false); setMobileNavOpen(false) }} />
           </div>
         </header>
 
         <div className="dashboard-content">
+          <PageActivity section={section} />
           {section === 'dashboard' && session.role !== 'dean' && data.academic_year && <section className="panel aims-reporting-term" aria-label="Reporting term" style={{ marginBottom: 18 }}><strong>AY {data.academic_year} · Semester {data.semester}</strong>{data.completion && <p>Active internships: {data.completion.deployed} · Coordinator approved: {data.completion.completed} · Grades released: {data.completion.grade_released}{data.completion.completed_legacy > 0 ? ` · Historical completed records: ${data.completion.completed_legacy}` : ''}</p>}<small>Internship activity uses this term and your access scope. Registered-account and partner inventories are labelled separately.</small></section>}
-          {section === 'settings' ? <WorkspaceSettings key={session.accessToken} session={session} onLogout={onLogout} adminOptions={session.role === 'admin' ? content : undefined} /> : content}
+          {section === 'dtr-corrections' ? <DTRCorrectionsPage role={session.role} /> : section === 'settings' ? <WorkspaceSettings key={session.accessToken} session={session} onLogout={onLogout} adminOptions={session.role === 'admin' ? content : undefined} /> : content}
         </div>
       </main>
     </div>

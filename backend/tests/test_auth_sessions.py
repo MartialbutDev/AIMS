@@ -35,6 +35,30 @@ class SessionTests(unittest.TestCase):
     def call(self,token,path='/sessions',method='get'):
         return getattr(self.client,method)('/auth'+path,headers={'Authorization':'Bearer '+token})
 
+    def test_student_browser_login_uses_existing_student_account_and_browser_session(self):
+        response = self.client.post('/auth/login/student', json={'email': 'one@example.invalid', 'password': 'Test-password-123'}, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome'})
+        self.assertEqual(response.status_code, 200)
+        token = response.json()['access_token']
+        sessions = self.call(token).json()['items']
+        self.assertEqual(sessions[0]['label'], 'Web browser')
+        self.assertTrue(sessions[0]['current'])
+        self.assertEqual(response.json()['user']['role'], 'student')
+
+    def test_student_account_does_not_gain_staff_web_login_access(self):
+        response = self.client.post('/auth/login/web', json={'email': 'one@example.invalid', 'password': 'Test-password-123'})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.db.query(AuthSession).count(), 0)
+
+    def test_android_login_retains_android_session_label(self):
+        response = self.client.post('/auth/login/student', json={'email': 'one@example.invalid', 'password': 'Test-password-123'}, headers={'User-Agent': 'okhttp Android'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.call(response.json()['access_token']).json()['items'][0]['label'], 'Android app / browser')
+
+    def test_okhttp_mobile_client_retains_android_session_label(self):
+        response = self.client.post('/auth/login/student', json={'email': 'one@example.invalid', 'password': 'Test-password-123'}, headers={'User-Agent': 'okhttp/4.12.0'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.call(response.json()['access_token']).json()['items'][0]['label'], 'Android app / browser')
+
     def test_tokens_unique_and_list_has_no_credentials(self):
         a,b=self.token(),self.token();self.assertNotEqual(a,b)
         self.assertEqual(self.call(a).status_code,200);r=self.call(b)

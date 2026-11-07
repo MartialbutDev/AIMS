@@ -1,4 +1,5 @@
 export const roles = [
+  'student',
   'coordinator',
   'dean',
   'career_center',
@@ -16,6 +17,7 @@ export interface UserSession {
 }
 
 export const roleLabels: Record<UserRole, string> = {
+  student: 'Student',
   coordinator: 'Coordinator',
   dean: 'Dean',
   career_center: 'Career Center',
@@ -24,6 +26,7 @@ export const roleLabels: Record<UserRole, string> = {
 }
 
 export const roleDescriptions: Record<UserRole, string> = {
+  student: 'Your applications, requirements and internship progress, together.',
   coordinator: 'Manage student placements, applications, and partner companies.',
   dean: 'Review department performance and keep academic programs on track.',
   career_center: 'Connect students with opportunities and employer events.',

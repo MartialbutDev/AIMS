@@ -63,7 +63,7 @@ export function ApplicationsPage({ data }: ApplicationsPageProps) {
         ))}
       </section>
 
-      <section className="cc-card cc-directory">
+      <section className="cc-card cc-directory cc-application-records">
         <div className="cc-section-header">
           <div>
             <span className="cc-section-kicker">APPLICATION RECORDS</span>
@@ -127,3 +127,4 @@ export function ApplicationsPage({ data }: ApplicationsPageProps) {
     </main>
   )
 }
+

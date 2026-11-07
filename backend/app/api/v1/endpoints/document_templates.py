@@ -161,6 +161,10 @@ async def publish(db, actor, metadata, file, series_id=None):
     destination = root / stored
     try:
         destination.write_bytes(data)
+        # There is no ORM relationship between these mappers to order inserts.
+        # Persist a new parent in this transaction before its first revision.
+        if series_id is None:
+            db.flush([series])
         revision = Revision(id=revision_id, series_id=series.id, title=draft.title, document_type=draft.document_type,
                             version=draft.version, version_key=draft.version.casefold(), instructions=draft.instructions,
                             approval_reference=draft.approval_reference, deadline=draft.deadline, original_filename=filename,

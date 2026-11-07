@@ -286,7 +286,7 @@ async def create_application(
         )
 
     academic_year, semester = _current_term()
-    db.query(User).filter(User.id == current_user.id).with_for_update().first()
+    DeploymentService.require_application_eligibility(db, current_user.id, academic_year, semester)
     direct_service.require_no_direct_conflict(db, current_user.id, academic_year, semester)
 
     company = (
@@ -528,6 +528,22 @@ async def get_hte_applications(
     )
 
 
+@router.get('/eligibility')
+def application_eligibility(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(403, 'Student access required')
+    year, semester = _current_term()
+    reason = DeploymentService.application_blocker(db, current_user.id, year, semester)
+    if not reason:
+        try:
+            direct_service.require_no_direct_conflict(db, current_user.id, year, semester)
+        except HTTPException as error:
+            if error.status_code != 409:
+                raise
+            reason = error.detail
+    return {'allowed': reason is None, 'reason': reason, 'academic_year': year, 'semester': semester}
+
+
 # ============================================================
 # GET SINGLE APPLICATION
 # ============================================================
@@ -661,6 +677,10 @@ async def update_application_status(
                     detail="Invalid Coordinator status transition",
                 )
 
+            if requested_status in (ApplicationStatus.REVIEWING, ApplicationStatus.ENDORSED):
+                DeploymentService.require_application_eligibility(db, application.student_id,
+                    application.academic_year, application.semester, application.id)
+
             if requested_status == ApplicationStatus.ENDORSED:
                 from app.services.endorsement_service import require_endorsement
                 require_endorsement(db, application.student_id, application.academic_year, application.semester)
@@ -695,6 +715,8 @@ async def update_application_status(
                 )
 
             if requested_status in (ApplicationStatus.INTERVIEW, ApplicationStatus.ACCEPTED):
+                DeploymentService.require_application_eligibility(db, application.student_id,
+                    application.academic_year, application.semester, application.id)
                 direct_service.ensure_application_ready(db, application)
             if requested_status == ApplicationStatus.ACCEPTED:
                 direct_service.require_no_direct_conflict(db, application.student_id, application.academic_year, application.semester, application.id)
@@ -845,3 +867,41 @@ async def get_application_attachment(application_id: str, kind: str, db: Session
     if not candidate.is_relative_to(root) or not candidate.is_file():
         raise HTTPException(status_code=404, detail="Attachment not found")
     return FileResponse(candidate, filename=document.original_filename or candidate.name, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+@router.get('/{application_id}/journey')
+def get_application_journey(application_id: str, db: Session = Depends(get_db),
+                            current_user: User = Depends(get_current_user)):
+    application = _get_application(db, application_id)
+    if current_user.role != UserRole.STUDENT or application.student_id != current_user.id:
+        raise HTTPException(404, 'Application not found')
+    from app.services.endorsement_service import endorsement_state
+    from app.models.internship_deployment import InternshipDeployment, DeploymentStatus
+    endorsement = endorsement_state(db, application.student_id, application.academic_year, application.semester)
+    document = db.get(Document, endorsement['document_id']) if endorsement['document_id'] else None
+    endorsement['review_notes'] = document.review_notes if document else None
+    deployment = db.query(InternshipDeployment).filter_by(application_id=application.id).first()
+    checklist = DeploymentService.get_checklist(db, deployment) if deployment else None
+    if application.status in (ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN):
+        stage = application.status.value
+    elif deployment and deployment.status == DeploymentStatus.CANCELLED:
+        stage = 'cancelled'
+    elif deployment and deployment.status == DeploymentStatus.COMPLETED:
+        stage = 'completed'
+    elif deployment and deployment.status == DeploymentStatus.DEPLOYED:
+        stage = 'deployed'
+    elif application.status == ApplicationStatus.ACCEPTED:
+        stage = 'deployment_approval' if checklist and checklist['ready_for_deployment'] else 'pre_deployment'
+    elif application.status in (ApplicationStatus.ENDORSED, ApplicationStatus.INTERVIEW):
+        stage = 'company_review'
+    elif endorsement['ready']:
+        stage = 'coordinator_review'
+    elif endorsement['status'] in ('missing', 'rejected', 'approval_revoked'):
+        stage = 'upload_endorsement'
+    else:
+        stage = 'endorsement_review'
+    return {'stage': stage, 'application_status': application.status.value,
+            'academic_year': application.academic_year, 'semester': application.semester,
+            'is_current_term': (application.academic_year, application.semester) == _current_term(),
+            'endorsement': endorsement, 'checklist': checklist,
+            'deployment_status': deployment.status.value if deployment else None}

@@ -18,6 +18,7 @@ from typing import Any
 
 from app.core.assignment_access import get_current_academic_term
 from app.core.config import settings
+from app.services.academic_requirements import rules as academic_rules, program_matches, year_level_matches
 
 from app.models.user import User
 
@@ -172,30 +173,8 @@ def _institution_matches(text: str) -> bool:
     )
 
 def _expected_codes() -> list[str]:
+    return academic_rules()["practicum_subject_codes"]
 
-    configured = str(
-
-        getattr(
-
-            settings,
-
-            "PRACTICUM_SUBJECT_CODES",
-
-            "",
-
-        ) or ""
-
-    )
-
-    return [
-
-        code.strip().upper()
-
-        for code in configured.split(",")
-
-        if code.strip()
-
-    ] or ["IT421"]
 
 def _subject_code_pattern(code: str) -> str:
 
@@ -599,6 +578,8 @@ def validate_cor(
 
         return _unreadable("cor")
 
+    policy = academic_rules()
+    required_hours = policy["required_hours"]
     codes = _expected_codes()
 
     matched_code, row = _practicum_row(
@@ -622,7 +603,7 @@ def validate_cor(
 
         and re.search(
 
-            r"\b486\s*(?:HRS?\.?|HOURS?)\b",
+            rf"\b{required_hours}\s*(?:HRS?\.?|HOURS?)\b",
 
             row,
 
@@ -658,29 +639,9 @@ def validate_cor(
 
         ),
 
-        "program_matches": bool(
+        "program_matches": program_matches(upper, policy["programs"]),
 
-            re.search(
-
-                r"\bB\.?\s*S\.?\s*(?:IN\s+)?INFORMATION\s+TECHNOLOGY\b",
-
-                upper,
-
-            )
-
-        ),
-
-        "year_level_matches": bool(
-
-            re.search(
-
-                r"\b4TH\s+YEAR\b",
-
-                upper,
-
-            )
-
-        ),
+        "year_level_matches": year_level_matches(upper, policy["year_levels"]),
 
         "semester_matches": (
 
@@ -767,6 +728,7 @@ def validate_cor(
         {
 
             "document_kind": "cor",
+            "academic_requirements": {k:policy[k] for k in ("id","version","required_hours","programs","year_levels","practicum_subject_codes")},
 
             "matched_subject_code": matched_code,
 
@@ -842,15 +804,13 @@ def validate_cor(
 
             "program_matches": (
 
-                "BS Information Technology "
-
-                "program is not identified"
+                f"Expected program ({', '.join(policy['programs'])}) is not identified"
 
             ),
 
             "year_level_matches": (
 
-                "4th Year enrollment is not identified"
+                f"Expected year level ({', '.join(map(str, policy['year_levels']))}) is not identified"
 
             ),
 
@@ -878,7 +838,7 @@ def validate_cor(
 
             "practicum_hours_matches": (
 
-                "PRACTICUM (486 hrs.) "
+                f"PRACTICUM ({required_hours} hrs.) "
 
                 "is not identified in the course row"
 

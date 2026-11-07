@@ -1,3 +1,4 @@
+import { ActivityViewed } from '../../components/ActivityIndicators'
 
 import { useCallback, useEffect, useState } from 'react'
 
@@ -201,7 +202,7 @@ export function DocumentVerificationPage() {
   }
 
   return (
-    <main className="co-page dv-page">
+    <main className="co-page dv-page"><ActivityViewed categories={['onboarding']} studentIds={queue.map(item => item.student.id)} ready={!loading && !error} recordIds={queue.filter(item => !search || JSON.stringify(item).toLowerCase().includes(search.toLowerCase())).map(item => item.submission.id)} />
       <header className="dv-header">
         <div>
           <span className="co-overline">

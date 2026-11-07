@@ -33,7 +33,6 @@ import ActivityTimeline from "../../../src/components/dashboard/ActivityTimeline
 import SectionHeader from "../../../src/components/dashboard/SectionHeader";
 import SkeletonLoader from "../../../src/components/dashboard/SkeletonLoader";
 
-const REQUIRED_HOURS = 486;
 
 // ============================================================
 // TYPES AND INTERFACES
@@ -76,7 +75,7 @@ const DEFAULT_STATS: DashboardStats = {
 const DEFAULT_PROGRESS: InternshipProgress = {
   progress: 0,
   hoursRendered: 0,
-  remainingHours: REQUIRED_HOURS,
+  remainingHours: 0,
   currentCompany: "Not yet assigned",
 };
 
@@ -204,6 +203,7 @@ export default function DashboardScreen() {
 
   const [progress, setProgress] =
     useState<InternshipProgress>(DEFAULT_PROGRESS);
+  const [progressError, setProgressError] = useState(false);
 
   const [deployment, setDeployment] =
     useState<InternshipDeployment | null>(null);
@@ -459,11 +459,12 @@ export default function DashboardScreen() {
           )
         );
 
+        const requiredHours = safeNumber(summary.required_hours);
         const remainingHours = Math.max(
           0,
           safeNumber(
             summary?.remaining_hours,
-            REQUIRED_HOURS - hoursRendered
+            requiredHours - hoursRendered
           )
         );
 
@@ -473,11 +474,12 @@ export default function DashboardScreen() {
             0,
             safeNumber(
               summary?.progress_percent,
-              (hoursRendered / REQUIRED_HOURS) * 100
+              requiredHours > 0 ? (hoursRendered / requiredHours) * 100 : 0
             )
           )
         );
 
+        setProgressError(false);
         setProgress({
           progress: progressPercent,
           hoursRendered,
@@ -491,6 +493,7 @@ export default function DashboardScreen() {
           "Error fetching internship progress:",
           error
         );
+        if (isCurrentRequest(requestId)) setProgressError(true);
       }
     },
     [isCurrentRequest]
@@ -716,7 +719,10 @@ export default function DashboardScreen() {
         {/* INTERNSHIP PROGRESS */}
         {/* ============================================= */}
 
-        <InternshipProgressCard
+        {progressError ? <View style={[styles.deploymentLink, { backgroundColor: colors.card }]}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>Internship progress unavailable</Text>
+          <Text style={{ color: colors.textSecondary, marginTop: 4 }}>Pull down to retry loading your academic requirements and hours.</Text>
+        </View> : <InternshipProgressCard
           progress={progress.progress}
           hoursRendered={
             progress.hoursRendered
@@ -732,7 +738,7 @@ export default function DashboardScreen() {
           semester={deployment?.semester}
           deploymentDate={deployment?.deployment_date}
           onViewCompletion={() => router.push("/(student)/completion")}
-        />
+        />}
 
         <TouchableOpacity
           accessibilityRole="button"

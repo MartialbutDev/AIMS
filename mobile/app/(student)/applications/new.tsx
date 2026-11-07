@@ -69,6 +69,20 @@ export default function NewApplicationScreen() {
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(false);
+  const [eligibility, setEligibility] = useState<{ allowed: boolean; reason: string | null } | null>(null);
+  const [checkingEligibility, setCheckingEligibility] = useState(true);
+  const [eligibilityRevision, setEligibilityRevision] = useState(0);
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setCheckingEligibility(true);
+    api.get('/applications/eligibility')
+      .then(response => { if (active) setEligibility(response.data); })
+      .catch(() => { if (active) setEligibility({ allowed: false, reason: 'Could not check application eligibility. Please retry.' }); })
+      .finally(() => { if (active) setCheckingEligibility(false); });
+    return () => { active = false; };
+  }, [eligibilityRevision]));
+
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [selectedCompany, setSelectedCompany] = useState<string>("");
@@ -395,6 +409,9 @@ export default function NewApplicationScreen() {
   // -------- submit --------
 
   const handleSubmit = async () => {
+    if (checkingEligibility || !eligibility?.allowed) {
+      return Alert.alert('Application unavailable', eligibility?.reason || 'Checking application eligibility.');
+    }
     if (!selectedCompany) return Alert.alert("Error", "Please select a company");
     if (!position.trim()) return Alert.alert("Error", "Please enter a position");
     if (!selectedResume)
@@ -404,14 +421,15 @@ export default function NewApplicationScreen() {
 
     setLoading(true);
     try {
-      await api.post("/applications/", {
+      const response = await api.post("/applications/", {
         company_id: selectedCompany,
         position: position.trim(),
         resume_id: selectedResume.id,
         application_letter_id: selectedAppLetter.id,
       });
 
-      Alert.alert("Success", "Application submitted successfully!", [
+      Alert.alert("Application submitted", "Your application is awaiting coordinator review. Open your application steps to check your endorsement letter status and see your next action.", [
+        { text: "Continue to application steps", onPress: () => router.replace({ pathname: '/(student)/applications/[id]', params: { id: response.data.id } }) },
         {
           text: "View Applications",
           onPress: () => router.push("/(student)/applications"),
@@ -425,6 +443,7 @@ export default function NewApplicationScreen() {
       setSelectedAppLetter(null);
     } catch (error: any) {
       console.error("Submission error:", error);
+      if (error.response?.status === 409) setEligibilityRevision(value => value + 1);
       Alert.alert(
         "Error",
         error.response?.data?.detail ||
@@ -437,6 +456,8 @@ export default function NewApplicationScreen() {
 
   const selectedCompanyData = companies.find((c) => c.id === selectedCompany);
   const canSubmit =
+    eligibility?.allowed === true &&
+    !checkingEligibility &&
     !!selectedCompany &&
     !!position.trim() &&
     !!selectedResume &&
@@ -477,7 +498,21 @@ export default function NewApplicationScreen() {
           { paddingBottom: 120 + insets.bottom },
         ]}
       >
-        {loadingCompanies ? (
+        {checkingEligibility ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={{ color: colors.textSecondary }}>Checking application eligibility…</Text>
+          </View>
+        ) : !eligibility?.allowed ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="information-circle-outline" size={40} color={colors.accent} />
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Application unavailable</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{eligibility?.reason}</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setEligibilityRevision(value => value + 1)} style={{ minHeight: 48, padding: 14 }}>
+              <Text style={{ color: colors.accent }}>Check again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : loadingCompanies ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.accent} />
             <Text style={[styles.loadingText, { color: colors.textSecondary }]}>

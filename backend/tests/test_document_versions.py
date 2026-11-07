@@ -38,8 +38,8 @@ Email: alex@example.com
 '''
 
 class DocumentVersionTests(unittest.TestCase):
-    def setUp(self):
-        self.f=fixtures.DirectPlacementTests();self.f.setUp();self.addCleanup(self.f.tearDown)
+    def setUp(self, *, approved_onboarding=True):
+        self.f=fixtures.DirectPlacementTests();self.f.setUp(approved_onboarding=approved_onboarding);self.addCleanup(self.f.tearDown)
         self.db,self.client=self.f.db,self.f.client
         self.client.app.include_router(documents.documents_router)
         student=self.db.get(User,'s1');student.first_name='Alex';student.middle_name='M.';student.last_name='Rivera';self.db.commit()
@@ -81,9 +81,21 @@ class DocumentVersionTests(unittest.TestCase):
         self.assertEqual(result['document']['version_label'],'Rejected')
         self.assertIn('does not match',result['document']['validation_message'])
 
-    def test_short_or_uncertain_scan_is_pending_replacement(self):
+    def test_short_unrelated_caption_requires_reupload_for_each_mobile_type(self):
+        from fastapi import HTTPException
         self.doc('approved')
-        result=self.upload('Blurry scanned page')
+        original_count = self.db.query(Document).count()
+        for kind in DocumentService.VALIDATION_FUNCTIONS:
+            with self.subTest(kind=kind), self.assertRaises(HTTPException) as error:
+                self.upload('Internship Day: group photograph from the campus event', kind)
+            self.assertEqual(error.exception.status_code, 422)
+            self.assertIn('Re-upload required', error.exception.detail)
+        self.assertEqual(self.db.query(Document).count(), original_count)
+        self.assertEqual(self.current().id,'approved')
+
+    def test_faint_recognizable_scan_is_pending_replacement(self):
+        self.doc('approved')
+        result=self.upload('RESUME')
         self.assertEqual(result['status'],'pending')
         self.assertEqual(result['document']['version_status'],'pending_replacement')
         self.assertEqual(self.current().id,'approved')

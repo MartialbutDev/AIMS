@@ -1,0 +1,11 @@
+.activity-badges{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap;vertical-align:middle;margin-left:8px;max-width:100%;line-height:1.5}
+.activity-unread-dot{display:inline-block;width:9px!important;height:9px!important;min-width:9px;border-radius:50%;background:#c6283e!important;border:2px solid white;box-shadow:0 0 0 1px #c6283e;flex:none;margin:3px}
+.activity-pending{display:inline-block;font-size:10px!important;line-height:1.5;font-weight:700;padding:3px 7px;border-radius:5px;background:#fff1cf;color:#6c4c08!important;overflow-wrap:anywhere}
+.activity-badges--compact{margin-left:auto;gap:4px;flex:none}.activity-badges--compact .activity-pending{padding:2px 5px;min-width:18px;text-align:center}
+.activity-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.activity-page-summary{display:flex;align-items:center;flex-wrap:wrap;gap:10px;background:#fff;border:1px solid #dce2ec;border-radius:9px;padding:11px 15px;margin:0 0 20px;color:#24334d;font-size:12px}
+.activity-page-summary>span{font-weight:650}.activity-page-summary small{font-size:10px;color:#657187;margin-left:auto}.activity-page-summary .activity-badges{margin-left:0}.activity-error{color:#8e2c3a;font-size:12px}.activity-error button{font:inherit;cursor:pointer}
+.sr-summary-grid .activity-badges{margin:4px 0;display:flex;align-items:center;gap:7px}.sr-summary-grid .activity-unread-dot{width:9px!important;height:9px!important;padding:0!important}.sr-summary-grid .activity-pending{font-size:10px!important}
+@media(max-width:600px){.activity-page-summary small{margin-left:0;width:100%}.activity-pending{font-size:10px!important}}
+
+.sw-sidebar nav a>.activity-badges{width:auto;font-size:inherit;text-align:left;flex-shrink:0}.sw-sidebar nav a>.activity-badges .activity-pending{font-size:10px!important}.sw-related a{display:inline-flex;align-items:center;justify-content:center;gap:5px}.sr-summary-grid>button>.activity-badges{display:flex;align-items:center;flex-wrap:wrap;gap:7px;min-height:20px;margin:0}

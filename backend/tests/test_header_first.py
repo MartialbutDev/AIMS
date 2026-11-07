@@ -98,7 +98,7 @@ class HeaderCropTests(unittest.TestCase):
             self.assertEqual(OCRService.extract_header(str(path),'pdf'),'RESUME')
 
 class HeaderUploadTests(unittest.TestCase):
-    def setUp(self): self.f=versions.DocumentVersionTests();self.f.setUp();self.db=self.f.db
+    def setUp(self): self.f=versions.DocumentVersionTests();self.f.setUp(approved_onboarding=False);self.db=self.f.db
     def tearDown(self): self.f.doCleanups()
 
     def test_wrong_type_rejection_preserves_approved_version(self):
@@ -111,10 +111,46 @@ class HeaderUploadTests(unittest.TestCase):
     def test_matching_header_alone_cannot_approve(self):
         self.assertEqual(self.f.upload('RESUME')['status'],'pending')
 
-    def test_unclear_header_with_otherwise_valid_content_requires_review(self):
+    def test_unclear_header_with_distinct_cv_sections_can_verify(self):
         with patch('app.services.document_identification.identify_header',return_value=identify_header('Unclear','resume')):
             result=self.f.upload(versions.RESUME)
-        self.assertEqual(result['status'],'pending')
+        self.assertEqual(result['status'],'verified')
+
+    def test_untitled_documents_use_structure_and_identity(self):
+        samples = {
+            'application_letter': 'Dear Dr. Smith,\nI am writing to apply for an internship at your company. My background in data analysis will help me contribute to your team.\nSincerely,\nAlex M. Rivera',
+            'resume': 'Alex M. Rivera\nalex@example.com\nEducation\nBachelor of Science in Information Technology\nAcademic Projects\nDeveloped a campus attendance tracker and documented the results for our department.',
+            'internship_plan': 'Alex M. Rivera\nLearning Objectives and Activities\nInternship at Data Analytics Corporation\nWeek 1 tasks: analyze existing reports with the supervisor and document reporting requirements.',
+        }
+        for kind, sample in samples.items():
+            with self.subTest(kind=kind):
+                result = self.f.upload(sample, kind)
+                self.assertEqual(result['status'], 'verified', result['validation'])
+
+    def test_job_post_and_employer_acceptance_do_not_verify_as_applications(self):
+        for body in [
+            'Dear students, apply for an internship with our team. Send your resume, skills and qualifications to our recruitment office.',
+            'Dear Alex M. Rivera, we are pleased to accept you for the internship position. Please report to the supervisor for your first assignment.',
+        ]:
+            result = self.f.upload(body + '\nBest regards,\nRecruitment office', 'application_letter')
+            self.assertNotEqual(result['status'], 'verified')
+
+    def test_untitled_official_documents_require_review(self):
+        from app.utils.official_document_evidence import official_evidence
+        from app.services.document_identification import identify_from_body
+        samples = {
+            'acceptance_letter': 'Dear Alex M. Rivera, we are pleased to accept you as an intern at our company. Your internship placement starts next month.',
+            'endorsement_letter': 'University of Technology. We hereby endorse Alex M. Rivera to your company for internship training. Please coordinate the schedule with our office.',
+            'medical_certificate': 'City Health Department. A physical examination was performed on Alex M. Rivera. The patient is physically fit for training.',
+        }
+        for kind, sample in samples.items():
+            with self.subTest(kind=kind):
+                self.assertIn(kind, official_evidence(sample))
+                suggestion = identify_from_body(identify_header('To whom it may concern', 'document'), sample)
+                self.assertEqual(suggestion['detected_type'], kind)
+                self.assertEqual(self.f.upload(sample, kind)['status'], 'pending')
+        acknowledgment = 'Dear Alex M. Rivera, we received your application for an internship. It will be reviewed by our company.'
+        self.assertFalse(official_evidence(acknowledgment))
 
     def test_matched_header_still_uses_identity_and_full_content_checks(self):
         result=self.f.upload(versions.RESUME)

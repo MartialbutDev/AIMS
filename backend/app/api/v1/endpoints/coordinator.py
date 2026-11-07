@@ -1,3 +1,4 @@
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 from app.services.document_version_service import effective_documents, annotate
 
 """Coordinator endpoints with assignment-based access control."""
@@ -62,20 +63,9 @@ class EvaluationInput(BaseModel):
 
 
 def _current_term() -> tuple[str, str]:
-    """Read the configured active term; fail closed on invalid configuration."""
-    import re
+    from app.core.assignment_access import get_current_academic_term
+    return get_current_academic_term()
 
-    year = str(getattr(settings, "CURRENT_ACADEMIC_YEAR", "") or "").strip()
-    semester = str(
-        getattr(settings, "CURRENT_SEMESTER", None)
-        or getattr(settings, "PRACTICUM_SEMESTER", "")
-    ).strip()
-    match = re.fullmatch(r"(\d{4})-(\d{4})", year)
-    if not match or int(match.group(2)) != int(match.group(1)) + 1:
-        raise HTTPException(503, "CURRENT_ACADEMIC_YEAR is invalid or missing")
-    if semester not in ("1", "2"):
-        raise HTTPException(503, "CURRENT_SEMESTER must be 1 or 2")
-    return year, semester
 
 
 def _has_active_designation(db: Session, actor: User) -> bool:
@@ -149,7 +139,7 @@ def _hours_summary(records: list[DTR]) -> dict:
 
     required_hours = max(
         0,
-        settings.REQUIRED_INTERNSHIP_HOURS,
+        academic_hours(),
     )
 
     remaining_hours = round(

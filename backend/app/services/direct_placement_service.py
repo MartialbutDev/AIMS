@@ -16,6 +16,7 @@ from app.models.internship_deployment import InternshipDeployment, DeploymentSta
 from app.models.notification import Notification, NotificationType
 from app.models.user import User, UserRole
 from app.services.endorsement_service import endorsement_state
+from app.services.onboarding_eligibility import require_approved_onboarding
 
 ACTIVE = ('pending', 'released')
 TERMINAL_APPLICATIONS = (ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN)
@@ -123,6 +124,7 @@ def release_application(db, placement, actor_id):
         InternshipDeployment.status != DeploymentStatus.CANCELLED).first()
     if existing or deployment:
         raise HTTPException(409, 'Another active application or placement exists. Resolve it before releasing this proposal.')
+    require_approved_onboarding(db, placement.student_id)
     application = Application(id=str(uuid.uuid4()), student_id=placement.student_id, company_id=placement.company_id,
         academic_year=placement.academic_year, semester=placement.semester, position=placement.position,
         cover_letter='SCHOOL-ARRANGED DIRECT PLACEMENT\n'+placement.reason,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { DashboardLayout } from '../components/DashboardLayout'
 import { getAdminDashboard } from '../services/adminService'
@@ -8,6 +8,8 @@ import { getCoordinatorDashboard } from '../services/coordinatorService'
 import { getDeanDashboard } from '../services/deanService'
 import type { UserRole, UserSession } from '../types/auth'
 import type { DashboardData } from '../types/dashboard'
+
+const StudentWorkspace = lazy(() => import('./student/StudentWorkspace').then(module => ({ default: module.StudentWorkspace })))
 
 interface RoleDashboardPageProps {
   session: UserSession
@@ -22,7 +24,11 @@ const dashboardLoaders = {
   admin: getAdminDashboard,
 }
 
-export function RoleDashboardPage({ session, onLogout }: RoleDashboardPageProps) {
+export function RoleDashboardPage(props: RoleDashboardPageProps) {
+  return props.session.role === 'student' ? <Suspense fallback={<main className="dashboard-loading"><span className="loading-spinner" /><p>Preparing your student workspace…</p></main>}><StudentWorkspace {...props} /></Suspense> : <StaffDashboard {...props} />
+}
+
+function StaffDashboard({ session, onLogout }: RoleDashboardPageProps) {
   const role = session.role
   const location = useLocation()
   const [result, setResult] = useState<{
@@ -33,7 +39,7 @@ export function RoleDashboardPage({ session, onLogout }: RoleDashboardPageProps)
 
   useEffect(() => {
     let isCurrent = true
-    dashboardLoaders[role]()
+    dashboardLoaders[role as Exclude<UserRole, 'student'>]()
       .then((data) => { if (isCurrent) setResult({ role, data }) })
       .catch((loadError: unknown) => {
         if (isCurrent) {

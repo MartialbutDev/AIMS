@@ -29,10 +29,11 @@ from app.models.notification import Notification
 from app.models.direct_placement import DirectPlacement as Placement,DirectPlacementEvent as Event
 from app.api.v1.endpoints import direct_placements as endpoint,applications,deployments
 from app.services import direct_placement_service as service, deployment_service
+from onboarding_fixtures import approve_onboarding
 
 
 class DirectPlacementTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self, *, approved_onboarding=True):
         self.engine=create_engine('sqlite://',connect_args={'check_same_thread':False},poolclass=StaticPool)
         Base.metadata.create_all(self.engine)
         self.db=Session(self.engine)
@@ -56,6 +57,10 @@ class DirectPlacementTests(unittest.TestCase):
         self.db.add(Document(id='fixture-endorsement',type=DocumentType.ENDORSEMENT_LETTER,uploaded_by='s1',
             file_path='endorsement-fixture.pdf',verification_status='verified',reviewed_by='c1',
             reviewed_at=datetime.now(timezone.utc).replace(tzinfo=None),academic_year='2026-2027',semester='1'))
+        self.db.flush()
+        if approved_onboarding:
+            for student in ('s1', 's2', 's3'):
+                approve_onboarding(self.db, student)
         self.db.commit();self.as_user('c1',UserRole.COORDINATOR)
         app=FastAPI();app.include_router(endpoint.router,prefix='/direct');app.include_router(applications.router,prefix='/applications');app.include_router(deployments.router,prefix='/deployments')
         app.dependency_overrides[endpoint.get_db]=lambda:self.db

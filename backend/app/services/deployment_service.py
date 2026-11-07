@@ -1,9 +1,11 @@
 from app.services.document_version_service import effective_documents
+from app.services.onboarding_eligibility import onboarding_blocker, onboarding_complete, require_approved_onboarding
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.core.assignment_access import (
@@ -27,6 +29,41 @@ class DeploymentService:
         DocumentType.MEDICAL_CERTIFICATE: "Medical Certificate",
         DocumentType.INTERNSHIP_PLAN: "Internship Plan",
     }
+
+    @staticmethod
+    def application_blocker(db: Session, student_id: str, year: str, semester: str,
+                            exclude_application_id: str | None = None, *, lock_onboarding: bool = False) -> str | None:
+        query = db.query(InternshipDeployment).filter(
+            InternshipDeployment.student_id == student_id,
+            or_(InternshipDeployment.status == DeploymentStatus.DEPLOYED,
+                and_(InternshipDeployment.academic_year == year,
+                     InternshipDeployment.semester == semester,
+                     InternshipDeployment.status.in_([DeploymentStatus.PRE_DEPLOYMENT, DeploymentStatus.COMPLETED]))),
+        )
+        if exclude_application_id:
+            query = query.filter(InternshipDeployment.application_id != exclude_application_id)
+        placement = query.first()
+        if placement:
+            if placement.status == DeploymentStatus.DEPLOYED:
+                return 'You are already deployed to an internship. You cannot apply to another company while it is active.'
+            if placement.status == DeploymentStatus.COMPLETED:
+                return 'You have already completed an internship for this semester.'
+            return 'You already have an accepted placement for this semester. Complete your pre-deployment requirements.'
+        accepted = db.query(Application.id).filter_by(student_id=student_id, academic_year=year,
+                                                     semester=semester, status=ApplicationStatus.ACCEPTED)
+        if exclude_application_id:
+            accepted = accepted.filter(Application.id != exclude_application_id)
+        if accepted.first():
+            return 'You already have an accepted application for this semester.'
+        return onboarding_blocker(db, student_id, lock=lock_onboarding)
+
+    @classmethod
+    def require_application_eligibility(cls, db: Session, student_id: str, year: str, semester: str,
+                                        exclude_application_id: str | None = None) -> None:
+        db.query(User).filter(User.id == student_id).with_for_update().one()
+        reason = cls.application_blocker(db, student_id, year, semester, exclude_application_id, lock_onboarding=True)
+        if reason:
+            raise HTTPException(409, reason)
 
     @staticmethod
     def _enum_value(value):
@@ -101,6 +138,7 @@ class DeploymentService:
         check('status', 'Awaiting official deployment confirmation', deployment.status == DeploymentStatus.PRE_DEPLOYMENT)
         student = db.get(User, deployment.student_id)
         check('student', 'Student account is active', student and student.is_active and student.role == UserRole.STUDENT)
+        check('onboarding', 'Orientation and COR are approved', onboarding_complete(db, deployment.student_id))
         application = db.get(Application, deployment.application_id)
         matches = application and application.status == ApplicationStatus.ACCEPTED and (
             application.student_id, application.company_id, application.academic_year, application.semester
@@ -261,6 +299,7 @@ class DeploymentService:
             mode="write",
         )
 
+        require_approved_onboarding(db, deployment.student_id)
         approval = cls.get_approval(db, deployment, actor)
         if not approval['ready']:
             raise HTTPException(409, detail={

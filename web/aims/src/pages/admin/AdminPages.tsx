@@ -1,6 +1,7 @@
 
 import { useEffect, useState } from 'react'
 import { CompanyAccessPage } from './CompanyAccessPage'
+import { ActivityHistory } from './ActivityHistory'
 
 import type { UserSession } from '../../types/auth'
 
@@ -291,6 +292,9 @@ export function AdminPages({
     // COORDINATOR ASSIGNMENTS
     // ========================================
 
+    case 'activity-history':
+      content = <ActivityHistory />
+      break
     case 'company-access':
       content = <CompanyAccessPage onManageAccounts={() => onNavigate('users')} />
       break

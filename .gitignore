@@ -141,3 +141,5 @@ backend/assets/completion_certificates/
 *-firebase-adminsdk-*.json
 
 *.pem
+
+backend/assets/private_moa/

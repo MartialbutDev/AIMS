@@ -20,7 +20,9 @@ Registers all API endpoints, including:
 - Student Onboarding Verification
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.services.academic_requirements import academic_policy_scope
+from app.api.v1.endpoints import academic_requirements
 
 from app.api.v1.endpoints import (
     auth,
@@ -51,8 +53,13 @@ from app.routers.documents import documents_router
 # MAIN API ROUTER
 # ============================================================
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(academic_policy_scope)])
+router.include_router(academic_requirements.router)
 router.include_router(company_access.router)
+from app.api.v1.endpoints import moa_files
+router.include_router(moa_files.router)
+from app.api.v1.endpoints import activity_history
+router.include_router(activity_history.router)
 from app.api.v1.endpoints import internship_completion
 router.include_router(internship_completion.router)
 
@@ -303,3 +310,6 @@ from app.api.v1.endpoints import password_reset
 router.include_router(password_reset.router, prefix='/auth/password-reset/otp', tags=['Password reset OTP'])
 
 router.include_router(dean_coordinators.legacy_router)
+
+from app.api.v1.endpoints import dtr_corrections
+router.include_router(dtr_corrections.router)

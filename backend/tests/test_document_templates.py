@@ -52,6 +52,20 @@ class TemplateTests(unittest.TestCase):
             self.pdf = pdf.tobytes()
         self.draft = dict(title='Test waiver', document_type='waiver', version='2026.1', instructions='Complete the blank form and follow the coordinator instructions.', approval_reference='TEST FIXTURE ONLY', deadline=(date.today()+timedelta(days=20)).isoformat(), acknowledge_approved=True, base_revision_id=None)
 
+    def test_new_library_publishes_with_foreign_keys_enforced(self):
+        self.db.execute(text('PRAGMA foreign_keys=ON'))
+        self.assertEqual(self.db.execute(text('PRAGMA foreign_keys')).scalar(), 1)
+        result = self.publish()
+        self.assertEqual(result.status_code, 201, result.text)
+        revision = self.db.get(Revision, result.json()['id'])
+        series = self.db.get(Series, revision.series_id)
+        self.assertIsNotNone(series)
+        self.assertEqual(series.current_revision_id, revision.id)
+        self.student()
+        library = self.client.get('/forms/my').json()
+        self.assertEqual(library['items'][0]['id'], revision.id)
+        self.assertEqual(self.client.get('/forms/files/' + revision.id).status_code, 200)
+
     def tearDown(self):
         self.client.close(); self.db.close(); self.engine.dispose()
         for p in reversed(self.patches): p.stop()

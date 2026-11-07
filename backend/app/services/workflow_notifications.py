@@ -17,7 +17,7 @@ def enqueue(db, recipients, kind, title, message, data=None, scope=None, exclude
     for uid in set(recipients) - {None, actor}:
         user = scope.users.get(uid)
         if user is None: continue
-        payload = {'event_id': event_id, **(data or {})}
+        payload = {'event_id': event_id, 'academic_year': scope.term[0], 'semester': scope.term[1], **(data or {})}
         payload.update(destinations(user.role, kind, payload.get('source', 'workflow')))
         db.add(Notification(id=str(uuid.uuid4()), user_id=uid, type=NotificationType(kind),
                             title=title[:255], message=message, data=json.dumps(payload), is_read=False))
@@ -42,6 +42,8 @@ def capture(db, flush_context, instances):
         def changed(field):
             return new or state.attrs[field].history.has_changes()
         def emit(users, kind, title, message, **payload):
+            if year and semester:
+                payload.update(academic_year=str(year), semester=str(semester))
             enqueue(db, users, kind, title, message, payload, scope)
         sid = getattr(obj, 'student_id', None)
         staff = scope.coordinators[sid]
@@ -75,10 +77,11 @@ def capture(db, flush_context, instances):
                  'A document approval was revoked. Open Documents to read the reason. Older versions will not become active automatically.' if revoked else 'A student document was uploaded or reviewed. Open Documents to see the result and any feedback.',
                  document_id=obj.id, status=status, student_id=sid, action='approval_revoked' if revoked else 'document_update')
         elif name == 'StudentOnboardingSubmission':
+            if not obj.id: obj.id = str(uuid.uuid4())
             if not changed('review_status'): continue
             status = obj.review_status or 'pending_review'
             emit({sid} | staff | scope.roles['admin'], 'document', f'Onboarding: {status.replace("_", " ")}',
-                 'An onboarding submission needs attention or has a review decision.', source='onboarding', status=status, student_id=sid)
+                 'An onboarding submission needs attention or has a review decision.', source='onboarding', status=status, student_id=sid, submission_id=obj.id, document_kind=obj.document_kind)
         elif name == 'InternshipDeployment':
             if getattr(obj, '_completion_workflow', False): continue
             if not changed('status'): continue
@@ -96,11 +99,11 @@ def capture(db, flush_context, instances):
         elif name == 'DeanCoordinatorDesignation':
             if not (changed('is_active') or changed('coordinator_id')): continue
             emit({obj.coordinator_id, obj.assigned_by_dean_id}, 'system', 'Coordinator designation updated',
-                 'A coordinator designation has changed. Review your access and assignments for the semester.')
+                 'A coordinator designation has changed. Review your access and assignments for the semester.', source='designation', coordinator_id=obj.coordinator_id)
         elif name == 'HTESupervisorCompany':
             if not (changed('is_active') or changed('company_id')): continue
             emit({obj.supervisor_id} | scope.roles['career_center'], 'system', 'Company access updated',
-                 'A company supervisor assignment has changed. Review your company workspace.')
+                 'A company supervisor assignment has changed. Review your company workspace.', source='company_access', company_id=obj.company_id, supervisor_id=obj.supervisor_id)
         elif name == 'Company':
             fields = ['is_active', 'is_moa_signed', 'moa_reference', 'moa_signed_at', 'moa_effective_at', 'moa_expires_at']
             if not (new or any(changed(f) for f in fields if f in state.attrs)): continue

@@ -62,3 +62,8 @@
 @media(max-width:1100px) { .sr-summary-grid { grid-template-columns:1fr; } }
 @media(max-width:600px) { .sr-dialog { margin:0; width:100vw; height:100dvh; max-height:100dvh; border:0; border-radius:0; } .sr-shell { height:100dvh; max-height:100dvh; } .sr-dialog-heading { padding:20px; } .sr-dialog-heading h2 { font-size:22px; } .sr-toolbar { padding:14px 20px; } .sr-body { padding:20px; } .sr-document-row { flex-wrap:wrap; gap:12px; } .sr-document-row > div { min-width:170px; } .sr-document-row button { margin-left:33px; } .sr-previews-paired { grid-template-columns:1fr; } .sr-photo-summary { align-items:flex-start; flex-direction:column; } .sr-photo-summary button { margin-left:0; } }
 @media(prefers-reduced-motion:reduce) { .sr-dialog *, .sr-summary-grid * { transition:none !important; } }
+
+.sr-export { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; padding: 16px; border: 1px solid #dce0ea; border-radius: 12px; }
+.sr-export label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sr-export select { max-width: 100%; padding: 8px; }
+.sr-export p { flex-basis: 100%; margin: 0; }

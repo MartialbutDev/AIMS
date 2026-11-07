@@ -506,6 +506,7 @@ export interface CoordinatorInternshipDocument {
   validation_confidence: number | null
 
   validation_message: string | null
+  supporting_wording?: string | null
 
   academic_year: string | null
 

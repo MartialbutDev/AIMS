@@ -1,6 +1,8 @@
 """Conservative header-first identification; content matching is not authenticity."""
 import re
 from app.services.ocr_service import OCRService
+from app.utils.untitled_documents import body_candidates
+from app.utils.official_document_evidence import OFFICIAL_TYPES, official_evidence
 
 # Whole title lines only: references to other forms in prose are not titles.
 TITLES = {
@@ -101,6 +103,26 @@ def confirm_orientation_context(identification: dict, header: str, content: str)
             'content_confirmation': 'orientation_event'}
 
 
+def identify_from_body(identification: dict, text: str) -> dict:
+    expected = identification['expected_type']
+    if (expected not in OFFICIAL_TYPES | {'document', 'application_letter', 'resume', 'internship_plan'}
+        or identification['candidates'] or identification.get('warning')):
+        return identification
+    evidence = official_evidence(text)
+    candidates = body_candidates(text) | evidence.keys()
+    if len(candidates) == 1:
+        detected = next(iter(candidates))
+        if expected in {'document', detected}:
+            if detected in evidence:
+                return {**identification, 'method': 'issuer_statement', 'status': 'matched',
+                        'detected_type': detected, 'candidates': [detected],
+                        'message': 'Document wording supports this type. Coordinator review is required.'}
+            return {**identification, 'method': 'content_structure', 'status': 'matched',
+                    'detected_type': detected, 'candidates': [detected],
+                    'message': 'Document type identified from its wording and structure. Identity and required content are checked separately.'}
+    return identification
+
+
 def inspect_upload(path: str, file_type: str, expected_type: str) -> dict:
     header_error = None
     try:
@@ -129,5 +151,6 @@ def inspect_upload(path: str, file_type: str, expected_type: str) -> dict:
         error = 'OCR extraction failed; manual review required.'
     if error is None:
         identification = confirm_orientation_context(identification, header, text)
+        identification = identify_from_body(identification, text)
     return {'text': text, 'identification': identification, 'ocr_error': error,
             'full_content_checked': error is None}
