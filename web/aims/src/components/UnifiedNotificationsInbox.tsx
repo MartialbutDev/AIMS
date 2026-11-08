@@ -1,3 +1,4 @@
+import { readStoredSession } from '../services/sessionStorage'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiRequest } from '../services/apiClient'
@@ -10,7 +11,7 @@ import './notifications-inbox.css'
 const date = (value: string) => new Date(value).toLocaleString()
 const human = (value: string) => value.replace(/_/g, ' ')
 export function NotificationsInbox() {
-  const navigate = useNavigate(), root = location.pathname.split('/')[1], account = localStorage.getItem('aims-session') ?? ''
+  const navigate = useNavigate(), root = location.pathname.split('/')[1], account = readStoredSession()?.accessToken ?? ''
   const unread = useNotificationCount(account)
   const [tab, setTab] = useState<'activity' | 'preferences'>('activity')
   const [items, setItems] = useState<UserNotification[]>([])

@@ -97,13 +97,15 @@ def _clean_middle_name(value: str | None) -> str | None:
     return value.strip() or None
 
 
-def _token_response(user: User, user_agent: str | None = None) -> LoginResponse:
+def _token_response(user: User, user_agent: str | None = None, remember_me: bool | None = None) -> LoginResponse:
     from sqlalchemy.orm import object_session
     from app.services.auth_session_service import track
+    # Browser-only persistence is explicit; older/mobile clients omit the field.
+    lifetime = None if remember_me is None else (timedelta(days=7) if remember_me else timedelta(hours=8))
     token = create_access_token({
         "sub":user.id,"role":user.role.value,"purpose":"access",
         "pwd":hashlib.sha256(user.hashed_password.encode()).hexdigest(),
-    })
+    }, expires_delta=lifetime)
     db=object_session(user)
     if db is not None:
         # Native Android requests may identify only as okhttp. Browser agents
@@ -253,7 +255,7 @@ def login_student(
         login_data.password,
         mobile=True,
     )
-    return _token_response(user, request.headers.get("user-agent") if request else None)
+    return _token_response(user, request.headers.get("user-agent") if request else None, login_data.remember_me)
 
 
 @router.post(
@@ -325,7 +327,7 @@ def login_web_user(
         login_data.password,
         mobile=False,
     )
-    return _token_response(user, request.headers.get("user-agent") if request else None)
+    return _token_response(user, request.headers.get("user-agent") if request else None, login_data.remember_me)
 
 
 @router.post("/login/form")

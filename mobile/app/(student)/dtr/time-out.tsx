@@ -1,10 +1,12 @@
+import { assessLocationAccuracy } from '../../../src/utils/locationAccuracy';
+import { LocationAccuracyNotice, confirmAttendanceLocation } from '../../../src/components/LocationAccuracyNotice';
 // app/(student)/dtr/time-out.tsx
 // Records Time-Out for a PENDING DTR entry, uploads photo + location, submits for review.
 
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -35,14 +37,19 @@ export default function TimeOutDTRScreen() {
     latitude: number;
     longitude: number;
     address: string;
+    accuracy: number | null;
   } | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const submissionInFlight = useRef(false);
+  const locationNeedsCaution = Boolean(location && assessLocationAccuracy(location.accuracy).caution);
 
   // ----- location -----
 
   const getCurrentLocation = async () => {
+    if (isGettingLocation || submissionInFlight.current) return;
     try {
       setIsGettingLocation(true);
+      setLocation(null);
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
@@ -57,25 +64,14 @@ export default function TimeOutDTRScreen() {
         accuracy: Location.Accuracy.High,
       });
 
-      const [addressData] = await Location.reverseGeocodeAsync({
-        latitude: locationData.coords.latitude,
-        longitude: locationData.coords.longitude,
-      });
-
-      const address = [
-        addressData?.name,
-        addressData?.street,
-        addressData?.city,
-        addressData?.region,
-      ]
-        .filter(Boolean)
-        .join(", ");
-
-      setLocation({
-        latitude: locationData.coords.latitude,
-        longitude: locationData.coords.longitude,
-        address: address || "Unknown location",
-      });
+      let address = 'Address unavailable';
+      try {
+        const [addressData] = await Location.reverseGeocodeAsync({ latitude: locationData.coords.latitude, longitude: locationData.coords.longitude });
+        address = [addressData?.name, addressData?.street, addressData?.city, addressData?.region].filter(Boolean).join(', ') || address;
+      } catch {
+        // Preserve captured coordinates when a street-address lookup is unavailable.
+      }
+      setLocation({ latitude: locationData.coords.latitude, longitude: locationData.coords.longitude, address, accuracy: locationData.coords.accuracy });
     } catch (error) {
       console.error("Location error:", error);
       Alert.alert("Error", "Failed to get location. Please try again.");
@@ -111,6 +107,7 @@ export default function TimeOutDTRScreen() {
   // ----- submit -----
 
   const handleTimeOut = async () => {
+    if (submissionInFlight.current || isGettingLocation) return;
     if (!imageOut) {
       Alert.alert("Error", "Please take a Time-Out photo.");
       return;
@@ -124,8 +121,10 @@ export default function TimeOutDTRScreen() {
       return;
     }
 
+    submissionInFlight.current = true;
     setLoading(true);
     try {
+      if (!await confirmAttendanceLocation(location.accuracy)) return;
       const formData = new FormData();
 
       const now = new Date();
@@ -168,11 +167,12 @@ export default function TimeOutDTRScreen() {
         "Failed to record Time-Out. Please try again.";
       Alert.alert("Error", errorMessage);
     } finally {
+      submissionInFlight.current = false;
       setLoading(false);
     }
   };
 
-  const canSubmit = !loading && !!imageOut && !!location;
+  const canSubmit = !loading && !isGettingLocation && !!imageOut && !!location;
 
   return (
     // ✅ Plain View — the parent layout handles the top inset.
@@ -273,12 +273,12 @@ export default function TimeOutDTRScreen() {
               style={[
                 styles.locationCard,
                 {
-                  backgroundColor: `${colors.success}10`,
-                  borderColor: `${colors.success}30`,
+                  backgroundColor: `${(locationNeedsCaution ? colors.warning : colors.success)}10`,
+                  borderColor: `${(locationNeedsCaution ? colors.warning : colors.success)}30`,
                 },
               ]}
             >
-              <Ionicons name="location-outline" size={20} color={colors.success} />
+              <Ionicons name="location-outline" size={20} color={(locationNeedsCaution ? colors.warning : colors.success)} />
               <View style={styles.locationInfo}>
                 <Text
                   style={[styles.locationText, { color: colors.textPrimary }]}
@@ -292,8 +292,8 @@ export default function TimeOutDTRScreen() {
                   {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
                 </Text>
               </View>
-              <TouchableOpacity onPress={getCurrentLocation} hitSlop={8}>
-                <Ionicons name="refresh-outline" size={18} color={colors.success} />
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel="Capture location again" onPress={getCurrentLocation} disabled={loading || isGettingLocation} hitSlop={8}>
+                <Ionicons name="refresh-outline" size={18} color={(locationNeedsCaution ? colors.warning : colors.success)} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -331,6 +331,7 @@ export default function TimeOutDTRScreen() {
               )}
             </TouchableOpacity>
           )}
+          {location && <LocationAccuracyNotice accuracy={location.accuracy} />}
         </View>
 
         {/* ----- Submit ----- */}

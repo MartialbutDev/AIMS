@@ -15,7 +15,7 @@ import {
 
   Alert,
 
-  Dimensions,
+  useWindowDimensions,
 
   KeyboardAvoidingView,
 
@@ -36,6 +36,7 @@ import {
 } from "react-native";
 
 import AppLogo from "../../src/components/common/AppLogo";
+import AuthLegalLinks from "../../src/components/auth/AuthLegalLinks";
 
 import { APP_NAME, APP_VERSION } from "../../src/constants/app";
 
@@ -43,11 +44,16 @@ import { useTheme } from "../../src/context/ThemeContext";
 
 import { authService } from "../../src/services/auth.service";
 
-const { height } = Dimensions.get("window");
+
 
 export default function SignUpScreen() {
 
   const { colors, isDark, toggleTheme } = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const contentWidth = Math.min(width, 520);
+  const compact = width < 360 || fontScale > 1.2;
+  const submittingRef = useRef(false);
+  const registeredRef = useRef(false);
 
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
@@ -206,6 +212,7 @@ export default function SignUpScreen() {
   };
 
   const handleSignUp = async () => {
+    if (submittingRef.current || registeredRef.current) return;
 
     if (!validateForm()) {
 
@@ -215,13 +222,14 @@ export default function SignUpScreen() {
 
     // Keep first, middle, and last names separate for backend storage.
 
+    submittingRef.current = true;
     setLoading(true);
 
     setSuccess(false);
 
     try {
 
-      const response = await authService.register({
+      await authService.register({
 
         email: email.trim(),
 
@@ -238,7 +246,9 @@ export default function SignUpScreen() {
 
       });
 
-      console.log('✅ Registration successful:', response);
+      registeredRef.current = true;
+      setPassword("");
+      setConfirmPassword("");
 
       setSuccess(true);
 
@@ -272,7 +282,7 @@ export default function SignUpScreen() {
 
               setSuccess(false);
 
-              router.push("/(auth)/login");
+              router.replace("/(auth)/login");
 
             }
 
@@ -284,7 +294,7 @@ export default function SignUpScreen() {
 
     } catch (error: any) {
 
-      console.log('❌ Registration error:', error);
+
 
       const errorMessage = error.message || "Registration failed. Please try again.";
 
@@ -292,6 +302,7 @@ export default function SignUpScreen() {
 
     } finally {
 
+      submittingRef.current = false;
       setLoading(false);
 
     }
@@ -300,7 +311,7 @@ export default function SignUpScreen() {
 
   const handleLogin = () => {
 
-    router.push("/(auth)/login");
+    router.replace("/(auth)/login");
 
   };
 
@@ -349,8 +360,9 @@ export default function SignUpScreen() {
       <View style={[
 
         styles.navySection,
+          { height: Math.max(300, Math.min(contentWidth * 0.9, 420)) },
 
-        { backgroundColor: isDark ? "#000066" : "#000080" }
+        { backgroundColor: "#0B0B2F" }
 
       ]}>
 
@@ -437,10 +449,11 @@ export default function SignUpScreen() {
             bounces={false}
 
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
 
           >
 
-            <View style={styles.headerContent}>
+            <View style={[styles.headerContent, { minHeight: Math.max(220, Math.min(contentWidth * 0.58, 280)), paddingHorizontal: compact ? 20 : 30 }]}>
 
               <View style={styles.logoWrapper}>
 
@@ -462,9 +475,10 @@ export default function SignUpScreen() {
 
             </View>
 
-            <View style={styles.cardWrapper}>
+            <View style={[styles.cardWrapper, { paddingHorizontal: compact ? 16 : 24 }]}>
 
-              <View style={[styles.card, { backgroundColor: colors.card }]}>
+              <View style={[styles.card,
+                  { paddingHorizontal: compact ? 16 : 24 }, { backgroundColor: colors.card }]}>
 
                 <View style={styles.cardHeader}>
 
@@ -540,7 +554,8 @@ export default function SignUpScreen() {
                         onSubmitEditing={handleFirstNameSubmit}
                         autoCapitalize="words"
                         autoCorrect={false}
-                        editable={!loading}
+                        editable={!loading && !success}
+                        autoComplete="given-name" textContentType="givenName"
                         accessibilityLabel="First Name"
                       />
                     </View>
@@ -575,7 +590,8 @@ export default function SignUpScreen() {
                         onSubmitEditing={handleMiddleNameSubmit}
                         autoCapitalize="words"
                         autoCorrect={false}
-                        editable={!loading}
+                        editable={!loading && !success}
+                        textContentType="middleName"
                         accessibilityLabel="Middle Name or Initial (Optional)"
                       />
                     </View>
@@ -613,7 +629,8 @@ export default function SignUpScreen() {
                         onSubmitEditing={handleLastNameSubmit}
                         autoCapitalize="words"
                         autoCorrect={false}
-                        editable={!loading}
+                        editable={!loading && !success}
+                        autoComplete="family-name" textContentType="familyName"
                         accessibilityLabel="Last Name"
                       />
                     </View>
@@ -680,11 +697,13 @@ export default function SignUpScreen() {
 
                         onSubmitEditing={handleStudentIdSubmit}
 
-                        autoCapitalize="characters"
+                        autoCapitalize="none"
+                        autoComplete="username"
+                        textContentType="username"
 
                         autoCorrect={false}
 
-                        editable={!loading}
+                        editable={!loading && !success}
 
                         accessibilityLabel="Student ID"
 
@@ -734,7 +753,7 @@ export default function SignUpScreen() {
 
                             onPress={() => setGender(selected ? null : value)}
 
-                            disabled={loading}
+                            disabled={loading || success}
 
                             accessibilityRole="radio"
 
@@ -830,8 +849,9 @@ export default function SignUpScreen() {
 
                         keyboardType="email-address"
 
-                        editable={!loading}
+                        editable={!loading && !success}
 
+                        autoComplete="email" textContentType="emailAddress"
                         accessibilityLabel="Email"
 
                       />
@@ -906,11 +926,11 @@ export default function SignUpScreen() {
 
                         onSubmitEditing={handlePasswordSubmit}
 
-                        textContentType="password"
+                        textContentType="newPassword"
 
-                        autoComplete="password"
+                        autoComplete="new-password"
 
-                        editable={!loading}
+                        editable={!loading && !success}
 
                         accessibilityLabel="Password"
 
@@ -1010,11 +1030,11 @@ export default function SignUpScreen() {
 
                         onSubmitEditing={handleConfirmPasswordSubmit}
 
-                        textContentType="password"
+                        textContentType="newPassword"
 
-                        autoComplete="password"
+                        autoComplete="new-password"
 
-                        editable={!loading}
+                        editable={!loading && !success}
 
                         accessibilityLabel="Confirm Password"
 
@@ -1058,13 +1078,13 @@ export default function SignUpScreen() {
 
                     onPress={handleSignUp}
 
-                    disabled={loading}
+                    disabled={loading || success}
 
                     activeOpacity={0.8}
 
                     accessibilityRole="button"
 
-                    accessibilityState={{ disabled: loading, busy: loading }}
+                    accessibilityState={{ disabled: loading || success, busy: loading }}
 
                   >
 
@@ -1131,6 +1151,7 @@ export default function SignUpScreen() {
                 © {new Date().getFullYear()} {APP_NAME}
 
               </Text>
+              <AuthLegalLinks disabled={loading} />
 
               <Text style={[styles.versionText, { color: colors.textSecondary }]}>{APP_VERSION}</Text>
 
@@ -1166,7 +1187,7 @@ const styles = StyleSheet.create({
 
     right: 0,
 
-    height: height * 0.40,
+    height: 360,
 
     overflow: 'hidden',
 
@@ -1311,6 +1332,9 @@ const styles = StyleSheet.create({
   scrollContent: {
 
     flexGrow: 1,
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
 
     paddingBottom: 20,
 
@@ -1320,13 +1344,13 @@ const styles = StyleSheet.create({
 
     paddingTop: 20,
 
-    paddingBottom: 10,
+    paddingBottom: 40,
 
     paddingHorizontal: 30,
 
     alignItems: "center",
 
-    minHeight: height * 0.28,
+    minHeight: 220,
 
   },
 
@@ -1530,7 +1554,7 @@ const styles = StyleSheet.create({
 
     paddingHorizontal: 14,
 
-    height: 50,
+    minHeight: 50,
 
   },
 
@@ -1572,7 +1596,7 @@ const styles = StyleSheet.create({
 
   signUpButton: {
 
-    height: 52,
+    minHeight: 52,
 
     borderRadius: 12,
 

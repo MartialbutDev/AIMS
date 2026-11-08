@@ -43,6 +43,7 @@ from app.models.coordinator_assignment import (
     CoordinatorStudentAssignment,
 )
 from app.services.document_service import DocumentService
+from app.services.student_document_feedback import student_document_payload, student_upload_payload
 from app.services.ocr_service import OCRService
 from app.services.document_identification import identify_header, identify_from_body
 from app.utils.official_document_evidence import OFFICIAL_TYPES, official_evidence
@@ -337,7 +338,7 @@ async def get_documents(
         query = query.filter(Document.academic_year == year, Document.semester == semester)
     documents = query.order_by(Document.created_at.desc(), Document.id.desc()).all()
     versions = annotate(db, documents)
-    return [DocumentService._serialize_document(document, versions[document.id]) for document in documents]
+    return [student_document_payload(DocumentService._serialize_document(document, versions[document.id])) if _role(current_user) == "student" else DocumentService._serialize_document(document, versions[document.id]) for document in documents]
 
 
 
@@ -368,7 +369,7 @@ async def identify_document_type(
             except Exception:
                 return {'status': 'unavailable', 'suggested_type': None,
                         'message': 'Could not read the header. Choose the document type manually.',
-                        'method': 'header_first_rules'}
+                        }
             result = identify_header(header, 'document')
             if not result['candidates']:
                 try:
@@ -383,7 +384,7 @@ async def identify_document_type(
             if detected in supported:
                 return {'status': 'suggested', 'suggested_type': detected,
                         'message': 'Suggested from the document. Confirm the type before uploading.',
-                        'method': result['method']}
+                        }
             if detected in {'cor', 'orientation'}:
                 message = 'This appears to be a registration or orientation document. Submit it through the onboarding requirements screen.'
             elif detected == 'unrelated_receipt':
@@ -391,7 +392,7 @@ async def identify_document_type(
             else:
                 message = 'The header does not identify a supported type clearly. Choose the type manually.'
             return {'status': 'unsupported' if detected else ('ambiguous' if len(result['candidates']) > 1 else 'uncertain'),
-                    'suggested_type': None, 'message': message, 'method': result['method']}
+                    'suggested_type': None, 'message': message, }
     finally:
         await file.close()
 
@@ -410,13 +411,13 @@ async def upload_document(
             detail="Student access required for uploads",
         )
 
-    return DocumentService.upload_document(
+    return student_upload_payload(DocumentService.upload_document(
         db=db,
         file=file,
         document_type=document_type,
         description=description,
         uploaded_by=current_user.id,
-    )
+    ))
 
 
 # ============================================================
@@ -607,7 +608,8 @@ async def get_document(
         document,
     )
 
-    return DocumentService._serialize_document(document)
+    payload = DocumentService._serialize_document(document)
+    return student_document_payload(payload) if _role(current_user) == "student" else payload
 
 
 @documents_router.get("/{document_id}/image")
@@ -789,7 +791,10 @@ async def get_document_review_history(
     )
 
     times = review_times(db, reviews)
-    return [_review_payload(review, times[review.id]) for review in sorted(reviews, key=lambda item: (times[item.id], item.id), reverse=True)]
+    ordered = sorted(reviews, key=lambda item: (times[item.id], item.id), reverse=True)
+    if _role(current_user) == 'student':
+        return [{'id': review.id, 'document_id': review.document_id, 'decision': review.decision, 'created_at': _review_payload(review, times[review.id])['created_at'], 'notes': review.notes if review.reviewer_id != 'system' else None} for review in ordered]
+    return [_review_payload(review, times[review.id]) for review in ordered]
 
 
 @documents_router.delete("/{document_id}", status_code=204)

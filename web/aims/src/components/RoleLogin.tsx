@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { AuthIdentity } from './AuthIdentity'
 import { Icon } from './Icons'
 import { roleDescriptions, roleLabels } from '../types/auth'
@@ -8,7 +8,7 @@ interface RoleLoginProps {
   role: UserRole
   isSigningIn: boolean
   onBack: () => void
-  onLogin: (loginIdentifier: string, password: string) => Promise<void>
+  onLogin: (loginIdentifier: string, password: string, keepSignedIn: boolean) => Promise<void>
 }
 
 export function RoleLogin({ role, isSigningIn, onBack, onLogin }: RoleLoginProps) {
@@ -16,13 +16,17 @@ export function RoleLogin({ role, isSigningIn, onBack, onLogin }: RoleLoginProps
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [keepSignedIn, setKeepSignedIn] = useState(false)
+  const submitting = useRef(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (isSigningIn) return
+    if (isSigningIn || submitting.current) return
+    submitting.current = true
     setError('')
-    try { await onLogin(loginIdentifier, password) }
+    try { await onLogin(loginIdentifier, password, keepSignedIn) }
     catch (loginError) { setError(loginError instanceof Error ? loginError.message : 'We could not sign you in. Please try again.') }
+    finally { submitting.current = false }
   }
 
   return (
@@ -41,6 +45,7 @@ export function RoleLogin({ role, isSigningIn, onBack, onLogin }: RoleLoginProps
             <input id="login-identifier" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder={role === 'company' ? 'Your company email or username' : 'Your email or username'} value={loginIdentifier} onChange={(event) => setLoginIdentifier(event.target.value)} required disabled={isSigningIn} />
             <div className="citc-password-label"><label htmlFor="login-password">Password</label><a href={role === 'student' ? '/student-forgot-password' : '/forgot-password'}>Forgot password?</a></div>
             <div className="citc-password-input"><input id="login-password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="Enter your password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={6} disabled={isSigningIn} /><button type="button" aria-controls="login-password" aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div>
+            <div className="citc-remember"><label htmlFor="keep-signed-in"><input id="keep-signed-in" type="checkbox" checked={keepSignedIn} onChange={event => setKeepSignedIn(event.target.checked)} disabled={isSigningIn} aria-describedby="keep-signed-in-hint" /><span>Keep me signed in</span></label><p id="keep-signed-in-hint">Use only on a personal device. Otherwise, this browser session lasts up to 8 hours. Always sign out on a shared computer.</p></div>
             {error && <p className="citc-login-error" role="alert">{error}</p>}
             <button className="citc-sign-in" type="submit" disabled={isSigningIn}><span>{isSigningIn ? 'Signing in…' : `Sign in as ${roleLabels[role]}`}</span><Icon name="arrow" size={19} /></button>
           </form>

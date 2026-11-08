@@ -58,6 +58,7 @@ function RootLayoutNav() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="welcome" options={{ headerShown: false }} />
         {/* Authentication screens */}
         <Stack.Screen
           name="(auth)/login"

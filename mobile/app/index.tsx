@@ -1,23 +1,19 @@
 import { useEffect, useState } from "react";
 import { Redirect } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import { resolveLaunchDestination, type LaunchDestination } from "../src/services/welcome.service";
 import { ActivityIndicator, View } from "react-native";
 
 import { useTheme } from "../src/context/ThemeContext";
 
 export default function LaunchScreen() {
   const { colors } = useTheme();
-  const [destination, setDestination] = useState<"/onboarding" | "/(auth)/login" | null>(null);
+  const [destination, setDestination] = useState<LaunchDestination | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void SecureStore.getItemAsync("access_token")
-      .then((token) => {
-        if (!cancelled) setDestination(token ? "/onboarding" : "/(auth)/login");
-      })
-      .catch(() => {
-        if (!cancelled) setDestination("/(auth)/login");
-      });
+    void resolveLaunchDestination().then(next => {
+      if (!cancelled) setDestination(next);
+    });
     return () => { cancelled = true; };
   }, []);
 

@@ -1,3 +1,4 @@
+import { documentFeedback } from "../../src/utils/documentFeedback";
 import { useNotificationRefresh } from '../../src/hooks/useNotificationRefresh';
 
 import React, {
@@ -508,6 +509,8 @@ export default function StudentOnboardingScreen() {
             </Text>
           </View>
         )}
+
+        {submission && <View style={{ gap: 6, marginTop: 10 }}><Text style={[styles.helperText, { color: colors.textSecondary }]}>{documentFeedback(submission.review_status, submission.student_feedback).reason}</Text><Text style={[styles.helperText, { color: colors.textPrimary }]}>{documentFeedback(submission.review_status, submission.student_feedback).next_action}</Text></View>}
 
         {/* Rejection notes */}
         {submission?.review_status ===

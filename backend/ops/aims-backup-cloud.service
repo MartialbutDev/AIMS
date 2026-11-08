@@ -1,0 +1,21 @@
+[Unit]
+Description=AIMS encrypted offsite replication and backup health monitoring
+Wants=network-online.target
+After=network-online.target aims-backup.service
+ConditionPathExists=/etc/aims/backup-cloud.json
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/opt/aims-backup/venv/bin/python /opt/aims-backup/cloud.py run
+TimeoutStartSec=20min
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/aims
+StandardOutput=journal
+StandardError=journal

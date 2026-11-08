@@ -1,0 +1,16 @@
+{
+  "database_env_file": "/home/ubuntu/aims/AIMS/backend/.env",
+  "expected_database": "aims_db",
+  "expected_host": "localhost",
+  "assets_dir": "/home/ubuntu/aims/AIMS/backend/assets",
+  "backup_dir": "/var/backups/aims",
+  "gpg_home": "/var/lib/aims-backup/gnupg",
+  "recipient_fingerprint": "REPLACE_WITH_YOUR_FULL_PUBLIC_KEY_FINGERPRINT",
+  "writer_services": ["aims-backend.service"],
+  "retain_days": 14,
+  "keep_minimum": 2,
+  "minimum_free_mb": 512,
+  "command_timeout_seconds": 300,
+  "pg_bin_dir": "",
+  "gpg_binary": "/usr/bin/gpg"
+}

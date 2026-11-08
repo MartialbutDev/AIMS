@@ -36,3 +36,7 @@ The bootstrap registers all current models, creates current tables, and stamps t
 Only EC2 security, OCR configuration and the EmailJS OTP transport fix were activated now. Assignment/assessment changes, the new setup command, migrations, upload-ignore rule, local connection defaults and mobile text fixes remain local for review. Do not run the new migrations or deploy the web build to EC2 before that review.
 
 Onboarding uploads are now ignored. Previously tracked upload deletions are preserved in the working tree; ignoring a folder alone does not remove Git history. Review removal/history treatment before publishing sensitive repositories.
+
+## Scheduled backups
+
+The standalone operator and daily EC2 service/timer are documented in [ops/README.md](ops/README.md). They are not part of API startup. Installation does not enable the timer; configure an offline recovery key and run a manual backup/recovery check first. Local rehearsals must use disposable targets, never a copy-over of the deployed database or local database.

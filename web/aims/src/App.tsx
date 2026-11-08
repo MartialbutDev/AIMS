@@ -116,6 +116,7 @@ interface LoginRouteProps {
     role: UserRole,
     identifier: string,
     password: string,
+    keepSignedIn?: boolean,
   ) => Promise<void>
 }
 
@@ -136,8 +137,8 @@ function LoginRoute({
       role={role}
       isSigningIn={isSigningIn}
       onBack={() => navigate('/')}
-      onLogin={(identifier, password) =>
-        login(role, identifier, password)
+      onLogin={(identifier, password, keepSignedIn) =>
+        login(role, identifier, password, keepSignedIn)
       }
     />
   )

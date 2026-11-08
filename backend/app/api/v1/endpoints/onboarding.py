@@ -1,3 +1,4 @@
+from app.services.student_document_feedback import feedback
 from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 from app.services.academic_requirements import guard_cor_approval
 
@@ -165,6 +166,7 @@ def _submission(
 
 def _submission_data(
     submission: StudentOnboardingSubmission | None,
+    include_diagnostics: bool = False,
 ) -> dict | None:
 
     if submission is None:
@@ -175,8 +177,9 @@ def _submission_data(
         "document_kind": submission.document_kind,
         "original_filename": submission.original_filename,
         "review_status": submission.review_status,
-        "validation_result": submission.validation_result,
-        "review_notes": submission.review_notes,
+        **({"validation_result": submission.validation_result} if include_diagnostics else {}),
+        "student_feedback": feedback(submission.review_status),
+        "review_notes": submission.review_notes if include_diagnostics or submission.reviewed_by not in (None, "", "system") else None,
         "submitted_at": submission.created_at,
         "reviewed_at": submission.reviewed_at,
     }
@@ -224,6 +227,7 @@ def _status(
     db: Session,
     student: User,
     record: StudentOnboarding | None = None,
+    *, include_diagnostics: bool = False,
 ) -> dict:
 
     if record is None:
@@ -330,8 +334,8 @@ def _status(
         "eligible": complete or dev_bypass,
         "onboarding_approved": complete,
         "next_step": next_step,
-        "orientation": _submission_data(orientation),
-        "cor": _submission_data(cor),
+        "orientation": _submission_data(orientation, include_diagnostics),
+        "cor": _submission_data(cor, include_diagnostics),
         "coordinator_assignment": coordinator_data,
         "development_onboarding_bypass": dev_bypass,
     }
@@ -561,7 +565,7 @@ async def _upload(
         extracted = inspection['text']
         ocr_error = inspection['ocr_error']
         if inspection['identification']['status'] == 'mismatch':
-            raise HTTPException(422, 'Document rejected: ' + inspection['identification']['message'])
+            raise HTTPException(422, 'Document rejected: Upload the requested document type. Check that you selected the correct, complete file.')
 
         if _is_test_fixture(extracted):
             raise HTTPException(
@@ -626,15 +630,11 @@ async def _upload(
             guard_cor_approval(db)
 
         if outcome == "mismatch":
-            reasons = (
-                validation.get("reasons")
-                or ["Required document details do not match"]
-            )
-
             raise HTTPException(
                 422,
-                "Document rejected: "
-                + "; ".join(reasons),
+                "Document rejected: Required information could not be confirmed. "
+                "Upload a clear, complete copy of the requested document that belongs to you, "
+                "or ask your coordinator for help.",
             )
 
         if outcome == "matched":
@@ -823,6 +823,7 @@ def verification_queue(
                 db,
                 student,
                 record,
+                include_diagnostics=True,
             ),
         }
         for record, student in rows
@@ -1047,4 +1048,5 @@ def review_submission(
         db,
         student,
         record,
+        include_diagnostics=True,
     )

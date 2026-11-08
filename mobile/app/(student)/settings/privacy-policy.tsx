@@ -6,7 +6,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 
 import { useTheme } from "../../../src/context/ThemeContext";
 
-export default function PrivacyPolicyScreen() {
+export default function PrivacyPolicyScreen({ onBack = () => router.back() }: { onBack?: () => void } = {}) {
   const { colors, isDark } = useTheme();
 
   return (
@@ -14,7 +14,7 @@ export default function PrivacyPolicyScreen() {
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={onBack} style={styles.backButton}>
           <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>

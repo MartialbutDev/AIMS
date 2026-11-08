@@ -119,3 +119,8 @@
   .citc-role { transition: none; }
   .citc-role:hover { transform: none; }
 }
+
+.citc-remember { margin-top: 18px; }
+.citc-login-form .citc-remember label { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-bottom: 0; cursor: pointer; }
+.citc-login-form .citc-remember input { width: 18px; height: 18px; flex-shrink: 0; padding: 0; accent-color: var(--citc-navy); }
+.citc-remember p { margin: 2px 0 0 28px; font-size: 12px; line-height: 1.6; color: #66667c; }

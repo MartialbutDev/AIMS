@@ -1,21 +1,7 @@
+import { readStoredSession } from './sessionStorage'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
-function getAccessToken(): string | undefined {
-  try {
-    const session: unknown = JSON.parse(localStorage.getItem('aims-session') ?? 'null')
-    if (
-      typeof session === 'object' &&
-      session !== null &&
-      'accessToken' in session &&
-      typeof session.accessToken === 'string'
-    ) {
-      return session.accessToken
-    }
-  } catch {
-    return undefined
-  }
-  return undefined
-}
+function getAccessToken(): string | undefined { return readStoredSession()?.accessToken }
 
 export async function apiRequest<T>(
   path: string,

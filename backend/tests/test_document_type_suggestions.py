@@ -24,7 +24,7 @@ class DocumentTypeSuggestionTests(unittest.TestCase):
     def test_suggests_untitled_letter_from_body(self):
         result = self.preview('March 3', body='Dear HR Manager,\nI am writing to apply for an internship at your company.').json()
         self.assertEqual(result['suggested_type'], 'application_letter')
-        self.assertEqual(result['method'], 'content_structure')
+        self.assertNotIn('method', result)
 
     def test_clear_titles_suggest_supported_types(self):
         for title,kind in [('CURRICULUM VITAE','resume'),('APPLICATION LETTER','application_letter'),('WAIVER','waiver'),('MEDICAL CERTIFICATE','medical_certificate'),('INTERNSHIP PLAN','internship_plan'),('INSURANCE POLICY','insurance'),('ENDORSEMENT LETTER','endorsement_letter'),('ACCEPTANCE LETTER','acceptance_letter'),('CERTIFICATE OF COMPLETION','certificate_of_completion')]:

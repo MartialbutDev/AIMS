@@ -1,3 +1,4 @@
+import { saveStoredSession } from '../../services/sessionStorage'
 import { useEffect, useState, type FormEvent } from 'react'
 import { changeAccountPassword, getAccount, requestVerification, saveAccount, type AccountProfile } from '../../services/accountService'
 import type { UserSession } from '../../types/auth'
@@ -10,7 +11,7 @@ export function AccountEditor({session,onLogout}:{session:UserSession;onLogout:(
   const [current,setCurrent]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState('')
   useEffect(()=>{let active=true;getAccount().then(p=>{if(active)setProfile(p)}).catch(e=>{if(active)setError(String(e.message))});return()=>{active=false}},[])
   async function perform(action:()=>Promise<void>){setBusy(true);setError('');setMessage('');try{await action()}catch(e){setError(e instanceof Error?e.message:'Could not save changes.')}finally{setBusy(false)}}
-  function save(e:FormEvent){e.preventDefault();if(!profile)return;void perform(async()=>{const updated=await saveAccount({first_name:profile.first_name.trim(),middle_name:profile.middle_name?.trim()||null,last_name:profile.last_name.trim(),phone:profile.phone?.trim()||null});setProfile(updated);const next={...session,name:`${updated.first_name} ${updated.last_name}`.trim()};localStorage.setItem('aims-session',JSON.stringify(next));window.dispatchEvent(new Event('aims-session-updated'));setMessage('Your account details were saved.')})}
+  function save(e:FormEvent){e.preventDefault();if(!profile)return;void perform(async()=>{const updated=await saveAccount({first_name:profile.first_name.trim(),middle_name:profile.middle_name?.trim()||null,last_name:profile.last_name.trim(),phone:profile.phone?.trim()||null});setProfile(updated);const next={...session,name:`${updated.first_name} ${updated.last_name}`.trim()};saveStoredSession(next);window.dispatchEvent(new Event('aims-session-updated'));setMessage('Your account details were saved.')})}
   function change(e:FormEvent){e.preventDefault();if(password!==confirm){setError('The new passwords do not match.');return}void perform(async()=>{await changeAccountPassword(current,password);setCurrent('');setPassword('');setConfirm('');setMessage('Your password was changed. Sign in again.');onLogout()})}
   return <section className="workspace-page"><header className="workspace-page-heading"><div><span className="stake-kicker">YOUR AIMS ACCOUNT</span><h1>Account settings</h1><p>Keep your contact details and sign-in information up to date.</p></div></header>
     {error&&<p className="account-error" role="alert">{error}</p>}{message&&<p className="account-success" role="status">{message}</p>}

@@ -1,8 +1,10 @@
+import { assessLocationAccuracy } from '../../../src/utils/locationAccuracy';
+import { LocationAccuracyNotice, confirmAttendanceLocation } from '../../../src/components/LocationAccuracyNotice';
 // app/(student)/dtr/new.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -38,8 +40,11 @@ export default function NewDTRScreen() {
     latitude: number;
     longitude: number;
     address: string;
+    accuracy: number | null;
   } | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const submissionInFlight = useRef(false);
+  const locationNeedsCaution = Boolean(location && assessLocationAccuracy(location.accuracy).caution);
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { 
@@ -71,8 +76,10 @@ export default function NewDTRScreen() {
   };
 
   const getCurrentLocation = async () => {
+    if (isGettingLocation || submissionInFlight.current) return;
     try {
       setIsGettingLocation(true);
+      setLocation(null);
       
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -84,22 +91,19 @@ export default function NewDTRScreen() {
         accuracy: Location.Accuracy.High,
       });
 
-      const [addressData] = await Location.reverseGeocodeAsync({
-        latitude: locationData.coords.latitude,
-        longitude: locationData.coords.longitude,
-      });
-
-      const address = [
-        addressData.name,
-        addressData.street,
-        addressData.city,
-        addressData.region,
-      ].filter(Boolean).join(', ');
+      let address = 'Address unavailable';
+      try {
+        const [addressData] = await Location.reverseGeocodeAsync({ latitude: locationData.coords.latitude, longitude: locationData.coords.longitude });
+        address = [addressData?.name, addressData?.street, addressData?.city, addressData?.region].filter(Boolean).join(', ') || address;
+      } catch {
+        // Coordinates remain useful when a street-address lookup is unavailable.
+      }
 
       setLocation({
         latitude: locationData.coords.latitude,
         longitude: locationData.coords.longitude,
-        address: address || 'Unknown location',
+        address,
+        accuracy: locationData.coords.accuracy,
       });
 
     } catch (error) {
@@ -138,6 +142,7 @@ export default function NewDTRScreen() {
   };
 
   const handleTimeIn = async () => {
+    if (submissionInFlight.current || isGettingLocation) return;
     if (!imageIn) {
       Alert.alert("Time-In Photo Required", "Please take your Time-In verification photo first.");
       return;
@@ -149,8 +154,10 @@ export default function NewDTRScreen() {
       return;
     }
 
+    submissionInFlight.current = true;
     setIsSubmitting(true);
     try {
+      if (!await confirmAttendanceLocation(location.accuracy)) return;
       const formData = new FormData();
       formData.append('date', formatDateForAPI(date));
       formData.append('time_in', formatTimeForAPI(timeIn));
@@ -200,6 +207,7 @@ export default function NewDTRScreen() {
       const errorMessage = error.response?.data?.detail || "Failed to record Time-In. Please try again.";
       Alert.alert("Error", errorMessage);
     } finally {
+      submissionInFlight.current = false;
       setIsSubmitting(false);
     }
   };
@@ -312,8 +320,8 @@ export default function NewDTRScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Location <Text style={styles.required}>*</Text></Text>
           {location ? (
-            <View style={[styles.locationCard, { backgroundColor: `${colors.success}10`, borderColor: `${colors.success}30` }]}>
-              <Ionicons name="location-outline" size={20} color={colors.success} />
+            <View style={[styles.locationCard, { backgroundColor: `${(locationNeedsCaution ? colors.warning : colors.success)}10`, borderColor: `${(locationNeedsCaution ? colors.warning : colors.success)}30` }]}>
+              <Ionicons name="location-outline" size={20} color={(locationNeedsCaution ? colors.warning : colors.success)} />
               <View style={styles.locationInfo}>
                 <Text style={[styles.locationText, { color: colors.textPrimary }]}>📍 {location.address}</Text>
                 <Text style={[styles.locationCoords, { color: colors.textSecondary }]}>
@@ -337,6 +345,8 @@ export default function NewDTRScreen() {
               )}
             </TouchableOpacity>
           )}
+          {location && <LocationAccuracyNotice accuracy={location.accuracy} />}
+          {location && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Capture location again" onPress={getCurrentLocation} disabled={isGettingLocation || isSubmitting} style={{ paddingVertical: 12 }}><Text style={{ color: colors.accent, fontWeight: '600' }}>Capture location again</Text></TouchableOpacity>}
         </View>
 
         <View style={styles.section}>
@@ -371,10 +381,10 @@ export default function NewDTRScreen() {
           style={[
             styles.submitButton,
             { backgroundColor: colors.primary },
-            (!imageIn || !location || isSubmitting) && styles.submitButtonDisabled,
+            (!imageIn || !location || isSubmitting || isGettingLocation) && styles.submitButtonDisabled,
           ]}
           onPress={handleTimeIn}
-          disabled={!imageIn || !location || isSubmitting}
+          disabled={!imageIn || !location || isSubmitting || isGettingLocation}
           activeOpacity={0.8}
         >
           {isSubmitting ? (

@@ -2,16 +2,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useRef, useState } from "react";
 
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
+  useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,6 +21,7 @@ import {
 } from "react-native";
 
 import AppLogo from "../../src/components/common/AppLogo";
+import AuthLegalLinks from "../../src/components/auth/AuthLegalLinks";
 
 import {
   APP_NAME,
@@ -31,10 +32,14 @@ import { useTheme } from "../../src/context/ThemeContext";
 
 import { authService } from "../../src/services/auth.service";
 
-const { height } = Dimensions.get("window");
+
 
 export default function LoginScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const contentWidth = Math.min(width, 520);
+  const compact = width < 360 || fontScale > 1.2;
+  const submittingRef = useRef(false);
 
   // ============================================================
   // FORM STATES
@@ -104,7 +109,7 @@ export default function LoginScreen() {
   // ============================================================
 
   const handleLogin = async () => {
-    if (loading) {
+    if (submittingRef.current) {
       return;
     }
 
@@ -112,7 +117,9 @@ export default function LoginScreen() {
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
+    let signedIn = false;
 
     try {
       // Authenticate student using existing AIMS backend.
@@ -145,11 +152,8 @@ export default function LoginScreen() {
       // ========================================================
 
       router.replace("/onboarding");
+      signedIn = true;
     } catch (error: any) {
-      console.error(
-        "Student login failed:",
-        error?.message || "Unknown error"
-      );
 
       let errorMessage =
         "Invalid credentials. Please try again.";
@@ -172,7 +176,7 @@ export default function LoginScreen() {
 
       setPassword("");
     } finally {
-      setLoading(false);
+      if (!signedIn) { submittingRef.current = false; setLoading(false); }
     }
   };
 
@@ -224,10 +228,9 @@ export default function LoginScreen() {
       <View
         style={[
           styles.navySection,
+          { height: Math.max(300, Math.min(contentWidth * 0.9, 420)) },
           {
-            backgroundColor: isDark
-              ? "#000066"
-              : "#000080",
+            backgroundColor: "#0B0B2F",
           },
         ]}
       >
@@ -332,12 +335,13 @@ export default function LoginScreen() {
             }
             bounces={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
             {/* ================================================= */}
             {/* APP BRANDING                                      */}
             {/* ================================================= */}
 
-            <View style={styles.headerContent}>
+            <View style={[styles.headerContent, { minHeight: Math.max(220, Math.min(contentWidth * 0.58, 280)), paddingHorizontal: compact ? 20 : 30 }]}>
               <View style={styles.logoWrapper}>
                 <AppLogo
                   size={100}
@@ -385,10 +389,11 @@ export default function LoginScreen() {
             {/* LOGIN CARD                                        */}
             {/* ================================================= */}
 
-            <View style={styles.cardWrapper}>
+            <View style={[styles.cardWrapper, { paddingHorizontal: compact ? 16 : 24 }]}>
               <View
                 style={[
                   styles.card,
+                  { paddingHorizontal: compact ? 16 : 24 },
                   {
                     backgroundColor: colors.card,
                   },
@@ -513,7 +518,9 @@ export default function LoginScreen() {
                         onSubmitEditing={
                           handleStudentIdSubmit
                         }
-                        autoCapitalize="characters"
+                        autoCapitalize="none"
+                        textContentType="username"
+                        autoComplete="username"
                         autoCorrect={false}
                         editable={!loading}
                         accessibilityLabel="Student ID"
@@ -625,7 +632,7 @@ export default function LoginScreen() {
                           handlePasswordSubmit
                         }
                         textContentType="password"
-                        autoComplete="password"
+                        autoComplete="current-password"
                         editable={!loading}
                         accessibilityLabel="Password"
                       />
@@ -769,107 +776,6 @@ export default function LoginScreen() {
                   </TouchableOpacity>
 
                   {/* =========================================== */}
-                  {/* SECURE LOGIN DIVIDER                        */}
-                  {/* =========================================== */}
-
-                  <View
-                    style={
-                      styles.dividerContainer
-                    }
-                  >
-                    <View
-                      style={[
-                        styles.divider,
-                        {
-                          backgroundColor:
-                            colors.border,
-                        },
-                      ]}
-                    />
-
-                    <Text
-                      style={[
-                        styles.dividerText,
-                        {
-                          color:
-                            colors.textSecondary,
-                        },
-                      ]}
-                    >
-                      Secure Login
-                    </Text>
-
-                    <View
-                      style={[
-                        styles.divider,
-                        {
-                          backgroundColor:
-                            colors.border,
-                        },
-                      ]}
-                    />
-                  </View>
-
-                  {/* =========================================== */}
-                  {/* SECURITY INFORMATION                        */}
-                  {/* =========================================== */}
-
-                  <View
-                    style={[
-                      styles.securityContainer,
-                      {
-                        backgroundColor:
-                          colors.background,
-                        borderColor:
-                          colors.border,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name="shield-checkmark-outline"
-                      size={20}
-                      color={
-                        colors.primary
-                      }
-                      style={
-                        styles.securityIcon
-                      }
-                    />
-
-                    <View
-                      style={
-                        styles.securityTextContainer
-                      }
-                    >
-                      <Text
-                        style={[
-                          styles.securityText,
-                          {
-                            color:
-                              colors.textPrimary,
-                          },
-                        ]}
-                      >
-                        Secure & Trusted
-                      </Text>
-
-                      <Text
-                        style={[
-                          styles.securitySubtext,
-                          {
-                            color:
-                              colors.textSecondary,
-                          },
-                        ]}
-                      >
-                        Your data is encrypted and
-                        protected with industry-standard
-                        security
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* =========================================== */}
                   {/* SIGN UP                                     */}
                   {/* =========================================== */}
 
@@ -949,6 +855,7 @@ export default function LoginScreen() {
               >
                 © {new Date().getFullYear()} {APP_NAME}
               </Text>
+              <AuthLegalLinks disabled={loading} />
 
               <Text
                 style={[
@@ -983,7 +890,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.4,
+    height: 360,
     overflow: "hidden",
   },
 
@@ -1071,15 +978,18 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     flexGrow: 1,
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
     paddingBottom: 20,
   },
 
   headerContent: {
     paddingTop: 20,
-    paddingBottom: 10,
+    paddingBottom: 40,
     paddingHorizontal: 30,
     alignItems: "center",
-    minHeight: height * 0.28,
+    minHeight: 220,
   },
 
   logoWrapper: {
@@ -1161,7 +1071,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
-    height: 50,
+    minHeight: 50,
   },
 
   inputWrapperFocused: {
@@ -1201,7 +1111,7 @@ const styles = StyleSheet.create({
   },
 
   loginButton: {
-    height: 52,
+    minHeight: 52,
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
@@ -1235,59 +1145,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 20,
-    gap: 16,
-  },
-
-  divider: {
-    flex: 1,
-    height: 1,
-  },
-
-  dividerText: {
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: 0.5,
-  },
-
-  securityContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-  },
-
-  securityIcon: {
-    marginRight: 12,
-    marginTop: 1,
-  },
-
-  securityTextContainer: {
-    flex: 1,
-  },
-
-  securityText: {
-    fontSize: 13,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-
-  securitySubtext: {
-    fontSize: 12,
-    lineHeight: 17,
-    opacity: 0.8,
-  },
-
   signUpContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 20,
   },
 
   signUpText: {

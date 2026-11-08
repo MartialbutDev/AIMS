@@ -20,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../../src/context/ThemeContext";
 import { useDocumentPicker } from "../../../src/hooks/useDocumentPicker";
 import api from "../../../src/services/api";
+import { documentFeedback } from "../../../src/utils/documentFeedback";
 
 interface DocumentType {
   value: string;
@@ -65,9 +66,6 @@ export default function UploadDocumentScreen() {
   const [selectedType, setSelectedType] = useState<string>(presetType);
   const [description, setDescription] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [ocrResult, setOcrResult] = useState<string | null>(null);
-  const [versionLabel, setVersionLabel] = useState("");
-  const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
 
   const [identifying, setIdentifying] = useState(false);
   const [suggestion, setSuggestion] = useState<{ fileUri: string; type: string | null; message: string } | null>(null);
@@ -223,11 +221,6 @@ export default function UploadDocumentScreen() {
         },
       });
 
-      if (response.data.extracted_text) {
-        setOcrResult(response.data.extracted_text);
-      }
-      setVerificationStatus(response.data.status);
-      setVersionLabel(response.data.document?.version_label || "");
 
       // ✅ Safe navigation — only navigate if the backend returned a document ID
       const docId: string | undefined = response.data?.document?.id;
@@ -246,23 +239,19 @@ export default function UploadDocumentScreen() {
 
       const statusTitle =
         response.data.status === "verified"
-          ? "✅ Document Verified"
-          : response.data.status === "pending"
+          ? "Document accepted for this requirement"
+          : ["pending", "pending_review"].includes(response.data.status)
           ? "⏳ Pending Review"
-          : "❌ Document Rejected";
+          : response.data.status === "rejected" ? "Document rejected" : "Upload received — check review status";
 
-      const statusBody =
-        response.data?.validation?.message ||
-        "Your document has been uploaded.";
+      const feedback = documentFeedback(response.data.status, response.data.student_feedback, response.data.document?.version_status);
+      const statusBody = `${feedback.reason}\n\n${feedback.next_action}`;
 
-      Alert.alert(statusTitle, statusBody, buttons);
+      Alert.alert(statusTitle, `${statusBody}\n\n${response.data.status === "verified" ? "Accepted for this requirement; this does not authenticate a signature or replace other approvals." : ["pending", "pending_review"].includes(response.data.status) ? "This upload is awaiting review and is not approved yet. Any current approved version remains active." : "Check Documents for the review result and next steps."}`, buttons);
 
       resetFile();
       setSelectedType(presetType);
       setDescription("");
-      setOcrResult(null);
-      setVerificationStatus(null);
-      setVersionLabel("");
     } catch (error: any) {
       const detail = error.response?.data?.detail;
       const reupload = typeof detail === "string" && detail.startsWith("Re-upload required: ");
@@ -463,11 +452,20 @@ export default function UploadDocumentScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={{ padding: 16, marginBottom: 18, gap: 8, borderRadius: 12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+          <Text accessibilityRole="header" style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>Understand your document result</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>Pending review: uploaded, not approved yet. Wait for review or follow the requested correction.</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>Verified / approved: accepted for this requirement by the current checks or review. Other application or deployment approvals may still be required.</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>Rejected: not accepted. Read the reason and upload a relevant, readable document.</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>OCR reads text and supports content checks. It does not authenticate signatures or guarantee the issuer is genuine.</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>Replacing a file keeps the current approved version active until the replacement is approved. Earlier versions and submitted application attachments remain in history.</Text>
+          <TouchableOpacity accessibilityRole="link" onPress={() => router.push({ pathname: '/(student)/settings/guide-detail', params: { id: '5' } })} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.accent, fontWeight: '600', textDecorationLine: 'underline' }}>Read the documents and replacements guide</Text></TouchableOpacity>
+        </View>
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
             Select Document
           </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>Choose a file to get a suggested type. It is submitted only when you tap Upload.</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>Choosing a file sends it for text extraction and a type suggestion. It is saved as a requirement only when you tap Upload. A suggestion is not approval.</Text>
 
           {selectedFile ? (
             renderFilePreview()
@@ -553,55 +551,7 @@ export default function UploadDocumentScreen() {
           />
         </View>
 
-        {ocrResult && (
-          <View style={styles.ocrSection}>
-            <View style={[styles.ocrHeader]}>
-              <Ionicons
-                name={
-                  verificationStatus === "verified" ? "checkmark-circle" : "alert-circle"
-                }
-                size={24}
-                color={
-                  verificationStatus === "verified" ? colors.success : colors.warning
-                }
-              />
-              <Text style={[styles.ocrTitle, { color: colors.textPrimary }]}>
-                OCR Results
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.ocrCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                style={[styles.ocrText, { color: colors.textSecondary }]}
-                numberOfLines={5}
-              >
-                {ocrResult}
-              </Text>
-              <View style={[styles.ocrStatus, { borderTopColor: colors.border }]}>
-                <Text
-                  style={[
-                    styles.ocrStatusText,
-                    verificationStatus === "verified"
-                      ? [styles.verifiedText, { color: colors.success }]
-                      : verificationStatus === "pending"
-                      ? [styles.pendingText, { color: colors.warning }]
-                      : [styles.rejectedText, { color: colors.error }],
-                  ]}
-                >
-                  {versionLabel || (verificationStatus === "verified"
-                    ? "Current approved"
-                    : verificationStatus === "pending"
-                    ? "⏳ Pending Review"
-                    : "Rejected")}
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
+
 
         {uploading && uploadProgress > 0 && (
           <View style={styles.progressSection}>

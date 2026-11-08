@@ -55,6 +55,7 @@ from app.models.coordinator_assignment import (
 )
 
 from app.services.document_service import DocumentService
+from app.services.student_document_feedback import student_document_payload, student_upload_payload
 
 from app.schemas.document import (
     DocumentResponse,
@@ -222,7 +223,7 @@ def _document_row(
 
 @router.post(
     "/upload",
-    response_model=DocumentUploadResponse,
+    response_model=None,
 )
 async def upload_document(
     file: UploadFile = File(...),
@@ -249,13 +250,13 @@ async def upload_document(
             detail="Student role required for document uploads",
         )
 
-    return DocumentService.upload_document(
+    return student_upload_payload(DocumentService.upload_document(
         db=db,
         file=file,
         document_type=document_type,
         description=description or "",
         uploaded_by=current_user.id,
-    )
+    ))
 
 
 # ============================================================
@@ -264,14 +265,14 @@ async def upload_document(
 
 @router.get(
     "/",
-    response_model=List[DocumentResponse],
+    response_model=None,
 )
 async def get_user_documents(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
 
-    return (
+    documents = (
         db.query(Document)
         .filter(
             Document.uploaded_by == current_user.id
@@ -281,6 +282,8 @@ async def get_user_documents(
         )
         .all()
     )
+    return [student_document_payload(DocumentService._serialize_document(doc)) if current_user.role == UserRole.STUDENT else DocumentService._serialize_document(doc) for doc in documents]
+
 
 
 # ============================================================
@@ -504,7 +507,7 @@ def review_document(
 
 @router.get(
     "/{document_id}",
-    response_model=DocumentResponse,
+    response_model=None,
 )
 async def get_document(
     document_id: str,
@@ -512,11 +515,14 @@ async def get_document(
     current_user: User = Depends(get_current_user),
 ):
 
-    return _authorized_document(
+    document = _authorized_document(
         db=db,
         actor=current_user,
         document_id=document_id,
     )
+    payload = DocumentService._serialize_document(document)
+    return student_document_payload(payload) if current_user.role == UserRole.STUDENT else payload
+
 
 
 # ============================================================

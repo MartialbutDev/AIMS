@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly AIMS offsite backup retries and independent health heartbeat
+
+[Timer]
+OnCalendar=*-*-* *:20:00
+Persistent=true
+Unit=aims-backup-cloud.service
+
+[Install]
+WantedBy=timers.target

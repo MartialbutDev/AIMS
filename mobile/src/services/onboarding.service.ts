@@ -1,3 +1,4 @@
+import type { StudentDocumentFeedback } from "../utils/documentFeedback";
 
 import * as SecureStore from "expo-secure-store";
 
@@ -54,13 +55,7 @@ export interface OnboardingSubmission {
   original_filename: string;
   review_status: ReviewStatus;
 
-  validation_result: {
-    automatic_result?: string;
-    checks?: Record<string, boolean | null>;
-    details?: Record<string, unknown>;
-    requires_manual_review?: boolean;
-    ocr_warning?: string;
-  } | null;
+  student_feedback?: StudentDocumentFeedback;
 
   review_notes: string | null;
   submitted_at: string | null;

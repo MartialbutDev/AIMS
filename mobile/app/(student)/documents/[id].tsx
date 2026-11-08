@@ -18,6 +18,7 @@ import * as Linking from "expo-linking";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import api from "../../../src/services/api";
+import { documentFeedback, type StudentDocumentFeedback } from "../../../src/utils/documentFeedback";
 import { BASE_URL } from "../../../src/config/env";
 
 interface DocumentDetail {
@@ -30,9 +31,8 @@ interface DocumentDetail {
   version_label?: string;
   created_at: string;
   file_path?: string;
-  extracted_text?: string;
-  validation_confidence?: number;
-  validation_message?: string;
+  student_feedback?: StudentDocumentFeedback;
+  review_notes?: string | null;
 }
 
 export default function DocumentDetailScreen() {
@@ -43,7 +43,6 @@ export default function DocumentDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [document, setDocument] = useState<DocumentDetail | null>(null);
   const [opening, setOpening] = useState(false);
-  const [showFullOcr, setShowFullOcr] = useState(false);
 
   const fetchDocument = useCallback(
     async (showSpinner = true) => {
@@ -164,7 +163,7 @@ export default function DocumentDetailScreen() {
   const displayStatus = document.version_status?.startsWith("pending") ? "pending" : document.verification_status;
   const statusColor = document.version_status === "superseded" ? colors.textSecondary : getStatusColor(displayStatus);
   const displayName = document.type.replace(/_/g, " ").toUpperCase();
-  const confidence = document.validation_confidence ?? 0;
+  const feedback = documentFeedback(document.verification_status, document.student_feedback, document.version_status);
 
   const statusLabel = document.version_label || (
     document.verification_status === "verified"
@@ -173,12 +172,6 @@ export default function DocumentDetailScreen() {
       ? "Pending Review"
       : "Rejected");
 
-  const statusIconName: keyof typeof Ionicons.glyphMap = document.version_status === "superseded" ? "archive-outline" :
-    displayStatus === "verified"
-      ? "checkmark-circle"
-      : displayStatus === "pending"
-      ? "time-outline"
-      : "close-circle";
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -267,93 +260,17 @@ export default function DocumentDetailScreen() {
           </View>
         )}
 
-        {/* ✅ Validation Result — with confidence bar and colored status */}
-        {document.validation_confidence !== null &&
-          document.validation_confidence !== undefined && (
-            <View style={styles.section}>
-              <Text
-                style={[styles.sectionTitle, { color: colors.textPrimary }]}
-              >
-                Validation Result
-              </Text>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Review status</Text>
+          <View style={[styles.validationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionText, { color: statusColor, fontWeight: '700' }]}>{feedback.status_label}</Text>
+            <Text style={[styles.sectionText, { color: colors.textSecondary, marginTop: 8 }]}>{feedback.reason}</Text>
+            <Text style={[styles.sectionText, { color: colors.textPrimary, marginTop: 10 }]}>{feedback.next_action}</Text>
+            <Text style={[styles.sectionText, { color: colors.textSecondary, marginTop: 10 }]}>{feedback.notice}</Text>
+          </View>
+        </View>
 
-              <View
-                style={[
-                  styles.validationCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-              >
-                {/* Status badge */}
-                <View
-                  style={[
-                    styles.validationBadge,
-                    { backgroundColor: `${statusColor}15` },
-                  ]}
-                >
-                  <Ionicons
-                    name={statusIconName}
-                    size={18}
-                    color={statusColor}
-                  />
-                  <Text
-                    style={[
-                      styles.validationBadgeText,
-                      { color: statusColor },
-                    ]}
-                  >
-                    {statusLabel}
-                  </Text>
-                </View>
-
-                {/* Confidence percentage */}
-                <View style={styles.confidenceRow}>
-                  <Text
-                    style={[
-                      styles.confidenceLabel,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    Confidence
-                  </Text>
-                  <Text
-                    style={[styles.confidenceValue, { color: statusColor }]}
-                  >
-                    {confidence}%
-                  </Text>
-                </View>
-
-                {/* Progress bar */}
-                <View
-                  style={[
-                    styles.confidenceTrack,
-                    { backgroundColor: `${statusColor}20` },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.confidenceFill,
-                      {
-                        width: `${Math.min(100, Math.max(0, confidence))}%`,
-                        backgroundColor: statusColor,
-                      },
-                    ]}
-                  />
-                </View>
-
-                {/* Validation message from backend */}
-                {document.validation_message ? (
-                  <Text
-                    style={[
-                      styles.validationMessage,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    {document.validation_message}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          )}
+        {document.review_notes && <View style={styles.section}><Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Reviewer feedback</Text><Text style={[styles.sectionText, { color: colors.textSecondary }]}>{document.review_notes}</Text></View>}
 
         {/* Description */}
         {document.description && (
@@ -376,51 +293,6 @@ export default function DocumentDetailScreen() {
             {formatDate(document.created_at)}
           </Text>
         </View>
-
-        {/* ✅ Extracted Text (OCR) with expand/collapse */}
-        {document.extracted_text && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              Extracted Text (OCR)
-            </Text>
-            <View
-              style={[
-                styles.ocrCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                style={[styles.ocrText, { color: colors.textSecondary }]}
-                numberOfLines={showFullOcr ? undefined : 8}
-              >
-                {document.extracted_text}
-              </Text>
-
-              {document.extracted_text.length > 400 && (
-                <TouchableOpacity
-                  style={styles.showMoreButton}
-                  onPress={() => setShowFullOcr((prev) => !prev)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[styles.showMoreText, { color: colors.accent }]}
-                  >
-                    {showFullOcr ? "Show less" : "Show more"}
-                  </Text>
-                  <Ionicons
-                    name={
-                      showFullOcr
-                        ? "chevron-up-outline"
-                        : "chevron-down-outline"
-                    }
-                    size={16}
-                    color={colors.accent}
-                  />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        )}
 
         {/* Open document button */}
         <TouchableOpacity

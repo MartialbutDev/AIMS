@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily AIMS backup at 02:00 Philippine time
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 Asia/Manila
+Persistent=true
+AccuracySec=1min
+Unit=aims-backup.service
+
+[Install]
+WantedBy=timers.target

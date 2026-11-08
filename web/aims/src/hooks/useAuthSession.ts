@@ -2,72 +2,16 @@
 import { useEffect, useState } from 'react'
 import { apiRequest } from '../services/apiClient'
 import { getCurrentUserSession, signIn } from '../services/authService'
-import { roles, type UserRole, type UserSession } from '../types/auth'
-
-const SESSION_KEY = 'aims-session'
-
-// ============================================================
-// VALIDATE USER ROLE
-// ============================================================
-
-function isUserRole(value: unknown): value is UserRole {
-  return (
-    typeof value === 'string' &&
-    roles.some((role) => role === value)
-  )
-}
-
-// ============================================================
-// READ SAVED SESSION
-// ============================================================
-
-function readSession(): UserSession | null {
-  try {
-    const stored = localStorage.getItem(SESSION_KEY)
-
-    if (!stored) {
-      return null
-    }
-
-    const session: unknown = JSON.parse(stored)
-
-    if (
-      typeof session === 'object' &&
-      session !== null &&
-      'name' in session &&
-      'email' in session &&
-      'role' in session &&
-      'accessToken' in session &&
-      typeof session.name === 'string' &&
-      typeof session.email === 'string' &&
-      typeof session.accessToken === 'string' &&
-      session.accessToken.trim().length > 0 &&
-      isUserRole(session.role)
-    ) {
-      return {
-        name: session.name,
-        email: session.email,
-        role: session.role,
-        accessToken: session.accessToken,
-      }
-    }
-
-    localStorage.removeItem(SESSION_KEY)
-    return null
-  } catch {
-    localStorage.removeItem(SESSION_KEY)
-    return null
-  }
-}
+import type { UserRole, UserSession } from '../types/auth'
+import { SESSION_KEY, readStoredSession, saveStoredSession, clearStoredSession } from '../services/sessionStorage'
 
 // ============================================================
 // AUTHENTICATION SESSION HOOK
 // ============================================================
 
 export function useAuthSession() {
-  useEffect(() => { const update = () => setSession(readSession()); window.addEventListener('aims-session-updated', update); return () => window.removeEventListener('aims-session-updated', update) }, [])
   const [session, setSession] = useState<UserSession | null>(
-    readSession,
+    readStoredSession,
   )
 
   const [isSigningIn, setIsSigningIn] = useState(false)
@@ -75,11 +19,13 @@ export function useAuthSession() {
   // Only restored sessions require an initial validation.
   const [tokenToRestore, setTokenToRestore] = useState<
     string | null
-  >(() => readSession()?.accessToken ?? null)
+  >(() => readStoredSession()?.accessToken ?? null)
 
   const [isRestoring, setIsRestoring] = useState(
-    () => Boolean(readSession()),
+    () => Boolean(readStoredSession()),
   )
+
+  useEffect(() => { const update = () => setSession(readStoredSession()); const sync = (event: StorageEvent) => { if (event.key === SESSION_KEY || event.key === null) update() }; window.addEventListener('aims-session-updated', update); window.addEventListener('storage', sync); return () => { window.removeEventListener('aims-session-updated', update); window.removeEventListener('storage', sync) } }, [])
 
   // ==========================================================
   // RESTORE AND VALIDATE EXISTING SESSION
@@ -98,10 +44,7 @@ export function useAuthSession() {
           return
         }
 
-        localStorage.setItem(
-          SESSION_KEY,
-          JSON.stringify(verifiedSession),
-        )
+        saveStoredSession(verifiedSession)
 
         setSession(verifiedSession)
       })
@@ -115,7 +58,7 @@ export function useAuthSession() {
           error,
         )
 
-        localStorage.removeItem(SESSION_KEY)
+        clearStoredSession()
         setSession(null)
       })
       .finally(() => {
@@ -140,6 +83,7 @@ export function useAuthSession() {
     role: UserRole,
     loginIdentifier: string,
     password: string,
+    keepSignedIn = false,
   ): Promise<void> {
     setIsSigningIn(true)
 
@@ -148,12 +92,10 @@ export function useAuthSession() {
         role,
         loginIdentifier,
         password,
+        keepSignedIn,
       )
 
-      localStorage.setItem(
-        SESSION_KEY,
-        JSON.stringify(nextSession),
-      )
+      saveStoredSession(nextSession, keepSignedIn)
 
       // The login endpoint has just issued this token.
       // Do not immediately repeat session restoration.
@@ -171,7 +113,7 @@ export function useAuthSession() {
 
   async function logout() {
     try { await apiRequest('/api/v1/auth/logout', { method: 'POST', signal: AbortSignal.timeout(10000) }) } catch { /* Local sign-out remains available offline. */ }
-    localStorage.removeItem(SESSION_KEY)
+    clearStoredSession()
 
     setTokenToRestore(null)
     setIsRestoring(false)

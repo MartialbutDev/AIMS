@@ -5,6 +5,7 @@ export async function signIn(
   role: UserRole,
   loginIdentifier: string,
   password: string,
+  keepSignedIn = false,
 ): Promise<UserSession> {
   const response = await apiRequest<{
     access_token: string
@@ -17,7 +18,7 @@ export async function signIn(
     }
   }>(role === 'student' ? '/api/v1/auth/login/student' : '/api/v1/auth/login/web', {
     method: 'POST',
-    body: JSON.stringify({ email: loginIdentifier, password }),
+    body: JSON.stringify({ email: loginIdentifier, password, remember_me: keepSignedIn }),
   })
   const backendRole = response.user.role === 'hte_supervisor' ? 'company' : response.user.role
   if (backendRole !== role) {

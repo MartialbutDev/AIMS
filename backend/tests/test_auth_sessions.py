@@ -162,3 +162,44 @@ class SessionTests(unittest.TestCase):
             service.revoke(self.db, self.db.get(User, 'one'), service.digest(token), target='missing')
         self.assertEqual(error.exception.status_code, 404)
         self.assertFalse(self.db.in_transaction())
+
+    def test_web_persistence_choice_sets_jwt_and_record_expiry_for_student_and_staff(self):
+        self.db.add(User(id='staff', first_name='Staff', last_name='Test', email='staff@example.invalid', hashed_password=self.password, role=UserRole.COORDINATOR, is_active=True))
+        self.db.commit()
+        for endpoint, email in (('student', 'one@example.invalid'), ('web', 'staff@example.invalid')):
+            for remember, seconds in ((False, 8 * 3600), (True, 7 * 86400)):
+                with self.subTest(endpoint=endpoint, remember=remember):
+                    result = self.client.post('/auth/login/' + endpoint, json={'email': email, 'password': 'Test-password-123', 'remember_me': remember}, headers={'User-Agent': 'Mozilla/5.0'})
+                    self.assertEqual(result.status_code, 200)
+                    token = result.json()['access_token']
+                    claims = decode_token(token)
+                    self.assertAlmostEqual(claims['exp'] - claims['iat'], seconds, delta=2)
+                    row = self.db.get(AuthSession, service.digest(token))
+                    self.assertAlmostEqual((row.expires_at - row.created_at).total_seconds(), seconds, delta=3)
+                    self.assertEqual(row.label, 'Web browser')
+
+    def test_mobile_omitted_persistence_choice_preserves_configured_expiry(self):
+        from app.core.config import settings
+        result = self.client.post('/auth/login/student', json={'email': 'one@example.invalid', 'password': 'Test-password-123'}, headers={'User-Agent': 'okhttp Android'})
+        self.assertEqual(result.status_code, 200)
+        claims = decode_token(result.json()['access_token'])
+        self.assertAlmostEqual(claims['exp'] - claims['iat'], settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60, delta=2)
+
+    def test_remembered_session_can_be_revoked_and_cannot_bypass_record_expiry(self):
+        def login():
+            result = self.client.post('/auth/login/student', json={'email': 'one@example.invalid', 'password': 'Test-password-123', 'remember_me': True})
+            self.assertEqual(result.status_code, 200)
+            return result.json()['access_token']
+        token = login()
+        self.assertEqual(self.call(token, '/logout', 'post').status_code, 200)
+        self.assertEqual(self.call(token).status_code, 401)
+        token = login()
+        self.db.get(AuthSession, service.digest(token)).expires_at = service.now() - timedelta(seconds=1)
+        self.db.commit()
+        self.assertEqual(self.call(token).status_code, 401)
+
+    def test_invalid_persistence_input_does_not_create_session(self):
+        before = self.db.query(AuthSession).count()
+        result = self.client.post('/auth/login/student', json={'email': 'one@example.invalid', 'password': 'Test-password-123', 'remember_me': {'unexpected': True}})
+        self.assertEqual(result.status_code, 422)
+        self.assertEqual(self.db.query(AuthSession).count(), before)

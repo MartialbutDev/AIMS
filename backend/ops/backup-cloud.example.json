@@ -1,0 +1,11 @@
+{
+  "bucket": "REPLACE_WITH_STACK_BUCKET_OUTPUT",
+  "account_id": "REPLACE_WITH_AWS_ACCOUNT_ID",
+  "region": "ap-southeast-2",
+  "instance_id": "i-0b272a98618427620",
+  "topic_arn": "REPLACE_WITH_STACK_ALERT_TOPIC_OUTPUT",
+  "prefix": "production/",
+  "backup_config": "/etc/aims/backup.json",
+  "freshness_hours": 30,
+  "recovery_days": 35
+}

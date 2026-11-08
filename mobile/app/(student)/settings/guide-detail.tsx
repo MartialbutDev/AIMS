@@ -19,93 +19,152 @@ interface GuideContent {
 
 const guideContents: Record<string, GuideContent> = {
   "1": {
-    id: "1",
-    title: "Getting Started",
-    icon: "rocket-outline",
-    sections: [
+    "id": "1",
+    "title": "Getting started",
+    "icon": "rocket-outline",
+    "sections": [
       {
-        title: "Create Your Account",
-        icon: "person-add-outline",
-        content: "1. Install the AIMS APK provided through your school’s approved distribution channel.\n2. Create your student account with accurate name, student ID and contact details.\n3. Submit the account-verification documents requested by AIMS.\n4. Wait for the school reviewer to verify your account.\n5. Sign in and follow the next step shown on your dashboard.",
+        "title": "One student account",
+        "icon": "person-add-outline",
+        "content": "1. Register with your own name, student number and contact details.\n2. Use that same account on mobile and the student web portal.\n3. Keep passwords and one-time codes private.\n4. Review your profile and active sign-in sessions in account settings."
       },
       {
-        title: "Complete Your Profile",
-        icon: "person-outline",
-        content: "Open Profile to review your details and photo. Use the edit controls for the fields available to you. Ask your coordinator to correct your student ID or other school-controlled information.",
+        "title": "Orientation and COR first",
+        "icon": "school-outline",
+        "content": "Upload your orientation certificate and current-term Certificate of Registration (COR) in onboarding. Both need approval before your application can advance. Pending or rejected documents do not establish eligibility. Read the review notes and follow the next step shown by AIMS."
       },
       {
-        title: "Understand the Dashboard",
-        icon: "grid-outline",
-        content: "Your dashboard shows the configured academic term, school-approved hours and deployment progress. Use Pre-deployment before starting the internship, and Completion & archive when you are ready for the final review. Read updates in Notifications.",
-      },
-    ],
+        "title": "Your academic term and next step",
+        "icon": "grid-outline",
+        "content": "The dashboard and DTR summary use the configured academic term and required hours. Follow your assigned coordinator and the current checklist. Completion & archive is in Profile, with a shortcut in the dashboard Internship Progress card."
+      }
+    ]
   },
   "2": {
-    id: "2",
-    title: "How to Apply",
-    icon: "briefcase-outline",
-    sections: [
+    "id": "2",
+    "title": "Applying and deployment",
+    "icon": "briefcase-outline",
+    "sections": [
       {
-        title: "Prepare your application",
-        icon: "search-outline",
-        content: "1. Upload your resume/CV and application letter in Documents.\n2. Wait for verification of both files.\n3. Open Applications and choose an available partner company.\n4. Check the company details and follow your coordinator’s placement instructions.",
+        "title": "Prepare and apply",
+        "icon": "document-text-outline",
+        "content": "1. Complete approved orientation and COR onboarding.\n2. Upload your resume/CV and application letter in Documents.\n3. Use current approved versions in your application.\n4. Select an available partner company, enter the requested details and submit.\n5. Track status and feedback in Applications."
       },
       {
-        title: "Submit Application",
-        icon: "send-outline",
-        content: "1. Create a new application.\n2. Select the company and position.\n3. Select your verified resume/CV and application letter.\n4. Add the requested application details and submit.\n5. Your coordinator reviews the application before company review.\n6. For a school-arranged placement, open the proposal, review it and acknowledge or decline it with a reason.",
+        "title": "Endorsement before company review",
+        "icon": "send-outline",
+        "content": "Your school provides the endorsement letter. Follow the steps inside your application to upload it under Endorsement Letter, linked to that application. Wait for review and approval. Your coordinator can forward the application to the company only after the required endorsement is approved. OCR reads text; it does not authenticate a signature."
       },
       {
-        title: "Track Application Status",
-        icon: "time-outline",
-        content: "Check the status and feedback in Applications. Company acceptance does not authorize attendance recording by itself. Complete the Pre-deployment checklist and wait for your coordinator to confirm deployment before recording DTR or submitting journals.",
+        "title": "Acceptance and deployment are separate",
+        "icon": "checkmark-circle-outline",
+        "content": "The company reviews the forwarded application and decides whether to accept you. The company provides an acceptance letter when required by your checklist. Complete Pre-deployment requirements and wait for coordinator deployment approval. Acceptance alone does not unlock DTR or journal submissions."
       },
-    ],
+      {
+        "title": "School-arranged placements",
+        "icon": "people-outline",
+        "content": "If you receive a direct-placement proposal, review its company and instructions, then acknowledge or decline through the proposal. It still requires the applicable eligibility, company/MOA and deployment checks. An active deployment prevents another internship application from proceeding."
+      }
+    ]
   },
   "3": {
-    id: "3",
-    title: "DTR Guide",
-    icon: "calendar-outline",
-    sections: [
+    "id": "3",
+    "title": "Attendance and corrections",
+    "icon": "calendar-outline",
+    "sections": [
       {
-        title: "Recording Time-In",
-        icon: "log-in-outline",
-        content: "1. Confirm that your deployment is active.\n2. Open DTR and create your time-in entry.\n3. Use a date on or after your official deployment date.\n4. Take a time-in photo and allow the requested location access.\n5. Review your entry before saving.",
+        "title": "Clock in and clock out",
+        "icon": "time-outline",
+        "content": "1. Confirm that your deployment is active.\n2. Open DTR, take your own clock-in photo and capture your location.\n3. Check the date, time, position and reported accuracy before saving.\n4. Open the pending entry when your shift ends.\n5. Take a clock-out photo, capture a fresh location and submit once.\n6. The completed entry goes to coordinator review; only approved hours count."
       },
       {
-        title: "Recording Time-Out",
-        icon: "log-out-outline",
-        content: "1. Open the pending DTR entry.\n2. Record a time-out later than the time-in.\n3. Provide the required time-out photo and location details.\n4. Submit the time-out. The complete entry goes to coordinator review.\n5. Only valid, school-approved hours contribute to completion progress.",
+        "title": "Check location accuracy",
+        "icon": "location-outline",
+        "content": "Location is an estimate, not proof of presence. A phone may use GPS and nearby networks; an Ethernet-only PC may give a rough network estimate. Enable precise location and recapture if the position is wrong. AIMS warns when reported accuracy is over 100 metres or unavailable. This is an app caution, not a school geofence or proof that a closer reading is correct. Contact your coordinator when a reliable capture is unavailable."
       },
       {
-        title: "DTR Status",
-        icon: "checkmark-circle-outline",
-        content: "Pending: time-in recorded, time-out still required.\nSubmitted: awaiting coordinator review.\nApproved: reviewed by the coordinator.\nRejected: read the feedback and ask your coordinator for correction instructions.\nArchived records require the coordinator to reopen completion before corrections.",
+        "title": "Request a time correction",
+        "icon": "create-outline",
+        "content": "Open the DTR record and its time-correction form. Enter the proposed clock-in/clock-out times and a clear reason. Your linked company supervisor reviews the request first, then your coordinator makes the school decision. A request alone does not change the recorded times or approved hours. Follow returned feedback. Completed archives may need to be reopened by the coordinator before changes."
       },
-    ],
+      {
+        "title": "Statuses and connection failures",
+        "icon": "cloud-offline-outline",
+        "content": "Pending: clock-in saved, clock-out still needed.\nSubmitted: awaiting coordinator review.\nApproved: counts toward completion hours.\nRejected: read the review feedback.\nIf the connection drops, refresh the DTR list before retrying; your submission may already have reached the server. Do not repeatedly clock out or create another entry to correct an existing one."
+      }
+    ]
   },
   "4": {
-    id: "4",
-    title: "Journal Writing",
-    icon: "book-outline",
-    sections: [
+    "id": "4",
+    "title": "Weekly journals",
+    "icon": "book-outline",
+    "sections": [
       {
-        title: "What to Write",
-        icon: "create-outline",
-        content: "Follow the journal format published or required by your coordinator. Describe the tasks completed, skills practised, challenges and what you learned. Prepare your report as a readable PDF before uploading it.",
+        "title": "Prepare a relevant journal",
+        "icon": "create-outline",
+        "content": "Use the journal format published or required by your coordinator. Describe tasks, skills, challenges and lessons learned. Prepare a readable PDF and omit confidential client or company information that you are not authorized to share."
       },
       {
-        title: "How to Submit",
-        icon: "send-outline",
-        content: "1. Confirm that your deployment is active.\n2. Open Journals and create a journal.\n3. Enter the week number (1–52), title and optional summary.\n4. Select the journal PDF.\n5. Submit it for coordinator review.\n6. Read any feedback in the journal details.",
+        "title": "Submit and review feedback",
+        "icon": "send-outline",
+        "content": "During an active deployment, open Journals, enter the week number and title, add the requested summary and select the PDF. Submit for coordinator review. A submitted or reviewing journal is not yet approved. Read returned/rejected feedback and follow the available correction or resubmission steps."
       },
       {
-        title: "Journal Status",
-        icon: "time-outline",
-        content: "Draft: not yet submitted.\nSubmitted or reviewing: awaiting a decision.\nApproved: accepted by your coordinator.\nRejected: read the feedback and follow your coordinator’s correction instructions.\nCompleting the journal requirements does not automatically approve internship completion.",
-      },
-    ],
+        "title": "Journals and completion",
+        "icon": "ribbon-outline",
+        "content": "Approved journals satisfy the relevant part of your completion checklist. Journals alone do not complete your internship, release your grade or replace company confirmation and coordinator final approval."
+      }
+    ]
   },
+  "5": {
+    "id": "5",
+    "title": "Documents and replacements",
+    "icon": "documents-outline",
+    "sections": [
+      {
+        "title": "Choose the correct file and type",
+        "icon": "document-text-outline",
+        "content": "Use Official forms for coordinator-published versions, instructions and deadlines. Upload readable, relevant files with your correct student details and academic term. Choosing a file may send it for text extraction and a type suggestion; saving it as a requirement is a separate Upload action. A suggested type is not approval."
+      },
+      {
+        "title": "Understand the review result",
+        "icon": "search-outline",
+        "content": "Pending review: uploaded but not approved. Wait for the responsible reviewer or follow the requested correction.\nVerified / approved: accepted for that requirement by the current checks or review; other application/deployment approvals may still be needed.\nRejected: not accepted; read the reason and submit the correct document.\nOCR assists text and content checks. Neither text extraction nor the Verified label authenticates signatures or guarantees the document issuer is genuine."
+      },
+      {
+        "title": "Replace without losing an approved document",
+        "icon": "copy-outline",
+        "content": "A new replacement does not automatically replace your current approved document. The approved version remains active while a pending replacement is checked. A rejected replacement does not invalidate the approved version. Once approved, the replacement becomes current and the previous version remains in history. Submitted application attachments keep their original versions."
+      },
+      {
+        "title": "View, hide or delete",
+        "icon": "ellipsis-horizontal-outline",
+        "content": "Use the document three-dot menu for available actions. Deletion can be restricted for documents linked to applications or retained academic records. Hide removes an item from the usual view without erasing its server record or review history. Contact your coordinator about an incorrect approved document or a revocation."
+      }
+    ]
+  },
+  "6": {
+    "id": "6",
+    "title": "Completion and archive",
+    "icon": "ribbon-outline",
+    "sections": [
+      {
+        "title": "Check eligibility",
+        "icon": "list-outline",
+        "content": "Open Profile → Completion & archive, or use the dashboard Internship Progress shortcut. Review the checklist for your deployment and academic term: approved attendance hours, journals, required documents and any outstanding reviews. Resolve missing items and returned feedback first."
+      },
+      {
+        "title": "Request and confirm completion",
+        "icon": "business-outline",
+        "content": "Submit your completion request when eligible. Your company supervisor reviews and confirms the internship, including the required completion evidence. If returned, read the reason, address it and use the available resubmission action. Enough hours alone do not approve completion."
+      },
+      {
+        "title": "Final approval, grade and archive",
+        "icon": "school-outline",
+        "content": "After company confirmation, your coordinator makes the final completion decision. Final grade release is a separate action; see the grade only when released. The completed internship is retained in the archive. Ordinary edits may be locked to protect that history; ask your coordinator about corrections rather than starting another record."
+      }
+    ]
+  }
 };
 
 export default function GuideDetailScreen() {
@@ -118,7 +177,7 @@ export default function GuideDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Guide Not Found</Text>
@@ -133,7 +192,7 @@ export default function GuideDetailScreen() {
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
@@ -263,7 +322,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionTitle: {
+    flex: 1,
+    flexShrink: 1,
     fontSize: 16,
+    lineHeight: 22,
     fontWeight: "600",
   },
   sectionDivider: {

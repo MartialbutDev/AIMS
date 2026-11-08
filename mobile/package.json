@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "check:launch": "node scripts/check-launch.cjs",
+    "check:welcome": "node scripts/check-welcome.cjs",
+    "check:attendance-location": "node scripts/check-attendance-location.cjs",
     "start": "expo start --lan",
     "start:clear": "expo start --lan --clear",
     "start:tunnel": "expo start --tunnel",

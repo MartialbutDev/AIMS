@@ -1,3 +1,4 @@
+import type { StudentDocumentFeedback } from "../../../src/utils/documentFeedback";
 // app/(student)/documents/index.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
@@ -28,6 +29,7 @@ import { BASE_URL } from "../../../src/config/env";
 import { SkeletonDocumentList } from "../../../src/components/common/Skeleton";
 
 interface Document {
+  student_feedback?: StudentDocumentFeedback;
   id: string;
   type: string;
   description: string;
@@ -41,8 +43,8 @@ interface Document {
   current_approved_id?: string | null;
   created_at: string;
   file_path?: string;
-  validation_confidence?: number;
-  validation_message?: string;
+
+
 }
 
 // ✅ Per-type icons
@@ -274,14 +276,6 @@ export default function DocumentsScreen() {
     const subtitle = item.original_filename || item.description || null;
     const typeIcon = getTypeIcon(item.type);
 
-    // Confidence badge color reflects status
-    const confidenceColor =
-      item.verification_status === "verified"
-        ? colors.success
-        : item.verification_status === "rejected"
-        ? colors.error
-        : colors.warning;
-
     return (
       <TouchableOpacity
         style={[styles.documentCard, { backgroundColor: colors.card }]}
@@ -318,6 +312,7 @@ export default function DocumentsScreen() {
           <Text style={[styles.documentDate, { color: colors.textSecondary }]}>
             {new Date(item.created_at).toLocaleDateString()}
           </Text>
+          {item.student_feedback && <Text style={[styles.documentDescription, { color: colors.textSecondary, marginTop: 6 }]} numberOfLines={2}>{item.student_feedback.reason}</Text>}
           {item.academic_year && <Text style={[styles.documentDate, { color: colors.textSecondary }]}>AY {item.academic_year}{item.semester ? ` · Semester ${item.semester}` : ''}</Text>}
           <View
             style={[styles.statusBadge, { alignSelf: "flex-start", marginTop: 7 }, { backgroundColor: `${statusColor}15` }]}
@@ -349,32 +344,6 @@ export default function DocumentsScreen() {
               : <Ionicons name="ellipsis-vertical" size={22} color={colors.textSecondary} />}
           </TouchableOpacity>
 
-          {item.validation_confidence !== null &&
-            item.validation_confidence !== undefined && (
-              <View
-                style={[
-                  styles.confidenceBadge,
-                  { backgroundColor: `${confidenceColor}15` },
-                ]}
-              >
-                <Ionicons
-                  name={
-                    item.verification_status === "verified"
-                      ? "checkmark-circle"
-                      : item.verification_status === "rejected"
-                      ? "close-circle"
-                      : "alert-circle"
-                  }
-                  size={10}
-                  color={confidenceColor}
-                />
-                <Text
-                  style={[styles.confidenceText, { color: confidenceColor }]}
-                >
-                  {item.validation_confidence}%
-                </Text>
-              </View>
-            )}
         </View>
       </TouchableOpacity>
     );

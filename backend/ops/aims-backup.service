@@ -1,0 +1,28 @@
+[Unit]
+Description=AIMS encrypted database and uploaded-file backup
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=2h
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/opt/aims-backup/venv/bin/python /opt/aims-backup/backup.py run --config /etc/aims/backup.json
+ExecStopPost=/opt/aims-backup/venv/bin/python /opt/aims-backup/backup.py resume --config /etc/aims/backup.json
+TimeoutStartSec=20min
+TimeoutStopSec=2min
+Restart=on-failure
+RestartSec=15min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/backups/aims /var/lib/aims-backup
+StandardOutput=journal
+StandardError=journal

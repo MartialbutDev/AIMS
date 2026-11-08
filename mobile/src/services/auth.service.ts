@@ -114,8 +114,6 @@ function formatApiError(error: unknown, fallback: string): Error {
     console.error('❌ API request failed:', {
       status: status ?? 'No HTTP response',
       code: error.code,
-      detail: responseData?.detail ?? null,
-      message: error.message,
     });
 
     if (!error.response) {
@@ -165,7 +163,7 @@ function formatApiError(error: unknown, fallback: string): Error {
     }
   }
 
-  console.error('❌ Unexpected error:', error);
+  console.error('❌ Unexpected API error');
   if (error instanceof Error) {
     return error;
   }

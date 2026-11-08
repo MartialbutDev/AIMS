@@ -197,6 +197,8 @@ class UserImportResponse(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    # None preserves the existing native/API client token policy.
+    remember_me: bool | None = None
 
 
 class LoginResponse(BaseModel):

@@ -143,3 +143,14 @@ backend/assets/completion_certificates/
 *.pem
 
 backend/assets/private_moa/
+
+# Scheduled backups and offline recovery secrets (never publish)
+backend/backups/
+backend/ops/backup.json
+backend/ops/recovery-private.asc
+backend/ops/recovery-private.asc.gpg
+*.tar.gpg
+
+# Names used by the offline recovery export instructions, anywhere in this checkout
+recovery-private.asc
+recovery-private.asc.gpg

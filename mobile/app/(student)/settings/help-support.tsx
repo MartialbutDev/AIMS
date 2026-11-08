@@ -6,22 +6,105 @@ import { useTheme } from '../../../src/context/ThemeContext';
 import { APP_VERSION, APP_BUILD } from '../../../src/constants/app';
 import { AccountPage, AccountHero, Panel, SectionLabel, MenuRow, ui } from '../../../src/components/account/AccountUI';
 const faqs = [
-  { id: 'apply', question: 'How do I apply for an internship?', answer: 'Complete your onboarding document requirements first. Upload your resume/CV and application letter and have them verified. In Applications, create an application for an available company and select those verified documents. Your coordinator reviews the application before it reaches the company.' },
-  { id: 'deploy', question: 'Why can’t I record DTR or submit a journal?', answer: 'Company acceptance comes before deployment. Open Pre-deployment from your dashboard, complete its checklist, and wait for your assigned coordinator to confirm deployment. DTR and journal submissions are available only during an active deployment in the configured academic term.' },
-  { id: 'docs', question: 'Which forms and documents should I use?', answer: 'Use the requirements shown in your Documents and Pre-deployment screens. Open Official forms in Documents for forms published by your coordinator, including their instructions, version and deadline. Follow your coordinator’s instructions for physical originals.' },
-  { id: 'hours', question: 'How many internship hours are required?', answer: 'Your dashboard, DTR summary and Completion & archive checklist show the configured required hours. Approved hours count toward that requirement. Follow the requirement and instructions for your academic term rather than an older sample form.' },
-  { id: 'dtr', question: 'What if my DTR is rejected or needs correction?', answer: 'Read the coordinator’s feedback in the DTR details. Contact your assigned coordinator through your school’s official channels for correction instructions. A pending record can receive a time-out; completed internship records require the coordinator to reopen completion before corrections.' },
-  { id: 'complete', question: 'Do enough hours automatically complete my internship?', answer: 'No. In Completion & archive, finish the checklist and request completion. Your company supervisor confirms the internship and supplies a completion certificate. Your coordinator makes the final approval and releases the final grade separately.' },
-  { id: 'notify', question: 'How do I enable phone notifications?', answer: 'Use an installed AIMS APK. Allow AIMS notifications in your phone settings, then open Settings → Notification preferences, enable Push Notifications and tap Connect / reconnect this phone. Tap a phone alert to view its details inside AIMS. Your in-app inbox remains available when optional alerts are muted.' },
-  { id: 'support', question: 'How do I get help with an app problem?', answer: 'Contact your assigned coordinator or school administrator through your school’s official channels. Include the app version/build shown below, the screen you opened, the steps you took and the exact error. Do not share your password or OTP. The app does not submit support tickets or offer private messaging.' },
+  {
+    "id": "apply",
+    "question": "How do I apply and submit the endorsement?",
+    "answer": "Get orientation and current-term COR approved first. Use your current approved resume/CV and application letter when applying. Upload the school-issued endorsement through the steps in your application. It must be approved before your coordinator forwards the application to the company."
+  },
+  {
+    "id": "deploy",
+    "question": "Does company acceptance mean I can start DTR?",
+    "answer": "No. Complete the Pre-deployment checklist and wait for coordinator deployment approval. DTR and journals require an active deployment in the configured academic term."
+  },
+  {
+    "id": "replace",
+    "question": "Will a new upload remove my approved document?",
+    "answer": "No. The current approved version stays active while a replacement is reviewed. A rejected replacement does not replace it. An approved replacement becomes current; previous versions remain in history, and submitted application attachments keep their original versions."
+  },
+  {
+    "id": "review",
+    "question": "Does OCR or Verified authenticate a signature?",
+    "answer": "No. OCR reads text and supports type/content checks. A type suggestion is not approval. Pending review means not approved yet. Verified / approved means accepted for the requirement by current checks or review; it does not authenticate signatures or guarantee the issuer is genuine."
+  },
+  {
+    "id": "docs",
+    "question": "Which forms should I use, and can I delete a file?",
+    "answer": "Use Documents → Official forms for published versions, instructions and deadlines. Follow school instructions for physical originals. The three-dot menu shows allowed View, Hide or Delete actions. Linked academic records may not be deletable; hiding does not erase server history."
+  },
+  {
+    "id": "location",
+    "question": "Why is the captured location inaccurate?",
+    "answer": "Device sensors, location permissions and available networks affect accuracy. Enable precise location and recapture if the position is wrong. AIMS warns about readings over 100 metres or unknown accuracy before submission. This is a caution, not a school geofence. Contact your coordinator if you cannot obtain a reliable reading."
+  },
+  {
+    "id": "hours",
+    "question": "Which attendance hours count?",
+    "answer": "Only approved DTR hours count toward the configured requirement shown in the dashboard, DTR summary and Completion checklist. A submitted time correction does not update approved hours until the required reviews approve it."
+  },
+  {
+    "id": "dtr",
+    "question": "How do I correct my recorded attendance time?",
+    "answer": "Open the DTR details and use Request a time correction. Enter the proposed times and reason. Your company supervisor reviews first, then the coordinator decides. Follow returned feedback. Archived completion records may need to be reopened before a correction."
+  },
+  {
+    "id": "complete",
+    "question": "How do I finish and see my grade?",
+    "answer": "Open Profile → Completion & archive, or the dashboard Internship Progress shortcut. Complete the checklist and request completion. Your company confirms it; the coordinator makes final approval and releases the grade separately. Enough hours alone do not complete the process."
+  },
+  {
+    "id": "retry",
+    "question": "What should I do after a connection failure?",
+    "answer": "Refresh the relevant list or record before retrying. A submission may have reached the server even when the phone did not receive confirmation. Check for the existing upload, application or DTR before submitting again."
+  },
+  {
+    "id": "notify",
+    "question": "How do I enable phone notifications?",
+    "answer": "In an installed AIMS build, allow notifications in phone settings, enable Push Notifications in AIMS Notification preferences and tap Connect / reconnect this phone. Optional alerts can be delayed or disabled; check in-app updates and official instructions for deadlines."
+  },
+  {
+    "id": "support",
+    "question": "How do I report a problem?",
+    "answer": "Contact your assigned coordinator or school administrator through official school channels. Include the version/build shown below, the screen, steps and exact error. Never send your password or OTP. AIMS does not provide private messaging or an in-app support-ticket service."
+  }
 ];
 const guides = [
-  { id: '1', title: 'Getting started', detail: 'Account verification, profile and the dashboard' },
-  { id: '2', title: 'Applying and deployment', detail: 'Verified documents, applications and school-arranged placements' },
-  { id: '3', title: 'Daily time records', detail: 'Clock-in, clock-out and coordinator review' },
-  { id: '4', title: 'Weekly journals', detail: 'PDF uploads, review and corrections' },
-];
-
+  {
+    "id": "1",
+    "title": "Getting started",
+    "detail": "Account, orientation/COR and the current academic term",
+    "icon": "rocket-outline"
+  },
+  {
+    "id": "2",
+    "title": "Applying and deployment",
+    "detail": "Endorsement, company acceptance and coordinator deployment",
+    "icon": "briefcase-outline"
+  },
+  {
+    "id": "3",
+    "title": "Attendance and corrections",
+    "detail": "Location accuracy, approved hours and the correction review route",
+    "icon": "calendar-outline"
+  },
+  {
+    "id": "4",
+    "title": "Weekly journals",
+    "detail": "PDF reports and coordinator review",
+    "icon": "book-outline"
+  },
+  {
+    "id": "5",
+    "title": "Documents and replacements",
+    "detail": "Pending, approved, replacements and retained history",
+    "icon": "documents-outline"
+  },
+  {
+    "id": "6",
+    "title": "Completion and archive",
+    "detail": "Checklist, company confirmation, final approval and grade release",
+    "icon": "ribbon-outline"
+  }
+] as const;
 
 export default function HelpSupportScreen() {
   const { colors } = useTheme();
@@ -39,8 +122,9 @@ export default function HelpSupportScreen() {
       <Text style={{ flex: 1, color: colors.textPrimary, fontWeight: '600', fontSize: 14, lineHeight: 21 }}>{item.question}</Text><Ionicons name={expanded === item.id ? 'remove' : 'add'} size={21} color={colors.accent} />
     </TouchableOpacity>{expanded === item.id && <Text style={[ui.description, { color: colors.textSecondary, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 }]}>{item.answer}</Text>}</Panel>)}
     {!filtered.length && <Panel><Ionicons name="search-outline" size={26} color={colors.textTertiary} /><Text style={{ color: colors.textPrimary, fontWeight: '600' }}>No matching topics</Text><Text style={[ui.description, { color: colors.textSecondary }]}>Try a shorter phrase, such as documents or DTR.</Text></Panel>}
+    <Panel><MenuRow icon="sparkles-outline" title="Replay the welcome tour" detail="Prepare, track and complete your internship in three quick steps." onPress={() => router.push({ pathname: '/welcome', params: { replay: '1' } })} /></Panel>
     <SectionLabel title="Step-by-step guides" />
-    <Panel>{guides.map((guide, index) => <MenuRow key={guide.id} icon={(['compass-outline', 'briefcase-outline', 'time-outline', 'book-outline'] as const)[index]} title={guide.title} detail={guide.detail} onPress={() => router.push({ pathname: '/(student)/settings/guide-detail', params: { id: guide.id } })} />)}</Panel>
+    <Panel>{guides.map(guide => <MenuRow key={guide.id} icon={guide.icon} title={guide.title} detail={guide.detail} onPress={() => router.push({ pathname: '/(student)/settings/guide-detail', params: { id: guide.id } })} />)}</Panel>
     <Panel><MenuRow icon="school-outline" title="Need school assistance?" detail="Contact your assigned coordinator or school administrator through official school channels." /><Text style={[ui.description, { color: colors.textSecondary }]}>When reporting a problem, include the screen, steps you took, exact error, and version below. Keep passwords and OTPs private.</Text><Text selectable style={{ color: colors.accent, fontSize: 12, fontWeight: '600' }}>{APP_VERSION} · Build {APP_BUILD}</Text></Panel>
   </AccountPage>;
 }
