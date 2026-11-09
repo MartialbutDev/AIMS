@@ -1,4 +1,4 @@
-from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours, hour_target
 
 from fastapi import (
     APIRouter,
@@ -12,7 +12,7 @@ from fastapi import (
 )
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case
+from sqlalchemy import func, case, and_
 from typing import List, Optional
 from datetime import datetime
 
@@ -34,6 +34,11 @@ from app.schemas.dtr import DTRResponse, DTRUpdate
 from app.schemas.pagination import PaginatedResponse
 from app.services.notification_service import NotificationService
 from app.services.deployment_service import DeploymentService
+from app.services import attendance_review as attendance
+from app.services.attendance_breaks import net_hours, instant, LOCAL
+from pydantic import BaseModel
+from uuid import UUID
+from typing import Literal
 
 router = APIRouter()
 
@@ -53,9 +58,8 @@ def save_upload_file(
 
     file_id = str(uuid.uuid4())
 
-    file_extension = os.path.splitext(
-        upload_file.filename or ""
-    )[1]
+    header=upload_file.file.read(8);upload_file.file.seek(0)
+    file_extension = '.png' if header == b'\x89PNG\r\n\x1a\n' else '.jpg'
 
     file_name = f"{file_id}{file_extension}"
 
@@ -96,7 +100,8 @@ def _to_response(
         entry
     ).model_copy(
         update={
-            "student_name": student_name
+            "student_name": student_name,
+            "company_reviewer_name": attendance.payload(entry)['company_reviewer_name'],
         }
     )
 
@@ -200,6 +205,65 @@ def _require_coordinator_record_access(
 # STUDENT: CREATE DTR / TIME-IN
 # ============================================================
 
+class CaptureRequest(BaseModel):
+    phase: Literal["in", "out"]
+    dtr_id: Optional[str] = None
+
+class BreakRequest(BaseModel):
+    action: Literal['start', 'end']
+    break_id: UUID
+
+@router.post('/{dtr_id}/break', response_model=DTRResponse)
+def record_break(dtr_id: str, body: BreakRequest, db=Depends(get_db), current_user=Depends(get_current_user)):
+    if current_user.role != UserRole.STUDENT or not current_user.is_active:
+        raise HTTPException(403, 'Active student access required')
+    row = db.query(DTR).filter_by(id=dtr_id, student_id=current_user.id).with_for_update().first()
+    if not row:
+        raise HTTPException(404, 'Attendance not found')
+    _require_current_record_term(row)
+    attendance.deployment(db, row, True)
+    clock = attendance.local_now().replace(microsecond=0, tzinfo=LOCAL)
+    if row.status != DTRStatus.PENDING or row.time_out or row.date.date() != clock.date():
+        raise HTTPException(409, 'Breaks are available only during today\'s open attendance')
+    periods = [dict(period) for period in (row.break_periods or [])]
+    identifier = str(body.break_id)
+    existing = next((period for period in periods if period['id'] == identifier), None)
+    # Retrying the same request never creates a second break or extends its end.
+    if existing and (body.action == 'start' or existing.get('ended_at')):
+        return _to_response(row, _student_name(current_user))
+    active = next((period for period in periods if not period.get('ended_at')), None)
+    if body.action == 'start':
+        if active:
+            raise HTTPException(409, 'A break is already active; refresh attendance')
+        if len(periods) >= 100:
+            raise HTTPException(409, 'Daily break limit reached; contact your coordinator')
+        lower = instant(periods[-1]['ended_at']) if periods else datetime.combine(row.date.date(), row.time_in, tzinfo=LOCAL)
+        if clock < lower:
+            raise HTTPException(409, 'Attendance clock is inconsistent; refresh before retrying')
+        periods.append({'id': identifier, 'started_at': clock.isoformat(), 'ended_at': None})
+    else:
+        if not active or active['id'] != identifier:
+            raise HTTPException(409, 'This break is not active; refresh attendance')
+        seconds = int((clock - instant(active['started_at'])).total_seconds())
+        if seconds < 0:
+            raise HTTPException(409, 'Break end cannot precede its start')
+        active['ended_at'] = clock.isoformat()
+        row.break_seconds = (row.break_seconds or 0) + seconds
+    row.break_periods = periods
+    attendance.history(row, current_user, 'break_' + body.action)
+    db.commit(); db.refresh(row)
+    return _to_response(row, _student_name(current_user))
+
+@router.post("/capture")
+def begin_capture(body: CaptureRequest, db=Depends(get_db), current_user=Depends(get_current_user)):
+    if current_user.role != UserRole.STUDENT: raise HTTPException(403,"Student access required")
+    DeploymentService.require_active_deployment(db,current_user.id)
+    if body.phase == "out":
+        row=db.query(DTR).filter_by(id=body.dtr_id,student_id=current_user.id).first()
+        if not row or row.status != DTRStatus.PENDING: raise HTTPException(409,"Open clock-in not found")
+    elif body.dtr_id is not None: raise HTTPException(422,"Clock-in cannot reference another attendance record")
+    return {"capture_token":attendance.capture_ticket(current_user,body.phase,body.dtr_id),"expires_in":300}
+
 @router.post(
     "/",
     response_model=DTRResponse,
@@ -211,6 +275,9 @@ async def create_dtr(
     time_out: Optional[str] = Form(None),
     tasks_completed: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
+    capture_token: Optional[str] = Form(None),
+    location_captured_at: Optional[str] = Form(None),
+    accuracy: Optional[float] = Form(None),
     latitude: Optional[float] = Form(None),
     longitude: Optional[float] = Form(None),
     location_address: Optional[str] = Form(None),
@@ -263,6 +330,10 @@ async def create_dtr(
             detail="Time in must be before time out",
         )
 
+    if time_out or image_out: raise HTTPException(422,"Clock in first, then capture a separate clock-out selfie")
+    server_time=attendance.local_now()
+    date_obj,time_in_obj=server_time.date(),server_time.time().replace(microsecond=0)
+    db.query(type(deployment)).filter_by(id=deployment.id).with_for_update().one()
     if date_obj < deployment.deployment_date:
         raise HTTPException(status_code=403, detail="DTR date precedes official deployment")
 
@@ -281,6 +352,7 @@ async def create_dtr(
             detail="DTR already submitted for this date",
         )
 
+    capture_id,evidence=attendance.validate_capture(db,current_user,capture_token,'in',None,image_in,latitude,longitude,accuracy,location_captured_at)
     upload_folder = os.path.join(
         settings.ASSET_DIR,
         "dtr_uploads",
@@ -330,6 +402,9 @@ async def create_dtr(
     dtr = DTR(
         id=str(uuid.uuid4()),
         student_id=current_user.id,
+        deployment_id=deployment.id,
+        capture_in_id=capture_id,
+        evidence_in=evidence,
         academic_year=academic_year,
         semester=semester,
         date=date_obj,
@@ -439,6 +514,9 @@ async def record_time_out(
     dtr_id: str,
     time_out: str = Form(...),
     image_out: UploadFile = File(...),
+    capture_token: Optional[str] = Form(None),
+    location_captured_at: Optional[str] = Form(None),
+    accuracy: Optional[float] = Form(None),
     latitude: Optional[float] = Form(None),
     longitude: Optional[float] = Form(None),
     location_address: Optional[str] = Form(None),
@@ -456,7 +534,7 @@ async def record_time_out(
         .filter(
             DTR.id == dtr_id
         )
-        .first()
+        .with_for_update().first()
     )
 
     if not dtr:
@@ -498,12 +576,21 @@ async def record_time_out(
             detail="Invalid time format",
         )
 
+    server_time=attendance.local_now()
+    if dtr.date.date()!=server_time.date(): raise HTTPException(409,"Use a time correction for a previous workday")
+    time_out_obj=server_time.time().replace(microsecond=0)
     if dtr.time_in >= time_out_obj:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Time in must be before time out",
         )
 
+    total_hours = net_hours(dtr, dtr.time_in, time_out_obj)
+
+    capture_id,evidence=attendance.validate_capture(db,current_user,capture_token,'out',dtr.id,image_out,latitude,longitude,accuracy,location_captured_at)
+    dtr.capture_out_id=capture_id
+    dtr.evidence_out=evidence
+    dtr.company_status='awaiting'
     upload_folder = os.path.join(
         settings.ASSET_DIR,
         "dtr_uploads",
@@ -512,25 +599,6 @@ async def record_time_out(
     image_out_path = save_upload_file(
         image_out,
         upload_folder,
-    )
-
-    dt_in = datetime.combine(
-        dtr.date,
-        dtr.time_in,
-    )
-
-    dt_out = datetime.combine(
-        dtr.date,
-        time_out_obj,
-    )
-
-    total_seconds = (
-        dt_out - dt_in
-    ).total_seconds()
-
-    total_hours = round(
-        total_seconds / 3600,
-        2,
     )
 
     dtr.time_out = time_out_obj
@@ -665,7 +733,7 @@ async def get_dtr_summary(
             func.sum(
                 case(
                     (
-                        DTR.status == DTRStatus.APPROVED,
+                        and_(DTR.status == DTRStatus.APPROVED, DTR.company_status == 'confirmed', DTR.company_reviewed_by.isnot(None), DTR.company_reviewed_at.isnot(None), DTR.company_review_revision == DTR.attendance_revision, DTR.coordinator_reviewed_by.isnot(None), DTR.coordinator_review_revision == DTR.attendance_revision, DTR.approved_date.isnot(None)),
                         1,
                     ),
                     else_=0,
@@ -684,7 +752,7 @@ async def get_dtr_summary(
                 func.sum(
                     case(
                         (
-                            DTR.status == DTRStatus.APPROVED,
+                            and_(DTR.status == DTRStatus.APPROVED, DTR.company_status == 'confirmed', DTR.company_reviewed_by.isnot(None), DTR.company_reviewed_at.isnot(None), DTR.company_review_revision == DTR.attendance_revision, DTR.coordinator_reviewed_by.isnot(None), DTR.coordinator_review_revision == DTR.attendance_revision, DTR.approved_date.isnot(None)),
                             DTR.total_hours,
                         ),
                         else_=0,
@@ -738,12 +806,13 @@ async def get_dtr_summary(
             else None
         )
 
-    required_hours = academic_hours(db, academic_year, semester)
+    target = hour_target(db, academic_year, semester, current_user.id)
+    required_hours = target['required_hours']
 
     from app.services.reporting_scope import approved_hours
     total_hours = approved_hours(db,{current_user.id},academic_year,semester)[current_user.id]
 
-    remaining_hours = max(
+    remaining_hours = None if required_hours is None else max(
         0,
         round(
             required_hours - total_hours,
@@ -758,8 +827,8 @@ async def get_dtr_summary(
                 total_hours / required_hours * 100
             ),
         )
-        if required_hours > 0
-        else 0
+        if required_hours is not None
+        else None
     )
 
     return {
@@ -780,7 +849,7 @@ async def get_dtr_summary(
         ),
         "total_hours": total_hours,
         "academic_year": academic_year, "semester": semester,
-        "required_hours": required_hours,
+        **target,
         "remaining_hours": remaining_hours,
         "progress_percent": progress_pct,
         "current_company": current_company,
@@ -822,6 +891,8 @@ async def get_dtr(
             mode="read",
         )
 
+    elif current_user.role == UserRole.HTE_SUPERVISOR:
+        attendance.company_access(db,current_user,dtr)
     elif (
         current_user.role != UserRole.ADMIN
         and current_user.id != dtr.student_id
@@ -853,145 +924,29 @@ async def get_dtr(
     "/{dtr_id}",
     response_model=DTRResponse,
 )
-async def update_dtr_status(
-    dtr_id: str,
-    update_data: DTRUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    if current_user.role not in [
-        UserRole.COORDINATOR,
-        UserRole.ADMIN,
-    ]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Only coordinators and admins "
-                "can update DTR status"
-            ),
-        )
-
-    dtr = (
-        db.query(DTR)
-        .filter(
-            DTR.id == dtr_id
-        )
-        .first()
-    )
-
-    if not dtr:
-        raise HTTPException(
-            status_code=404,
-            detail="DTR entry not found",
-        )
-
-    _require_current_record_term(dtr)
-
-    updates = update_data.model_dump(
-        exclude_unset=True
-    )
-
-    if current_user.role == UserRole.COORDINATOR:
-        _require_coordinator_record_access(
-            db,
-            current_user,
-            dtr,
-            mode="write",
-        )
-
-        if set(updates) != {"status"}:
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "Coordinators may only review "
-                    "DTR status"
-                ),
-            )
-
-        if (
-            dtr.status != DTRStatus.SUBMITTED
-            or dtr.time_out is None
-        ):
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "Only completed, submitted "
-                    "DTRs may be reviewed"
-                ),
-            )
-
-        if updates["status"] not in (
-            DTRStatus.APPROVED,
-            DTRStatus.REJECTED,
-        ):
-            raise HTTPException(
-                status_code=422,
-                detail="Invalid coordinator DTR status",
-            )
-
-    old_status = dtr.status
-
-    if "status" in updates:
-        if updates["status"] in [
-            DTRStatus.APPROVED,
-            DTRStatus.REJECTED,
-        ]:
-            dtr.approved_date = datetime.utcnow()
-
-    for key, value in updates.items():
-        setattr(
-            dtr,
-            key,
-            value,
-        )
-
-    dtr.updated_at = func.now()
-
-    db.commit()
-    db.refresh(dtr)
-
-    student = (
-        db.query(User)
-        .filter(
-            User.id == dtr.student_id
-        )
-        .first()
-    )
-
-    if old_status != dtr.status:
-        _fire_dtr_notification(
-            db,
-            dtr,
-            dtr.status.value,
-        )
-
-    return _to_response(
-        dtr,
-        _student_name(student),
-    )
+async def update_dtr_status(dtr_id: str, update_data: DTRUpdate, db: Session=Depends(get_db), current_user: User=Depends(get_current_user)):
+    row=db.query(DTR).filter_by(id=dtr_id).with_for_update().first()
+    if not row: raise HTTPException(404,"DTR entry not found")
+    updates=update_data.model_dump(exclude_unset=True)
+    if set(updates)!={'status'}: raise HTTPException(403,"Use the audited time-correction workflow for attendance edits")
+    attendance.final_review(db,current_user,row,getattr(update_data.status,'value',update_data.status))
+    db.commit();db.refresh(row)
+    _fire_dtr_notification(db,row,row.status.value)
+    return _to_response(row,_student_name(db.get(User,row.student_id)))
 
 
 @router.get("/{dtr_id}/photo/{photo_type}")
-async def get_student_dtr_photo(
-    dtr_id: str,
-    photo_type: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+async def get_student_dtr_photo(dtr_id: str, photo_type: str, db: Session=Depends(get_db), current_user: User=Depends(get_current_user)):
     from pathlib import Path
     from fastapi.responses import FileResponse
-    if current_user.role != UserRole.STUDENT:
-        raise HTTPException(status_code=403, detail="Student access required")
-    entry = db.query(DTR).filter(DTR.id == dtr_id, DTR.student_id == current_user.id).first()
-    if entry is None:
-        raise HTTPException(status_code=404, detail="DTR entry not found")
-    if photo_type not in ("in", "out"):
-        raise HTTPException(status_code=422, detail="Choose an in or out photo")
-    relative = entry.image_in_path if photo_type == "in" else entry.image_out_path
-    if not relative:
-        raise HTTPException(status_code=404, detail="Photo not uploaded")
-    root = (Path(settings.ASSET_DIR) / "dtr_uploads").resolve()
-    candidate = (Path(settings.ASSET_DIR) / relative.replace("\\", "/")).resolve()
-    if not candidate.is_relative_to(root) or not candidate.is_file():
-        raise HTTPException(status_code=404, detail="Photo not found")
-    return FileResponse(candidate, headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+    try:
+        await get_dtr(dtr_id,db,current_user)
+    except HTTPException as error:
+        if error.status_code==403:raise HTTPException(404,'Photo unavailable')
+        raise
+    row=db.get(DTR,dtr_id)
+    if photo_type not in ('in','out'): raise HTTPException(422,"Choose in or out")
+    name=row.image_in_path if photo_type=='in' else row.image_out_path
+    root=Path(settings.ASSET_DIR).resolve();path=(root/(name or '')).resolve()
+    if not name or not path.is_relative_to(root/'dtr_uploads') or not path.is_file(): raise HTTPException(404,"Photo unavailable")
+    return FileResponse(path,headers={'Cache-Control':'no-store'})

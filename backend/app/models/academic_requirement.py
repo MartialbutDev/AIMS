@@ -18,6 +18,8 @@ class AcademicRequirement(Base):
     year_levels = Column(JSON, nullable=False)
     practicum_subject_codes = Column(JSON, nullable=False)
     required_hours = Column(Integer, nullable=False)
+    # NULL retains an existing legacy term policy; individual NULL targets mean unconfigured.
+    program_requirements = Column(JSON, nullable=True)
     is_active = Column(Boolean, nullable=False, default=False)
     version = Column(Integer, nullable=False, default=1)
     updated_by = Column(String(36), nullable=True)

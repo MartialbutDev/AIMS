@@ -13,6 +13,8 @@ from sqlalchemy import (
     Float,
     Text,
     Time,
+    Integer,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -69,6 +71,12 @@ class DTR(Base):
     time_out = Column(Time, nullable=True)
 
     total_hours = Column(Float, nullable=True)
+    break_periods = Column(JSON, nullable=False, default=list, server_default="[]")
+    break_seconds = Column(Integer, nullable=False, default=0, server_default="0")
+
+    @property
+    def on_break(self):
+        return any(not period.get('ended_at') for period in (self.break_periods or []))
 
     # GPS LOCATION
     latitude = Column(Float, nullable=True)
@@ -85,6 +93,21 @@ class DTR(Base):
     # PHOTO EVIDENCE
     image_in_path = Column(String(255), nullable=True)
     image_out_path = Column(String(255), nullable=True)
+
+    deployment_id = Column(String(36), nullable=True, index=True)
+    attendance_revision = Column(Integer, nullable=False, default=1, server_default="1")
+    company_status = Column(String(20), nullable=False, default="awaiting", server_default="awaiting")
+    company_reviewed_by = Column(String(36), nullable=True)
+    company_reviewed_at = Column(DateTime, nullable=True)
+    company_review_revision = Column(Integer, nullable=True)
+    company_feedback = Column(Text, nullable=True)
+    coordinator_reviewed_by = Column(String(36), nullable=True)
+    coordinator_review_revision = Column(Integer, nullable=True)
+    evidence_in = Column(JSON, nullable=True)
+    evidence_out = Column(JSON, nullable=True)
+    attendance_history = Column(JSON, nullable=False, default=list, server_default="[]")
+    capture_in_id = Column(String(36), nullable=True, unique=True)
+    capture_out_id = Column(String(36), nullable=True, unique=True)
 
     status = Column(
         SQLEnum(DTRStatus),

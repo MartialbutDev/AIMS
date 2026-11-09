@@ -1,4 +1,5 @@
-from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
+from app.services.attendance_review import fully_approved, payload as attendance_payload
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours, hour_target
 from app.services.document_version_service import effective_documents, annotate
 
 """Coordinator endpoints with assignment-based access control."""
@@ -122,11 +123,11 @@ def _require_current_record_term(record) -> None:
         raise HTTPException(409, "This record belongs to a historical or unverified term and cannot be changed here")
 
 
-def _hours_summary(records: list[DTR]) -> dict:
+def _hours_summary(records: list[DTR], db=None, student_id=None, year=None, semester=None) -> dict:
     approved = [
         record
         for record in records
-        if record.status == DTRStatus.APPROVED
+        if fully_approved(record)
     ]
 
     total_hours = round(
@@ -137,12 +138,10 @@ def _hours_summary(records: list[DTR]) -> dict:
         2,
     )
 
-    required_hours = max(
-        0,
-        academic_hours(),
-    )
+    target = hour_target(db, year, semester, student_id)
+    required_hours = target['required_hours']
 
-    remaining_hours = round(
+    remaining_hours = None if required_hours is None else round(
         max(0, required_hours - total_hours),
         2,
     )
@@ -150,7 +149,7 @@ def _hours_summary(records: list[DTR]) -> dict:
     progress = (
         min(100, round(total_hours / required_hours * 100))
         if required_hours
-        else 0
+        else None
     )
 
     daily_hours: dict[date, float] = {}
@@ -170,18 +169,18 @@ def _hours_summary(records: list[DTR]) -> dict:
         else None
     )
 
-    days_left = (
+    days_left = None if required_hours is None else (
         math.ceil(remaining_hours / average_daily_hours)
         if remaining_hours and average_daily_hours
         else 0 if not remaining_hours else None
     )
 
     return {
-        "required_hours": required_hours,
+        **target,
         "approved_hours": total_hours,
         "remaining_hours": remaining_hours,
         "progress_percent": progress,
-        "remaining_percent": 100 - progress,
+        "remaining_percent": 100 - progress if progress is not None else None,
         "average_approved_hours_per_day": (
             round(average_daily_hours, 2)
             if average_daily_hours is not None
@@ -405,7 +404,7 @@ async def list_students(
                 )
             },
             "journey": _hours_summary(
-                dtrs_by_student.get(student.id, [])
+                dtrs_by_student.get(student.id, []), db, student.id, year, semester
             ),
             "grade": (
                 float(evaluations_by_student[student.id].grade)
@@ -533,7 +532,7 @@ async def get_student_detail(
             "phone": student.phone,
             "is_active": student.is_active,
         },
-        "journey": _hours_summary(dtrs),
+        "journey": _hours_summary(dtrs, db, student.id, year, semester),
         "document_statuses": [
             {
                 "document_id": latest[kind.value].id if kind.value in latest else None,
@@ -578,6 +577,7 @@ async def get_student_detail(
                 "status": entry.status.value,
                 "tasks_completed": entry.tasks_completed,
                 "notes": entry.notes,
+                **attendance_payload(entry),
                 "image_in_available": bool(entry.image_in_path),
                 "image_out_available": bool(entry.image_out_path),
             }
@@ -854,6 +854,7 @@ async def get_review_queue(
                 "total_hours": entry.total_hours,
                 "status": entry.status.value,
                 "tasks_completed": entry.tasks_completed,
+                **attendance_payload(entry),
                 "image_in_available": bool(
                     entry.image_in_path
                 ),
@@ -905,7 +906,7 @@ async def review_dtr(
 ):
     entry = db.query(DTR).filter(
         DTR.id == dtr_id
-    ).first()
+    ).with_for_update().first()
 
     if entry is None:
         raise HTTPException(
@@ -933,8 +934,8 @@ async def review_dtr(
             detail="A DTR requires time-out before review",
         )
 
-    entry.status = DTRStatus(review.status)
-    entry.approved_date = datetime.utcnow()
+    from app.services.attendance_review import final_review
+    final_review(db,current_user,entry,review.status)
     entry.updated_at = func.now()
 
     db.commit()

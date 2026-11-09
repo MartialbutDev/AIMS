@@ -114,14 +114,16 @@ async def get_dean_analytics(
         official={id for (id,) in deps.join(InternshipCompletionCase,InternshipCompletionCase.deployment_id==InternshipDeployment.id).filter(
             InternshipDeployment.status==DeploymentStatus.COMPLETED,InternshipCompletionCase.status=='completed',
             InternshipCompletionCase.approved_at.isnot(None),InternshipCompletionCase.approved_by.isnot(None)).with_entities(InternshipDeployment.student_id)}
-    required_hours = academic_hours(db,year,semester)
+    targets = {id:academic_hours(db,year,semester,id) for id in assigned_ids}
     def summary(students):
         count=len(students)
         docs=sum(sum(latest.get(id,{}).get(kind)=='verified' for kind in required_types)/len(required_types)*100 for id in students)
-        progress=sum(min(100,hours.get(id,0)/required_hours*100) if required_hours else 0 for id in students)
+        missing=sum(targets[id] is None for id in students)
+        progress=sum(min(100,hours.get(id,0)/targets[id]*100) for id in students if targets[id] is not None)
         complete=len(students & official)
         return {'average_document_completion_percent':round(docs/count) if count else 0,
-                'average_ojt_completion_percent':round(progress/count) if count else 0,
+                'average_ojt_completion_percent':None if missing else round(progress/count) if count else 0,
+                'students_awaiting_hour_configuration':missing,
                 'fully_complete_students':complete,'fully_complete_percent':round(complete/count*100) if count else 0}
     overview = dean_analytics.snapshot(db, current_user, year, semester)
     overview.pop('_details')

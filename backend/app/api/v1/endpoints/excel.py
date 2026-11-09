@@ -66,7 +66,7 @@ async def export_dtr_report(
         raise HTTPException(404, 'Student not found')
     query = db.query(DTR).filter_by(student_id=target, academic_year=academic_year, semester=semester)
     if approved_only:
-        query = query.filter(DTR.status == 'approved')
+        query = query.filter(DTR.status == 'approved', DTR.company_status == 'confirmed', DTR.company_reviewed_by.isnot(None), DTR.company_reviewed_at.isnot(None), DTR.company_review_revision == DTR.attendance_revision, DTR.coordinator_reviewed_by.isnot(None), DTR.coordinator_review_revision == DTR.attendance_revision, DTR.approved_date.isnot(None))
     records = query.order_by(DTR.date, DTR.id).all()
     if not records:
         raise HTTPException(404, 'No matching DTR records for the selected semester')

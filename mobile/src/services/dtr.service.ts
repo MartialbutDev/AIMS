@@ -5,6 +5,13 @@ import * as Sharing from 'expo-sharing';
 import { Alert } from 'react-native';
 
 export interface DTR {
+  break_periods?: { id: string; started_at: string; ended_at: string | null }[];
+  break_seconds?: number;
+  on_break?: boolean;
+  company_status?: string;
+  company_feedback?: string | null;
+  evidence_in?: Record<string, unknown> | null;
+  evidence_out?: Record<string, unknown> | null;
   id: string;
   date: string;
   time_in: string;
@@ -31,9 +38,10 @@ export interface DTRSummary {
   total_hours: number;
 
   // ✅ NEW — dashboard progress card fields
-  required_hours: number;
-  remaining_hours: number;
-  progress_percent: number;
+  required_hours: number | null;
+  remaining_hours: number | null;
+  progress_percent: number | null;
+  program_notice?: string | null;
   current_company: string | null;
 }
 
@@ -57,6 +65,14 @@ export interface PaginatedDTR {
 }
 
 export const dtrService = {
+  async recordBreak(id: string, action: 'start' | 'end', breakId: string): Promise<DTR> {
+    const response = await api.post(`/dtr/${encodeURIComponent(id)}/break`, { action, break_id: breakId });
+    return response.data;
+  },
+  async beginCapture(phase: 'in' | 'out', dtr_id?: string): Promise<{ capture_token: string; expires_in: number }> {
+    const response = await api.post('/dtr/capture', { phase, dtr_id: dtr_id ?? null });
+    return response.data;
+  },
   async getMyDTR(page: number = 1, limit: number = 10): Promise<PaginatedDTR> {
     try {
       const response = await api.get(`/dtr/?page=${page}&limit=${limit}`);

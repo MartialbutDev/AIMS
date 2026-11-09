@@ -1,3 +1,4 @@
+from attendance_fixtures import approved_attendance_fields
 """Completion lifecycle, ownership, privacy, archive and migration regression tests."""
 import importlib.util
 import json
@@ -50,7 +51,7 @@ class CompletionTests(unittest.TestCase):
         (Path(self.tmp.name)/'journal.pdf').write_bytes(self.pdf)
         for day in range(2):
             self.db.add(DTR(id=f'time{day}',student_id='s1',academic_year='2026-2027',semester='1',
-                date=datetime.combine(self.start+timedelta(days=day),time()),time_in=time(8),time_out=time(16),total_hours=8,status=DTRStatus.APPROVED))
+                date=datetime.combine(self.start+timedelta(days=day),time()),time_in=time(8),time_out=time(16),total_hours=8,status=DTRStatus.APPROVED,**approved_attendance_fields()))
         self.db.add(Journal(id='journal',student_id='s1',academic_year='2026-2027',semester='1',week=1,title='Approved work',
                            file_path='journal.pdf',status=JournalStatus.APPROVED,summary='Completed helpdesk tasks'))
         self.db.commit();self.db.query(Notification).delete();self.db.commit()

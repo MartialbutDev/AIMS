@@ -1,3 +1,5 @@
+from app.services import attendance_review as attendance
+from app.services.attendance_breaks import net_hours
 """Audited corrections of existing attendance entries."""
 import uuid
 from datetime import datetime, time, timezone
@@ -27,7 +29,8 @@ class Decision(BaseModel):
 
 def snapshot(row):
     return {"time_in": row.time_in.isoformat(), "time_out": row.time_out.isoformat() if row.time_out else None,
-            "total_hours": row.total_hours, "status": row.status.value}
+            "total_hours": row.total_hours, "status": row.status.value, "attendance_revision": row.attendance_revision,
+            "break_periods": row.break_periods or [], "break_seconds": row.break_seconds or 0}
 
 def access(db, user, correction):
     role = getattr(user.role, "value", user.role)
@@ -81,7 +84,9 @@ def request(dtr_id:str, body:Request, db=Depends(get_db), user=Depends(get_curre
         raise HTTPException(409,"Resolve the completion request with your coordinator before correcting hours")
     if db.query(DTRCorrection).filter(DTRCorrection.dtr_id==dtr.id,DTRCorrection.status.in_(["company_review","coordinator_review"])).first():
         raise HTTPException(409,"A correction is already awaiting review")
+    if not dtr.image_in_path or not dtr.image_out_path or not dtr.evidence_in or not dtr.evidence_out: raise HTTPException(409,'Complete selfie/location capture before requesting a time correction')
     if body.time_out<=body.time_in: raise HTTPException(422,"Clock-out must be later than clock-in on the same day")
+    net_hours(dtr, body.time_in, body.time_out)
     row=DTRCorrection(id=str(uuid.uuid4()),dtr_id=dtr.id,deployment_id=dep.id,student_id=user.id,
         status="company_review",original=snapshot(dtr),
         proposed={"time_in":body.time_in.isoformat(),"time_out":body.time_out.isoformat()},
@@ -103,6 +108,7 @@ def decide(correction_id:str, body:Decision, db=Depends(get_db), user=Depends(ge
     if role == "coordinator":
         ensure_coordinator_student_access(db,user,dtr.student_id,mode="write",
                                          academic_year=dtr.academic_year,semester=dtr.semester)
+    if role=='hte_supervisor': attendance.company_access(db,user,dtr,True)
     expected={"hte_supervisor":"company_review","coordinator":"coordinator_review"}.get(role)
     if not expected or row.status!=expected: raise HTTPException(409,"This decision is unavailable at the current stage")
     if role=="coordinator" and body.approve:
@@ -110,10 +116,18 @@ def decide(correction_id:str, body:Decision, db=Depends(get_db), user=Depends(ge
         dep=db.query(InternshipDeployment).filter_by(id=row.deployment_id).with_for_update().one()
         if dep.status!=DeploymentStatus.DEPLOYED or db.query(InternshipCompletionCase).filter_by(deployment_id=dep.id).first():
             raise HTTPException(409,"Internship completion or deployment status changed")
-        if snapshot(dtr)!=row.original: raise HTTPException(409,"The original DTR changed. Decline this request and submit a new correction.")
+        original = {**row.original, 'break_periods': row.original.get('break_periods', []), 'break_seconds': row.original.get('break_seconds', 0)}
+        if snapshot(dtr)!=original: raise HTTPException(409,"The original DTR changed. Decline this request and submit a new correction.")
+        if not dtr.image_in_path or not dtr.image_out_path or not dtr.evidence_in or not dtr.evidence_out: raise HTTPException(409,'Both capture records are required')
+        dtr.attendance_revision += 1
+        company_event=next((event for event in reversed(row.history) if event['action']=='coordinator_review'),None)
+        if not company_event: raise HTTPException(409,'Company correction confirmation is missing')
+        dtr.company_status='confirmed';dtr.company_reviewed_by=company_event['actor'];dtr.company_reviewed_at=datetime.fromisoformat(company_event['at']).replace(tzinfo=None);dtr.company_review_revision=dtr.attendance_revision
+        dtr.coordinator_reviewed_by=user.id;dtr.coordinator_review_revision=dtr.attendance_revision
+        attendance.history(dtr,user,'time_correction_approved',body.reason)
         dtr.time_in=time.fromisoformat(row.proposed["time_in"])
         dtr.time_out=time.fromisoformat(row.proposed["time_out"])
-        dtr.total_hours=round((datetime.combine(dtr.date,dtr.time_out)-datetime.combine(dtr.date,dtr.time_in)).total_seconds()/3600,2)
+        dtr.total_hours=net_hours(dtr,dtr.time_in,dtr.time_out)
         dtr.status=DTRStatus.APPROVED
         dtr.approved_date=datetime.now(timezone.utc).replace(tzinfo=None)
     row.status=("coordinator_review" if role=="hte_supervisor" else "approved") if body.approve else "declined"

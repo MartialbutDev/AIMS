@@ -46,9 +46,10 @@ interface DashboardStats {
 }
 
 interface InternshipProgress {
-  progress: number;
+  progress: number | null;
   hoursRendered: number;
-  remainingHours: number;
+  remainingHours: number | null;
+  programNotice?: string | null;
   currentCompany: string;
 }
 
@@ -73,9 +74,9 @@ const DEFAULT_STATS: DashboardStats = {
 };
 
 const DEFAULT_PROGRESS: InternshipProgress = {
-  progress: 0,
+  progress: null,
   hoursRendered: 0,
-  remainingHours: 0,
+  remainingHours: null,
   currentCompany: "Not yet assigned",
 };
 
@@ -481,9 +482,10 @@ export default function DashboardScreen() {
 
         setProgressError(false);
         setProgress({
-          progress: progressPercent,
+          progress: summary.required_hours == null ? null : progressPercent,
           hoursRendered,
-          remainingHours,
+          remainingHours: summary.required_hours == null ? null : remainingHours,
+          programNotice: summary.program_notice ?? null,
           currentCompany:
             summary?.current_company ||
             "Not yet assigned",
@@ -730,6 +732,7 @@ export default function DashboardScreen() {
           remainingHours={
             progress.remainingHours
           }
+          programNotice={progress.programNotice}
           currentCompany={
             deployment?.company_name || progress.currentCompany
           }

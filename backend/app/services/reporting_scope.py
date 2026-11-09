@@ -12,6 +12,7 @@ from app.models.hte_supervisor_company import HTESupervisorCompany as CompanyAcc
 from app.models.internship_deployment import InternshipDeployment as Deployment, DeploymentStatus
 from app.models.internship_completion import InternshipCompletionCase as Case
 from app.models.dtr import DTR
+from app.services.attendance_review import fully_approved
 
 
 def term_metadata(year, semester): return {'academic_year':year,'semester':semester}
@@ -70,7 +71,7 @@ def completion_counts(db, query):
 def valid_approved_record(record, start=None, day=None):
     hours=record.total_hours
     return bool(record.date and (start is None or record.date.date()>=start) and record.date.date()<=(day or today())
-        and getattr(record.status,'value',record.status)=='approved' and record.time_out and hours
+        and fully_approved(record) and record.time_out and hours
         and math.isfinite(hours) and 0<hours<=24)
 
 

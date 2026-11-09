@@ -1,4 +1,4 @@
-from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours, hour_target
 """Completion transitions share student locks with record writes and deployment."""
 import hashlib
 import json
@@ -60,6 +60,10 @@ def deployment(db, actor, id, write=False, role=None):
     obj = scoped(db, actor).filter(Deployment.id == id).first()
     if not obj: raise HTTPException(404, 'Internship not found in your scope')
     if write:
+        if db.bind.dialect.name=='postgresql':
+            from sqlalchemy import text
+            # Serialize transitions against administrator target changes, then read fresh targets.
+            db.execute(text('SELECT pg_advisory_xact_lock_shared(71520611)'))
         db.query(User).filter(User.id == obj.student_id).with_for_update().populate_existing().one()
         obj = scoped(db, actor).filter(Deployment.id == id).populate_existing().with_for_update().first()
         if not obj: raise HTTPException(409, 'Internship access changed; refresh the page')
@@ -97,17 +101,20 @@ def checklist(db, obj, case=None):
                                        Journal.semester == obj.semester).all()
     valid = [r for r in records if start and valid_approved_record(r,start,today())]
     hours = round(sum(r.total_hours for r in valid), 2)
-    required = academic_hours(db,obj.academic_year,obj.semester)
+    target = hour_target(db,obj.academic_year,obj.semester,obj.student_id)
+    required = target['required_hours']
     docs = DeploymentService.get_checklist(db, obj)
     count = db.query(Deployment).filter(Deployment.student_id == obj.student_id, Deployment.academic_year == obj.academic_year,
         Deployment.semester == obj.semester, Deployment.status.in_([DeploymentStatus.DEPLOYED, DeploymentStatus.COMPLETED])).count()
     items = [
         {'key':'deployment', 'label':'Confirmed internship deployment', 'met': bool(obj.confirmed_by and obj.confirmed_at and start and count == 1)},
-        {'key':'hours', 'label':f'{required} school-approved internship hours', 'met': required > 0 and hours >= required},
+        {'key':'hours', 'label':f'{required} school-approved internship hours' if required is not None else 'Required hours awaiting configuration', 'met': required is not None and hours >= required},
         {'key':'dtr', 'label':'All term DTR reviewed, complete and within the internship period', 'met': bool(records) and len(valid) == len(records)},
         {'key':'journals', 'label':'At least one journal, with all term journals approved', 'met': bool(journals) and all(value(j.status) == 'approved' for j in journals)},
         {'key':'documents', 'label':'Existing pre-deployment requirements verified', 'met': docs['ready_for_deployment']},
     ]
+    from app.models.dtr_correction import DTRCorrection
+    items.append({'key':'corrections','label':'No unresolved attendance time corrections','met':db.query(DTRCorrection.id).filter(DTRCorrection.deployment_id==obj.id,DTRCorrection.status.in_(['company_review','coordinator_review'])).first() is None})
     academic_ready = all(i['met'] for i in items)
     confirmation = case.company_confirmation if case else None
     confirmed = bool(confirmation)
@@ -115,13 +122,13 @@ def checklist(db, obj, case=None):
         try:
             path = certificate_path(confirmation)
             confirmed = hashlib.sha256(path.read_bytes()).hexdigest() == confirmation.get('sha256')
-            confirmed = confirmed and float(confirmation['hours']) + .01 >= hours and float(confirmation['hours']) >= required
+            confirmed = confirmed and required is not None and float(confirmation['hours']) + .01 >= hours and float(confirmation['hours']) >= required
             confirmed = confirmed and confirmation['start_date'] == (start.isoformat() if start else None)
             end = date.fromisoformat(confirmation['end_date'])
             confirmed = confirmed and end <= today() and all(r.date.date() <= end for r in valid)
         except (HTTPException, KeyError, ValueError, OSError): confirmed = False
     items.append({'key':'company', 'label':'Company confirms dates, hours and provides a completion certificate', 'met': bool(confirmed)})
-    return {'label':'Working completion checklist', 'required_hours':required, 'approved_hours':hours,
+    return {'label':'Working completion checklist', **target, 'approved_hours':hours,
             'dtr_count':len(records), 'journal_count':len(journals), 'items':items,
             'ready_to_request':academic_ready, 'ready_to_approve':academic_ready and bool(confirmed),
             'approved_dtr_ids':[r.id for r in valid], 'approved_journal_ids':[j.id for j in journals if value(j.status) == 'approved']}
@@ -153,6 +160,7 @@ def request_completion(db, obj, actor, version, note):
     if case: expect(case, version, {'returned'})
     elif version != 0: raise HTTPException(409, 'Refresh the completion checklist')
     eligibility = checklist(db,obj,case)
+    if eligibility['required_hours'] is None: raise HTTPException(409,'Required hours awaiting configuration; contact the administrator before requesting completion')
     if not eligibility['ready_to_request']: raise HTTPException(409, 'Complete the eligibility checklist before requesting completion')
     if not case:
         case = Case(id=str(uuid.uuid4()),deployment_id=obj.id,status='requested',version=1,request_note=note,submitted_at=utcnow())
@@ -170,6 +178,7 @@ def confirm_company(db,obj,case,actor,version,start,end,hours,note,certificate):
     expect(case,version,{'requested'})
     if obj.status != DeploymentStatus.DEPLOYED: raise HTTPException(409,'Internship is no longer active')
     current=checklist(db,obj,case)
+    if current['required_hours'] is None: raise HTTPException(409,'Required hours awaiting configuration')
     if start != obj.deployment_date or end < start or end > today():
         raise HTTPException(422,'Confirmation dates must start on the deployment date and end on or before today')
     if not math.isfinite(hours) or hours < current['required_hours'] or hours + .01 < current['approved_hours']:

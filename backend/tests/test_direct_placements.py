@@ -44,12 +44,14 @@ class DirectPlacementTests(unittest.TestCase):
         for p in self.patches:p.start()
         for identifier,role in [('c1',UserRole.COORDINATOR),('c2',UserRole.COORDINATOR),('s1',UserRole.STUDENT),('s2',UserRole.STUDENT),('s3',UserRole.STUDENT),('dean1',UserRole.DEAN),('dean2',UserRole.DEAN),('career',UserRole.CAREER_CENTER),('hte',UserRole.HTE_SUPERVISOR),('hte2',UserRole.HTE_SUPERVISOR),('admin',UserRole.ADMIN)]:
             self.db.add(User(id=identifier,first_name=identifier,last_name='Fixture',student_id=identifier if role==UserRole.STUDENT else None,email=identifier+'@example.invalid',hashed_password='test',role=role,is_active=True))
+        self.db.flush()  # Persist parent users before foreign-key fixture rows.
         for number in [1,2]:
             self.db.add(Assignment(id=f'a{number}',student_id=f's{number}',coordinator_id=f'c{number}',academic_year='2026-2027',semester='1'))
             self.db.add(Designation(id=f'd{number}',coordinator_id=f'c{number}',assigned_by_dean_id=f'dean{number}',academic_year='2026-2027',semester='1',is_active=True))
         for identifier in ['partner','pending','other']:
             self.db.add(Company(id=identifier,name=identifier.title()+' Company',is_active=True,is_moa_signed=identifier!='pending',moa_reference='FIXTURE-MOA' if identifier!='pending' else None,
                 moa_signed_at=self.today-timedelta(days=60) if identifier!='pending' else None,moa_effective_at=self.today-timedelta(days=30) if identifier!='pending' else None,moa_expires_at=self.today+timedelta(days=365) if identifier!='pending' else None))
+        self.db.flush()  # Persist companies before supervisor-company links.
         for company in ['partner','pending']:
             self.db.add(HTESupervisorCompany(id='hte-'+company,supervisor_id='hte',company_id=company,is_active=True))
         self.db.add(HTESupervisorCompany(id='hte-other',supervisor_id='hte2',company_id='other',is_active=True))

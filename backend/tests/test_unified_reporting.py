@@ -1,3 +1,4 @@
+from attendance_fixtures import approved_attendance_fields
 import asyncio
 import sys
 import unittest
@@ -34,7 +35,7 @@ class UnifiedReportingTests(unittest.TestCase):
             position=id,status=ApplicationStatus.PENDING,applied_date=datetime.now()));self.db.commit()
 
     def test_student_reports_exclude_other_terms_and_students(self):
-        self.db.add(DTR(id='old',student_id='s1',academic_year='2025-2026',semester='1',date=datetime.now(),time_in=time(8),time_out=time(16),total_hours=8,status=DTRStatus.APPROVED))
+        self.db.add(DTR(id='old',student_id='s1',academic_year='2025-2026',semester='1',date=datetime.now(),time_in=time(8),time_out=time(16),total_hours=8,status=DTRStatus.APPROVED,**approved_attendance_fields()))
         self.db.commit();self.add_app('old-app',year='2025-2026');self.add_app('other-student',student='s2',company='other')
         summary=reports.ReportService.get_student_summary(self.db,'s1')
         self.assertEqual(summary['total_hours'],16);self.assertEqual(summary['dtr_count'],2)

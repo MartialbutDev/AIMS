@@ -1,3 +1,4 @@
+from attendance_fixtures import approved_attendance_fields
 """Current-term admin assignment and assessment regressions; isolated records only."""
 import sys,unittest,sqlite3
 from pathlib import Path
@@ -88,9 +89,12 @@ class TermManagementTests(unittest.TestCase):
     def test_stale_assessment_cannot_overwrite_current_or_legacy_grade(self):
         self.assertEqual(self.assess('2').status_code,409);self.assertEqual(self.db.query(Evaluation).count(),0)
     def test_current_dtr_review_works_with_history_but_past_record_stays_locked(self):
+        from app.models.internship_deployment import InternshipDeployment,DeploymentStatus
+        self.db.add(InternshipDeployment(id='review-placement',application_id='fixture-app',student_id='s1',company_id='partner',academic_year='2026-2027',semester='1',status=DeploymentStatus.DEPLOYED,deployment_date=datetime(2026,9,1).date(),confirmed_by='c1',confirmed_at=datetime.now()))
+        self.db.commit()
         self.history('s1');self.actor='c1'
         for id,year in [('current','2026-2027'),('past','2025-2026')]:
-            self.db.add(DTR(id=id,student_id='s1',date=datetime(2026,10,1),time_in=time(8),time_out=time(16),total_hours=8,status=DTRStatus.SUBMITTED,academic_year=year,semester='1'))
+            self.db.add(DTR(id=id,student_id='s1',date=datetime(2026,10,1),time_in=time(8),time_out=time(16),total_hours=8,status=DTRStatus.SUBMITTED,**approved_attendance_fields(),academic_year=year,semester='1'))
         self.db.commit()
         with patch.object(coordinator.NotificationService,'create_dtr_notification'):
             self.assertEqual(self.client.put('/coordinator/review-queue/dtrs/past',json={'status':'approved'}).status_code,409)

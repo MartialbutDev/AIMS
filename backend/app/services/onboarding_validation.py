@@ -18,7 +18,7 @@ from typing import Any
 
 from app.core.assignment_access import get_current_academic_term
 from app.core.config import settings
-from app.services.academic_requirements import rules as academic_rules, program_matches, year_level_matches
+from app.services.academic_requirements import rules as academic_rules, program_matches, year_level_matches, detect_program, PROGRAM_CATALOG
 
 from app.models.user import User
 
@@ -579,7 +579,9 @@ def validate_cor(
         return _unreadable("cor")
 
     policy = academic_rules()
-    required_hours = policy["required_hours"]
+    detected_program = detect_program(upper,policy.get('program_requirements') or PROGRAM_CATALOG)
+    program_policy = next((p for p in (policy.get('program_requirements') or []) if p['code']==detected_program),None)
+    required_hours = program_policy.get('required_hours') if policy.get('program_requirements') is not None and program_policy else None if policy.get('program_requirements') is not None else policy['required_hours']
     codes = _expected_codes()
 
     matched_code, row = _practicum_row(
@@ -659,7 +661,8 @@ def validate_cor(
 
         ),
 
-        "practicum_hours_matches": hours_match,
+        # An unpublished target must not prevent otherwise valid COR onboarding.
+        "practicum_hours_matches": hours_match if required_hours is not None else True,
 
     }
 
@@ -730,6 +733,9 @@ def validate_cor(
             "document_kind": "cor",
             "academic_requirements": {k:policy[k] for k in ("id","version","required_hours","programs","year_levels","practicum_subject_codes")},
 
+            "detected_program_code": detected_program,
+            "program_required_hours": required_hours,
+            "hours_check_status": 'not_configured' if required_hours is None else 'configured',
             "matched_subject_code": matched_code,
 
             "configured_subject_codes": codes,

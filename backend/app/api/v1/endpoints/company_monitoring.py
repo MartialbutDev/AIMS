@@ -1,7 +1,7 @@
-from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
+from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours, hour_target
 """Read-only workplace monitoring for explicitly assigned HTE supervisors."""
 import math
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,6 +19,7 @@ from app.models.hte_supervisor_company import HTESupervisorCompany
 from app.models.internship_deployment import InternshipDeployment, DeploymentStatus
 from app.models.journal import Journal, JournalStatus
 from app.models.user import User, UserRole
+from app.services.attendance_review import payload as attendance_payload
 
 router = APIRouter()
 
@@ -51,8 +52,22 @@ class Attendance(BaseModel):
     time_in: time
     time_out: time | None
     total_hours: float | None
+    break_periods: list[dict] = Field(default_factory=list)
+    break_seconds: int = 0
+    on_break: bool = False
     status: str
     tasks_completed: str | None
+    company_status: str = 'awaiting'
+    attendance_revision: int = 1
+    company_feedback: str | None = None
+    company_reviewed_by: str | None = None
+    company_reviewer_name: str | None = None
+    company_reviewed_at: datetime | None = None
+    evidence_in: dict | None = None
+    evidence_out: dict | None = None
+    attendance_history: list[dict] = Field(default_factory=list)
+    image_in_available: bool = False
+    image_out_available: bool = False
 
 
 class JournalEntry(BaseModel):
@@ -68,7 +83,11 @@ class MonitoringDetail(BaseModel):
     intern: Intern
     records_available: bool
     notice: str | None = None
-    required_hours: int
+    required_hours: int | None
+    hours_notice: str | None = None
+    hours_status: str = 'configured'
+    program_code: str | None = None
+    program_notice: str | None = None
     approved_hours: float | None
     remaining_hours: float | None
     progress_percent: float | None
@@ -161,9 +180,10 @@ def get_intern(
         # Same response for unknown and out-of-company records.
         raise HTTPException(status_code=404, detail="Intern deployment not found")
     deployment, student, company = row
-    required_hours = academic_hours(db, deployment.academic_year, deployment.semester)
+    target = hour_target(db, deployment.academic_year, deployment.semester, student.id)
+    required_hours = target['required_hours']
     result = MonitoringDetail(
-        intern=intern_response(*row), records_available=False, required_hours=required_hours,
+        intern=intern_response(*row), records_available=False, **target,
         approved_hours=None, remaining_hours=None, progress_percent=None,
         attendance_page=attendance_page, journal_page=journal_page, limit=limit,
     )
@@ -195,16 +215,65 @@ def get_intern(
     approved_hours = round(hours,2)
     result.records_available = True
     result.approved_hours = approved_hours
-    result.remaining_hours = round(max(0, required_hours - approved_hours), 2)
-    result.progress_percent = round(min(100, approved_hours / required_hours * 100), 1) if required_hours > 0 else 0
+    result.remaining_hours = round(max(0, required_hours - approved_hours), 2) if required_hours is not None else None
+    result.progress_percent = round(min(100, approved_hours / required_hours * 100), 1) if required_hours is not None else None
     result.attendance_total = attendance.count()
     result.journal_total = journals.count()
     result.attendance = [Attendance(
         id=record.id, date=record.date, time_in=record.time_in, time_out=record.time_out,
         total_hours=record.total_hours, status=record.status.value, tasks_completed=record.tasks_completed,
+        **attendance_payload(record),
+        image_in_available=bool(record.image_in_path),image_out_available=bool(record.image_out_path),
     ) for record in attendance.order_by(DTR.date.desc(), DTR.id).offset((attendance_page - 1) * limit).limit(limit).all()]
     result.journals = [JournalEntry(
         id=record.id, week=record.week, title=record.title, summary=record.summary,
         status=record.status.value, submitted_date=record.submitted_date,
     ) for record in journals.order_by(Journal.week.desc(), Journal.id).offset((journal_page - 1) * limit).limit(limit).all()]
     return result
+
+
+class AttendanceDecision(BaseModel):
+    decision: Literal['confirmed','disputed']
+    reason: str = Field(default='',max_length=1000)
+    revision: int = Field(ge=1)
+    expected_status: Literal['awaiting','disputed']
+
+class WeeklyItem(BaseModel):
+    id: str
+    revision: int = Field(ge=1)
+
+class WeeklyAttendanceDecision(BaseModel):
+    week_start: date
+    items: list[WeeklyItem] = Field(min_length=1,max_length=7)
+    reason: str = Field(default='',max_length=1000)
+
+@router.post('/interns/{deployment_id}/attendance/{dtr_id}/decision')
+def review_attendance(deployment_id: str,dtr_id: str,body: AttendanceDecision,db=Depends(get_db),current_user=Depends(get_current_user)):
+    from app.services.attendance_review import company_access,confirm_company,payload
+    row=db.query(DTR).filter_by(id=dtr_id).with_for_update().first()
+    if not row:raise HTTPException(404,'Attendance not found')
+    dep=company_access(db,current_user,row,True)
+    if dep.id!=deployment_id:raise HTTPException(404,'Attendance not found')
+    confirm_company(db,current_user,row,body.decision,body.reason,body.revision,body.expected_status)
+    db.commit()
+    return {'id':row.id,'status':row.status.value,**payload(row)}
+
+@router.post('/interns/{deployment_id}/attendance/weekly-confirmation')
+def confirm_week(deployment_id: str,body: WeeklyAttendanceDecision,db=Depends(get_db),current_user=Depends(get_current_user)):
+    from app.services.attendance_review import company_access,confirm_company
+    if body.week_start.weekday()!=0:raise HTTPException(422,'Select the Monday of the review week')
+    ids=[item.id for item in body.items]
+    if len(set(ids))!=len(ids):raise HTTPException(422,'Duplicate attendance selection')
+    rows=db.query(DTR).filter(DTR.id.in_(ids)).order_by(DTR.id).with_for_update().all()
+    try:
+        if len(rows)!=len(ids):raise HTTPException(404,'Attendance selection changed; refresh')
+        versions={item.id:item.revision for item in body.items}
+        for row in rows:
+            dep=company_access(db,current_user,row,True)
+            if row.company_status=='disputed':raise HTTPException(409,'Resolve disputed attendance individually')
+            if dep.id!=deployment_id or not body.week_start<=row.date.date()<body.week_start+timedelta(days=7):raise HTTPException(409,'Every selected entry must belong to this intern and review week')
+        for row in rows:confirm_company(db,current_user,row,'confirmed',body.reason,versions[row.id])
+        db.commit()
+    except Exception:
+        db.rollback();raise
+    return {'confirmed_ids':ids,'week_start':body.week_start}

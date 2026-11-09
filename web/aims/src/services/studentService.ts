@@ -1,3 +1,4 @@
+import type { AttendanceReviewFields } from '../components/AttendanceEvidence'
 import { apiRequest, apiRequestBlob } from './apiClient'
 
 export const studentApi = <T>(path: string, options?: RequestInit) => apiRequest<T>(`/api/v1${path}`, options)
@@ -25,8 +26,8 @@ export interface Onboarding { eligible: boolean; onboarding_approved?: boolean; 
 export interface Eligibility { allowed: boolean; reason: string | null; academic_year: string; semester: string }
 export interface ChecklistItem { document_type: string; label: string; required: boolean; document_id?: string; status: string }
 export interface Deployment { id: string; application_id: string; company_id: string; company_name?: string; academic_year: string; semester: string; status: string; confirmed_at?: string; deployment_date?: string; checklist?: { items: ChecklistItem[]; ready_for_deployment: boolean } }
-export interface Dtr { id: string; date: string; time_in: string; time_out: string | null; status: string; total_hours?: number; hours?: number; hours_rendered?: number; tasks_completed?: string; notes?: string; feedback?: string; latitude?: number | null; longitude?: number | null; location_address?: string | null }
-export interface DtrSummary { total_entries: number; pending: number; submitted: number; approved: number; rejected: number; total_hours: number; required_hours: number; remaining_hours: number; progress_percent: number; current_company?: string }
+export interface Dtr extends AttendanceReviewFields { id: string; date: string; time_in: string; time_out: string | null; status: string; total_hours?: number; hours?: number; hours_rendered?: number; tasks_completed?: string; notes?: string; feedback?: string; latitude?: number | null; longitude?: number | null; location_address?: string | null }
+export interface DtrSummary { total_entries: number; pending: number; submitted: number; approved: number; rejected: number; total_hours: number; required_hours: number | null; remaining_hours: number | null; progress_percent: number | null; current_company?: string; program_notice?: string | null }
 export interface Journal { id: string; week: number; title: string; summary?: string; status: string; feedback?: string; submitted_date?: string }
 export interface ReportSummary { academic_year: string; semester: string; applications: number; documents: number; dtr_count: number; journals: number; total_hours: number; status_distribution: Record<string, number> }
 export interface Activity { id: string; title: string; description: string; status: string; created_at: string }

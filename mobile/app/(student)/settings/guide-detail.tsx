@@ -75,7 +75,12 @@ const guideContents: Record<string, GuideContent> = {
       {
         "title": "Clock in and clock out",
         "icon": "time-outline",
-        "content": "1. Confirm that your deployment is active.\n2. Open DTR, take your own clock-in photo and capture your location.\n3. Check the date, time, position and reported accuracy before saving.\n4. Open the pending entry when your shift ends.\n5. Take a clock-out photo, capture a fresh location and submit once.\n6. The completed entry goes to coordinator review; only approved hours count."
+        "content": "1. Confirm that your deployment is active.\n2. Open DTR, take your own clock-in photo and capture your location.\n3. Check the position and reported accuracy before saving. The server records clock times; capture sessions expire after five minutes.\n4. Open the pending entry when your shift ends.\n5. Take a clock-out photo, capture a fresh location and submit once.\n6. The company supervisor confirms or disputes attendance first. Your coordinator then gives final approval. Only company-confirmed and coordinator-approved hours count."
+      },
+      {
+        "title": "Lunch and other breaks",
+        "icon": "pause-circle-outline",
+        "content": "Open today's pending DTR record and tap Start break when you stop working. Tap End break when you return. Breaks are saved by the server and remain recorded when you close the app. Stay connected and check that the save succeeds. End any active break before clocking out. Working hours equal clock-out minus clock-in minus recorded breaks. Company and coordinator review are still required. A time correction preserves recorded break deductions."
       },
       {
         "title": "Check location accuracy",
@@ -90,7 +95,7 @@ const guideContents: Record<string, GuideContent> = {
       {
         "title": "Statuses and connection failures",
         "icon": "cloud-offline-outline",
-        "content": "Pending: clock-in saved, clock-out still needed.\nSubmitted: awaiting coordinator review.\nApproved: counts toward completion hours.\nRejected: read the review feedback.\nIf the connection drops, refresh the DTR list before retrying; your submission may already have reached the server. Do not repeatedly clock out or create another entry to correct an existing one."
+        "content": "Pending: clock-in saved, clock-out still needed.\nSubmitted: awaiting company confirmation, then coordinator review.\nApproved: counts toward completion only when company confirmation is also recorded.\nRejected: read the review feedback.\nIf the connection drops, refresh the DTR list before retrying; your submission may already have reached the server. Do not repeatedly clock out or create another entry to correct an existing one."
       }
     ]
   },

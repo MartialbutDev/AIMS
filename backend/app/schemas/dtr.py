@@ -1,10 +1,10 @@
 # backend/app/schemas/dtr.py
 
-from datetime import datetime, time
+from datetime import datetime, time, timezone
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class DTRStatus(str, Enum):
@@ -57,12 +57,29 @@ class DTRResponse(DTRBase):
     semester: Optional[str] = None
 
     total_hours: Optional[float] = None
+    break_periods: list[dict] = Field(default_factory=list)
+    break_seconds: int = 0
+    on_break: bool = False
     status: DTRStatus
 
     submitted_date: Optional[datetime] = None
     approved_date: Optional[datetime] = None
 
     feedback: Optional[str] = None
+    company_status: str = "awaiting"
+    company_reviewed_by: Optional[str] = None
+    company_reviewer_name: Optional[str] = None
+    company_reviewed_at: Optional[datetime] = None
+    company_feedback: Optional[str] = None
+    attendance_revision: int = 1
+    evidence_in: Optional[dict] = None
+    evidence_out: Optional[dict] = None
+    attendance_history: list[dict] = Field(default_factory=list)
+
+    @field_validator('company_reviewed_at',mode='before')
+    @classmethod
+    def review_time(cls,value):
+        return value.replace(tzinfo=timezone.utc) if isinstance(value,datetime) and value.tzinfo is None else value
 
     created_at: datetime
     updated_at: Optional[datetime] = None

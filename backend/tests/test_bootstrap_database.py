@@ -63,7 +63,7 @@ class BootstrapTests(unittest.TestCase):
         with e.begin() as c:
             bootstrap(c);self.assertTrue({'internship_deployments','internship_completion_cases','auth_sessions'}<=set(inspect(c).get_table_names()))
             self.assertTrue({'academic_requirements','academic_requirement_events'}<=set(inspect(c).get_table_names()))
-            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'m93c57ea4fc8')
+            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'p26f80bd72fb')
         e.dispose()
     def test_existing_database_is_refused_without_stamping_or_changing_records(self):
         e=create_engine('sqlite://')

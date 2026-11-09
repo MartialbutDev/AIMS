@@ -11,9 +11,10 @@ import type { DeploymentStatus } from "../../services/deployment.service";
 
 
 interface InternshipProgressCardProps {
-  progress: number;
+  progress: number | null;
   hoursRendered: number;
-  remainingHours: number;
+  remainingHours: number | null;
+  programNotice?: string | null;
   currentCompany: string;
   deploymentStatus?: DeploymentStatus | null;
   academicYear?: string | null;
@@ -33,6 +34,7 @@ export default function InternshipProgressCard({
   progress,
   hoursRendered,
   remainingHours,
+  programNotice,
   currentCompany,
   deploymentStatus,
   academicYear,
@@ -50,7 +52,7 @@ export default function InternshipProgressCard({
     ? ([colors.card, colors.surfaceSecondary] as const)
     : (["#FFFFFF", "#F8FAFC"] as const);
 
-  const safeProgress = Number.isFinite(progress)
+  const safeProgress = progress != null && Number.isFinite(progress)
     ? Math.max(0, Math.min(100, progress))
     : 0;
 
@@ -92,11 +94,11 @@ export default function InternshipProgressCard({
               { color: accentColor },
             ]}
           >
-            {Math.round(safeProgress)}%
+            {progress == null ? "—" : `${Math.round(safeProgress)}%`}
           </Text>
         </View>
 
-        <View style={styles.progressBarContainer}>
+        {progress == null ? <Text style={{ color: colors.textSecondary, lineHeight: 21, marginBottom: 18 }}>Required hours awaiting configuration{programNotice ? `\n${programNotice}` : ''}</Text> : <View style={styles.progressBarContainer}>
           <View
             style={[
               styles.progressBarTrack,
@@ -117,7 +119,7 @@ export default function InternshipProgressCard({
               ]}
             />
           </View>
-        </View>
+        </View>}
 
         <View
           style={[
@@ -195,7 +197,7 @@ export default function InternshipProgressCard({
                   { color: colors.textPrimary },
                 ]}
               >
-                {remainingHours}h
+                {remainingHours == null ? "—" : `${remainingHours}h`}
               </Text>
               <Text
                 style={[

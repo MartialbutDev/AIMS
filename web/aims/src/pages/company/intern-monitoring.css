@@ -77,3 +77,4 @@
 @media(max-width:800px) { .hte-workspace { grid-template-columns:1fr; } .hte-intern-list { max-height:320px; } .hte-scope { flex-wrap:wrap; } .hte-scope > span { margin-left:44px; } }
 @media(max-width:600px) { .hte-heading { align-items:flex-start; flex-direction:column; } .hte-filters > label,.hte-filters select { width:100%; } .hte-profile { align-items:flex-start; flex-direction:column; } .hte-scope,.hte-hours { padding:20px; } .hte-record-panel > header { padding:20px; flex-wrap:wrap; } .hte-hours strong { font-size:26px; } }
 @media(max-width:600px) { .hte-scope { display:grid; grid-template-columns:24px minmax(0,1fr); align-items:start; gap:14px; } .hte-scope > div { min-width:0; } .hte-scope > span { grid-column:2; margin-left:0; } }
+.hte-hours-pending { grid-column:1/-1; margin:0; padding:14px 16px; background:#fff7da; color:#765b16; border-radius:8px; font-size:12px; line-height:1.8; }

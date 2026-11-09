@@ -1,7 +1,7 @@
 import { apiRequest, apiRequestBlob } from './apiClient'
 
 export interface CompletionChecklist {
-  label: string; required_hours: number; approved_hours: number; dtr_count: number; journal_count: number
+  label: string; required_hours: number | null; approved_hours: number; dtr_count: number; journal_count: number
   ready_to_request: boolean; ready_to_approve: boolean
   items: { key: string; label: string; met: boolean }[]
   records?: { documents?: { id: string; type: string; status: string }[]; dtr: { id: string; date: string; time_in: string; time_out: string; hours: number; tasks: string }[]; journals: { id: string; week: number; title: string; summary: string }[] }

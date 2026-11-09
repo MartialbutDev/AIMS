@@ -34,13 +34,13 @@ class ExcelExportService:
         
         # ============ HEADER SECTION ============
         # Title
-        ws.merge_cells('A1:H1')
+        ws.merge_cells('A1:I1')
         cell = ws['A1']
         cell.value = "ACADEMIC INTERNSHIP MANAGEMENT SYSTEM (AIMS)"
         cell.font = Font(size=16, bold=True)
         cell.alignment = Alignment(horizontal='center')
         
-        ws.merge_cells('A2:H2')
+        ws.merge_cells('A2:I2')
         cell = ws['A2']
         cell.value = "DAILY TIME RECORD (DTR) REPORT"
         cell.font = Font(size=14, bold=True)
@@ -59,6 +59,10 @@ class ExcelExportService:
             ("Entries included:", "Approved only" if approved_only else "All review statuses"),
             ("Generated On:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         ]
+        from app.services.academic_requirements import hour_target
+        target=hour_target(db,academic_year,semester,student_id)
+        student_info.extend([('Program:',target['program_code'] or 'Not classified'),
+                             ('Required internship hours:',str(target['required_hours']) if target['required_hours'] is not None else 'Required hours awaiting configuration')])
         
         row = 5
         for label, value in student_info:
@@ -77,7 +81,7 @@ class ExcelExportService:
         if credited_hours is None:
             from app.services.reporting_scope import approved_hours
             credited_hours = approved_hours(db, {student_id}, academic_year, semester)[student_id]
-        approved_count = len([d for d in dtr_records if d.status == "approved"])
+        approved_count = len([d for d in dtr_records if __import__("app.services.attendance_review",fromlist=["fully_approved"]).fully_approved(d)])
         submitted_count = len([d for d in dtr_records if d.status == "submitted"])
         pending_count = len([d for d in dtr_records if d.status == "pending"])
         rejected_count = len([d for d in dtr_records if d.status == "rejected"])
@@ -109,7 +113,7 @@ class ExcelExportService:
         # ============ TABLE HEADERS ============
         headers = [
             "Date", "Day", "Time In", "Time Out", 
-            "Hours", "Location", "Tasks", "Status"
+            "Hours", "Location", "Tasks", "Status", "Break minutes (excluded)"
         ]
         
         # Header styling
@@ -151,7 +155,7 @@ class ExcelExportService:
             tasks = dtr.tasks_completed or "â€”"
             status = dtr.status.upper() if dtr.status else "PENDING"
             
-            row_data = [date, day, time_in, time_out, hours, location, tasks, status]
+            row_data = [date, day, time_in, time_out, hours, location, tasks, status, round((dtr.break_seconds or 0) / 60, 2)]
             
             for col, value in enumerate(row_data, 1):
                 cell = ws.cell(row=row, column=col, value=value)
@@ -161,7 +165,7 @@ class ExcelExportService:
                 cell.border = thin_border
                 
                 # Color status column
-                if col == len(row_data):  # Status column
+                if col == 8:  # Status column
                     if status.lower() in status_colors:
                         cell.fill = status_colors[status.lower()]
             

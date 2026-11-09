@@ -94,15 +94,15 @@ function StudentDetails({ detail, onEvaluationSaved }: { detail: CoordinatorStud
           <span className="student-profile-avatar">{student.first_name.slice(0, 1)}{student.last_name.slice(0, 1)}</span>
           <div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> STUDENT SUMMARY</span><h2>{fullName}</h2><p>{student.student_id || 'No student ID'} · {student.email}</p></div>
         </div>
-        <div className="journey-progress-heading"><span>OJT completion</span><strong>{journey.progress_percent}% complete</strong></div>
-        <ProgressBar value={journey.progress_percent} label="OJT completion" />
+        <div className="journey-progress-heading"><span>OJT completion</span><strong>{journey.progress_percent == null ? "Required hours awaiting configuration" : `${journey.progress_percent}% complete`}</strong></div>
+        {journey.progress_percent != null && <ProgressBar value={journey.progress_percent} label="OJT completion" />}
         <div className="journey-stats">
           <div><strong>{journey.approved_hours.toLocaleString()}h</strong><span>approved</span></div>
-          <div><strong>{journey.remaining_hours.toLocaleString()}h</strong><span>hours remaining</span></div>
+          <div><strong>{journey.remaining_hours == null ? "—" : `${journey.remaining_hours.toLocaleString()}h`}</strong><span>hours remaining</span></div>
           <div><strong>{journey.estimated_days_left ?? '—'}</strong><span>estimated working days left</span></div>
           <div><strong>{journey.pending_dtr_count}</strong><span>DTRs awaiting review</span></div>
         </div>
-        <p className="journey-estimate-note">{journey.average_approved_hours_per_day
+        <p className="journey-estimate-note">{journey.required_hours == null ? "Required hours awaiting configuration. Approved attendance continues to accumulate." : journey.average_approved_hours_per_day
           ? `Days estimate uses the student's approved-record average of ${journey.average_approved_hours_per_day} hours per working day.`
           : journey.remaining_hours
             ? 'A days-left estimate will appear after approved DTR hours are recorded.'
@@ -207,7 +207,7 @@ export function StudentsPage() {
       <div className="coordinator-columns">
         <aside className="panel coordinator-student-list">
           <label className="coordinator-search"><Icon name="search" size={16} /><input value={search} onChange={(event) => searchStudents(event.target.value)} placeholder="Search name, email, or ID" /></label>
-          {isLoadingList && students.length === 0 ? <p className="empty-state">Loading student records…</p> : students.length === 0 ? <p className="empty-state">No students found.</p> : <div className="coordinator-student-items">          {students.map((student) => <button key={student.id} className={`coordinator-student-item${student.id === selectedId ? ' coordinator-student-item--active' : ''}`} onClick={() => selectStudent(student.id)}><span className="student-profile-avatar">{student.first_name.slice(0, 1)}{student.last_name.slice(0, 1)}</span><span className="coordinator-student-copy"><strong>{student.first_name} {student.last_name}<ActivityBadges compact studentId={student.id} categories={['documents','attendance','journals','deployment']} /></strong><small>{student.student_id || student.email}</small><span className="student-progress-inline"><i style={{ width: `${student.journey.progress_percent}%` }} /></span></span><span className="coordinator-student-percent">{student.journey.progress_percent}%</span></button>)}</div>}
+          {isLoadingList && students.length === 0 ? <p className="empty-state">Loading student records…</p> : students.length === 0 ? <p className="empty-state">No students found.</p> : <div className="coordinator-student-items">          {students.map((student) => <button key={student.id} className={`coordinator-student-item${student.id === selectedId ? ' coordinator-student-item--active' : ''}`} onClick={() => selectStudent(student.id)}><span className="student-profile-avatar">{student.first_name.slice(0, 1)}{student.last_name.slice(0, 1)}</span><span className="coordinator-student-copy"><strong>{student.first_name} {student.last_name}<ActivityBadges compact studentId={student.id} categories={['documents','attendance','journals','deployment']} /></strong><small>{student.student_id || student.email}</small>{student.journey.progress_percent != null && <span className="student-progress-inline"><i style={{ width: `${student.journey.progress_percent}%` }} /></span>}</span><span className="coordinator-student-percent">{student.journey.progress_percent == null ? "Target pending" : `${student.journey.progress_percent}%`}</span></button>)}</div>}
           {page < totalPages && <button className="load-more-students" onClick={loadMoreStudents} disabled={isLoadingList}>{isLoadingList ? 'Loading…' : 'Load more students'}</button>}
         </aside>
         <div className="coordinator-detail-column">

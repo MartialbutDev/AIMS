@@ -65,7 +65,7 @@ class FeatureCompletionTests(unittest.TestCase):
         self.assertEqual(self.client.get('/dtr/d1/photo/unknown').status_code,422)
     def test_private_photo_other_owner_and_role(self):
         self.db.get(DTR,'d1').student_id='another';self.db.commit();self.assertEqual(self.client.get('/dtr/d1/photo/in').status_code,404)
-        self.actor=self.supervisor;self.assertEqual(self.client.get('/dtr/d1/photo/in').status_code,403)
+        self.actor=self.supervisor;self.assertEqual(self.client.get('/dtr/d1/photo/in').status_code,404)
     def test_photo_cannot_escape_storage(self):
         self.db.get(DTR,'d1').image_in_path='../private.txt';self.db.commit();self.assertEqual(self.client.get('/dtr/d1/photo/in').status_code,404)
     def test_company_endorsed_list_and_identity(self):

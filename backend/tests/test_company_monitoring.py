@@ -1,3 +1,4 @@
+from attendance_fixtures import approved_attendance_fields
 """Isolated SQLite regression tests: never connects to or writes the AIMS database."""
 import sys
 import unittest
@@ -70,7 +71,7 @@ class CompanyMonitoringTests(unittest.TestCase):
     def add_dtr(self, identifier, day, status=DTRStatus.APPROVED, hours=8, term="1"):
         self.db.add(DTR(id=identifier, student_id="s1", academic_year="2026-2027", semester=term,
             date=datetime(2026, 10, day) if day > 0 else datetime(2026, 9, 30), time_in=time(8), time_out=time(17),
-            total_hours=hours, status=status, tasks_completed="Work summary", notes="Private note", feedback="Private feedback", latitude=8, longitude=124))
+            total_hours=hours, status=status, **approved_attendance_fields(), tasks_completed="Work summary", notes="Private note", feedback="Private feedback", latitude=8, longitude=124))
 
     def add_journal(self, identifier, status=JournalStatus.SUBMITTED, submitted=None, term="1"):
         self.db.add(Journal(id=identifier, student_id="s1", academic_year="2026-2027", semester=term,

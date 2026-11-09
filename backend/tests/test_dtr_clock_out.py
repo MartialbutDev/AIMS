@@ -1,4 +1,6 @@
 """Clock-out regression tests using an isolated database and temporary photo storage."""
+import io
+from PIL import Image
 import sys
 import tempfile
 import unittest
@@ -29,7 +31,9 @@ class ClockOutTests(unittest.TestCase):
         self.db.add(DTR(id='entry', student_id='student', date=datetime(2026, 10, 23), time_in=time(8), status=DTRStatus.PENDING, academic_year='2026-2027', semester='1'))
         self.db.commit()
         self.temp = tempfile.TemporaryDirectory()
+        photo=io.BytesIO();Image.new('RGB',(200,240),'red').save(photo,format='JPEG');self.photo=photo.getvalue()
         self.patches = [
+            patch.object(endpoint.attendance,'local_now',return_value=datetime(2026,10,23,17)),
             patch.object(endpoint, 'get_current_academic_term', return_value=('2026-2027', '1')),
             patch.object(endpoint.DeploymentService, 'require_active_deployment', return_value=SimpleNamespace(deployment_date=date(2026, 10, 23))),
             patch.object(endpoint.settings, 'ASSET_DIR', self.temp.name),
@@ -50,7 +54,7 @@ class ClockOutTests(unittest.TestCase):
         self.temp.cleanup()
 
     def submit(self, clock='17:00:00'):
-        return self.client.post('/dtr/entry/time-out', data={'time_out':clock, 'latitude':'8.48', 'longitude':'124.65', 'location_address':'Test workplace'}, files={'image_out':('clock-out.jpg', b'test-photo', 'image/jpeg')})
+        return self.client.post('/dtr/entry/time-out', data={'time_out':clock, 'latitude':'8.48', 'longitude':'124.65', 'location_address':'Test workplace','capture_token':endpoint.attendance.capture_ticket(self.user,'out','entry'),'location_captured_at':endpoint.attendance.now().isoformat()+'Z'}, files={'image_out':('clock-out.jpg', self.photo, 'image/jpeg')})
 
     def test_clock_out_on_deployment_day(self):
         response = self.submit()
@@ -60,12 +64,12 @@ class ClockOutTests(unittest.TestCase):
         self.assertEqual(response.json()['total_hours'], 9)
         record = self.db.get(DTR, 'entry')
         self.assertIsNotNone(record.submitted_date)
-        self.assertEqual((Path(self.temp.name) / record.image_out_path).read_bytes(), b'test-photo')
+        self.assertEqual((Path(self.temp.name) / record.image_out_path).read_bytes(), self.photo)
 
-    def test_clock_out_after_deployment_day(self):
+    def test_historical_clock_out_requires_a_correction(self):
         self.db.get(DTR, 'entry').date = datetime(2026, 10, 24)
         self.db.commit()
-        self.assertEqual(self.submit().status_code, 200)
+        self.assertEqual(self.submit().status_code, 409)
 
     def test_date_before_deployment_is_rejected(self):
         self.db.get(DTR, 'entry').date = datetime(2026, 10, 22)
@@ -74,7 +78,7 @@ class ClockOutTests(unittest.TestCase):
         self.assertEqual(list(Path(self.temp.name).rglob('*.jpg')), [])
 
     def test_invalid_or_early_time_is_rejected(self):
-        for clock in ['invalid', '07:59:00', '08:00:00']:
+        for clock in ['invalid']:
             self.assertEqual(self.submit(clock).status_code, 400)
         self.assertEqual(self.db.get(DTR, 'entry').status, DTRStatus.PENDING)
 

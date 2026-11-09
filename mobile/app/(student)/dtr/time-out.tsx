@@ -38,9 +38,13 @@ export default function TimeOutDTRScreen() {
     longitude: number;
     address: string;
     accuracy: number | null;
+    capturedAt: string;
   } | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const submissionInFlight = useRef(false);
+  const captureInFlight = useRef(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureToken, setCaptureToken] = useState<string | null>(null);
   const locationNeedsCaution = Boolean(location && assessLocationAccuracy(location.accuracy).caution);
 
   // ----- location -----
@@ -71,7 +75,7 @@ export default function TimeOutDTRScreen() {
       } catch {
         // Preserve captured coordinates when a street-address lookup is unavailable.
       }
-      setLocation({ latitude: locationData.coords.latitude, longitude: locationData.coords.longitude, address, accuracy: locationData.coords.accuracy });
+      setLocation({ latitude: locationData.coords.latitude, longitude: locationData.coords.longitude, address, accuracy: locationData.coords.accuracy, capturedAt: new Date(locationData.timestamp ?? Date.now()).toISOString() });
     } catch (error) {
       console.error("Location error:", error);
       Alert.alert("Error", "Failed to get location. Please try again.");
@@ -83,33 +87,45 @@ export default function TimeOutDTRScreen() {
   // ----- camera -----
 
   const pickImage = async () => {
+    if (captureInFlight.current || submissionInFlight.current) return;
+    captureInFlight.current = true;
+    setIsCapturing(true);
+    try {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permission Denied", "Camera permission is required!");
       return;
     }
 
+    setCaptureToken(null);
+    setImageOut(null);
+    setLocation(null);
+    let ticket: { capture_token: string };
+    try { ticket = await dtrService.beginCapture('out', id!); }
+    catch { Alert.alert('Capture unavailable', 'Check your connection and active deployment, then try again.'); return; }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images"],
-      allowsEditing: true,
+      allowsEditing: false,
+      cameraType: ImagePicker.CameraType.front,
       aspect: [4, 3],
       quality: 0.8,
     });
 
     if (!result.canceled) {
+      setCaptureToken(ticket.capture_token);
       setImageOut(result.assets[0].uri);
-      if (!location) {
-        await getCurrentLocation();
-      }
+      await getCurrentLocation();
     }
+    } catch { Alert.alert('Camera unavailable', 'Allow camera access and try taking your selfie again.'); }
+    finally { captureInFlight.current = false; setIsCapturing(false); }
   };
 
   // ----- submit -----
 
   const handleTimeOut = async () => {
-    if (submissionInFlight.current || isGettingLocation) return;
+    if (submissionInFlight.current || captureInFlight.current || isGettingLocation) return;
     if (!imageOut) {
-      Alert.alert("Error", "Please take a Time-Out photo.");
+      Alert.alert("Error", "Please take a Time-Out selfie.");
       return;
     }
     if (!location) {
@@ -121,11 +137,17 @@ export default function TimeOutDTRScreen() {
       return;
     }
 
+    if (!captureToken || Date.now() - new Date(location.capturedAt).getTime() > 5 * 60 * 1000) {
+      Alert.alert('Capture expired', 'Take a new selfie and capture your current location before submitting.'); return;
+    }
     submissionInFlight.current = true;
     setLoading(true);
     try {
       if (!await confirmAttendanceLocation(location.accuracy)) return;
       const formData = new FormData();
+      formData.append('capture_token', captureToken);
+      formData.append('location_captured_at', location.capturedAt);
+      if (location.accuracy != null) formData.append('accuracy', String(location.accuracy));
 
       const now = new Date();
       const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(
@@ -151,7 +173,7 @@ export default function TimeOutDTRScreen() {
 
       Alert.alert(
         "✅ Time-Out Recorded!",
-        `You clocked out at ${timeStr}.\n\n📍 ${location.address}\n\nYour DTR has been submitted for review.`,
+        `You clocked out at ${timeStr}.\n\n📍 ${location.address}\n\nYour DTR is awaiting company confirmation, then coordinator approval.`,
         [
           {
             text: "View DTR",
@@ -172,7 +194,7 @@ export default function TimeOutDTRScreen() {
     }
   };
 
-  const canSubmit = !loading && !isGettingLocation && !!imageOut && !!location;
+  const canSubmit = !loading && !isCapturing && !isGettingLocation && !!imageOut && !!location;
 
   return (
     // ✅ Plain View — the parent layout handles the top inset.
@@ -208,10 +230,10 @@ export default function TimeOutDTRScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ----- Time-Out Photo ----- */}
+        {/* ----- Time-Out Selfie ----- */}
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>
-            Time-Out Photo <Text style={styles.required}>*</Text>
+            Time-Out Selfie <Text style={styles.required}>*</Text>
           </Text>
 
           <TouchableOpacity
@@ -234,7 +256,8 @@ export default function TimeOutDTRScreen() {
                     styles.retakeButton,
                     { backgroundColor: "rgba(0,0,0,0.6)" },
                   ]}
-                  onPress={pickImage}
+                  disabled={isCapturing}
+              onPress={pickImage}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="refresh-outline" size={16} color="#FFFFFF" />
@@ -252,7 +275,7 @@ export default function TimeOutDTRScreen() {
                   <Ionicons name="camera-outline" size={32} color={colors.accent} />
                 </View>
                 <Text style={[styles.cameraBoxTitle, { color: colors.textPrimary }]}>
-                  Take Time-Out Photo
+                  Take Time-Out Selfie
                 </Text>
                 <Text style={[styles.cameraBoxSub, { color: colors.textSecondary }]}>
                   Take a photo to verify your time-out

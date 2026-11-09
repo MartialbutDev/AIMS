@@ -1,3 +1,4 @@
+import type { AttendanceReviewFields } from '../components/AttendanceEvidence'
 
 import { getDashboardAnalytics } from './analyticsService'
 import { apiRequest, apiRequestBlob } from './apiClient'
@@ -25,11 +26,11 @@ export interface CoordinatorStudent {
 }
 
 export interface CoordinatorJourney {
-  required_hours: number
+  required_hours: number | null
   approved_hours: number
-  remaining_hours: number
-  progress_percent: number
-  remaining_percent: number
+  remaining_hours: number | null
+  progress_percent: number | null
+  remaining_percent: number | null
   average_approved_hours_per_day: number | null
   estimated_days_left: number | null
   approved_dtr_count: number
@@ -79,7 +80,7 @@ export interface CoordinatorStudentDetail {
     applied_date: string
   }>
 
-  dtr_records: Array<{
+  dtr_records: Array<AttendanceReviewFields & {
     id: string
     date: string
     time_in: string
@@ -236,7 +237,7 @@ export interface CoordinatorReviewApplication {
   applied_date: string
 }
 
-export interface CoordinatorReviewDtr {
+export interface CoordinatorReviewDtr extends AttendanceReviewFields {
   id: string
   student_id: string
   student_name: string

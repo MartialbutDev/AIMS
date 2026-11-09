@@ -1,3 +1,4 @@
+from attendance_fixtures import approved_attendance_fields
 """Isolated regression tests; no production database or message delivery."""
 import asyncio
 import json
@@ -143,7 +144,7 @@ class StudentReminderTests(unittest.TestCase):
         self.db.add(Company(id="company", name="Test Host"))
         for semester in ["1", "2"]:
             self.db.add(Document(id="doc" + semester, type=DocumentType.WAIVER, uploaded_by="s1", file_path="test.pdf", academic_year="2026-2027", semester=semester))
-            self.db.add(DTR(id="dtr" + semester, student_id="s1", academic_year="2026-2027", semester=semester, date=datetime(2026, 10, 1), time_in=time(8), time_out=time(17), total_hours=8, status=DTRStatus.APPROVED))
+            self.db.add(DTR(id="dtr" + semester, student_id="s1", academic_year="2026-2027", semester=semester, date=datetime(2026, 10, 1), time_in=time(8), time_out=time(17), total_hours=8, status=DTRStatus.APPROVED,**approved_attendance_fields()))
             self.db.add(Journal(id="journal" + semester, student_id="s1", academic_year="2026-2027", semester=semester, week=1, title="Test", file_path="test.pdf", status=JournalStatus.SUBMITTED))
             self.db.add(Application(id="application" + semester, student_id="s1", company_id="company", academic_year="2026-2027", semester=semester, position="Intern", status=ApplicationStatus.ACCEPTED))
         self.db.commit()

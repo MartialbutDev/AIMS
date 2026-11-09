@@ -1,3 +1,4 @@
+import { AttendanceEvidence } from '../../components/AttendanceEvidence'
 import { ActivityBadges, ActivityViewed } from '../../components/ActivityIndicators'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../components/Icons'
@@ -243,14 +244,14 @@ export function ApplicationsPage() {
                   <div className="co-review-record-top"><strong>{item.student_name}</strong><Status value={item.status} /></div>
                   <p>{formatDate(item.date)} · {item.time_in} – {item.time_out || 'No time-out'} · {item.total_hours ?? 0} hours</p>
                   {item.tasks_completed && <small>{item.tasks_completed}</small>}
-                  {expandedId === item.id && <div className="co-review-details"><span>Student ID: {item.student_id}</span><span>DTR ID: {item.id}</span><span>{item.time_out ? 'Time-out recorded' : 'Time-out not recorded'}</span></div>}
+                  {expandedId === item.id && <div className="co-review-details"><span>Student ID: {item.student_id}</span><span>DTR ID: {item.id}</span><AttendanceEvidence record={item} /><span>{item.time_out ? 'Time-out recorded' : 'Time-out not recorded'}</span></div>}
                 </div>
                 <div className="co-review-actions">
                   <button type="button" disabled={!!busy} onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>{expandedId === item.id ? 'Less details' : 'Details'}</button>
                   {item.image_in_available && <button type="button" disabled={!!busy} onClick={() => void openPreview(item.student_id, item.id, 'in', 'DTR time-in photo')}>Time-in photo</button>}
                   {item.image_out_available && <button type="button" disabled={!!busy} onClick={() => void openPreview(item.student_id, item.id, 'out', 'DTR time-out photo')}>Time-out photo</button>}
-                  {item.status === 'submitted' && item.time_out && <>
-                    <button type="button" className="co-review-approve" disabled={!!busy} onClick={() => requestDecision('dtrs', item, 'approved')}>Approve</button>
+                  {item.status === 'submitted' && item.time_out && <><span>Company: {item.company_status || 'awaiting confirmation'}</span>
+                    <button type="button" className="co-review-approve" disabled={!!busy || item.company_status !== 'confirmed'} title={item.company_status === 'confirmed' ? 'Company confirmed; ready for final review' : 'Company confirmation is required'} onClick={() => requestDecision('dtrs', item, 'approved')}>Approve</button>
                     <button type="button" className="co-review-reject" disabled={!!busy} onClick={() => requestDecision('dtrs', item, 'rejected')}>Reject</button>
                   </>}
                   {item.status === 'submitted' && !item.time_out && <span className="co-review-hint">Waiting for time-out</span>}

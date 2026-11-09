@@ -17,7 +17,6 @@ import {
   Platform,
   Image,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 
@@ -27,10 +26,8 @@ import { dtrService } from "../../../src/services/dtr.service";
 export default function NewDTRScreen() {
   const { colors, isDark } = useTheme();
   const [loading, setLoading] = useState(false);
-  const [date, setDate] = useState(new Date());
-  const [timeIn, setTimeIn] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimeInPicker, setShowTimeInPicker] = useState(false);
+
+
   const [tasks, setTasks] = useState("");
   const [notes, setNotes] = useState("");
   const [imageIn, setImageIn] = useState<string | null>(null);
@@ -41,18 +38,14 @@ export default function NewDTRScreen() {
     longitude: number;
     address: string;
     accuracy: number | null;
+    capturedAt: string;
   } | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const submissionInFlight = useRef(false);
+  const captureInFlight = useRef(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureToken, setCaptureToken] = useState<string | null>(null);
   const locationNeedsCaution = Boolean(location && assessLocationAccuracy(location.accuracy).caution);
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { 
@@ -104,6 +97,7 @@ export default function NewDTRScreen() {
         longitude: locationData.coords.longitude,
         address,
         accuracy: locationData.coords.accuracy,
+        capturedAt: new Date(locationData.timestamp ?? Date.now()).toISOString(),
       });
 
     } catch (error) {
@@ -115,36 +109,43 @@ export default function NewDTRScreen() {
   };
 
   const pickImage = async () => {
+    if (captureInFlight.current || submissionInFlight.current) return;
+    captureInFlight.current = true;
+    setIsCapturing(true);
+    try {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'Camera permission is required for Time-In verification.');
       return;
     }
 
+    setCaptureToken(null);
+    setImageIn(null);
+    setLocation(null);
+    let ticket: { capture_token: string };
+    try { ticket = await dtrService.beginCapture('in'); }
+    catch { Alert.alert('Capture unavailable', 'Check your connection and active deployment, then try again.'); return; }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
+      allowsEditing: false,
+      cameraType: ImagePicker.CameraType.front,
       aspect: [4, 3],
       quality: 0.8,
     });
 
     if (!result.canceled) {
+      setCaptureToken(ticket.capture_token);
       setImageIn(result.assets[0].uri);
-      if (!location) {
-        await getCurrentLocation();
-      }
+      await getCurrentLocation();
     }
-  };
-
-  const setCurrentTime = () => {
-    const now = new Date();
-    setTimeIn(now);
+    } catch { Alert.alert('Camera unavailable', 'Allow camera access and try taking your selfie again.'); }
+    finally { captureInFlight.current = false; setIsCapturing(false); }
   };
 
   const handleTimeIn = async () => {
-    if (submissionInFlight.current || isGettingLocation) return;
+    if (submissionInFlight.current || captureInFlight.current || isGettingLocation) return;
     if (!imageIn) {
-      Alert.alert("Time-In Photo Required", "Please take your Time-In verification photo first.");
+      Alert.alert("Time-In Selfie Required", "Please take your Time-In verification photo first.");
       return;
     }
 
@@ -154,13 +155,20 @@ export default function NewDTRScreen() {
       return;
     }
 
+    if (!captureToken || Date.now() - new Date(location.capturedAt).getTime() > 5 * 60 * 1000) {
+      Alert.alert('Capture expired', 'Take a new selfie and capture your current location before submitting.'); return;
+    }
     submissionInFlight.current = true;
     setIsSubmitting(true);
     try {
       if (!await confirmAttendanceLocation(location.accuracy)) return;
+      const clockInTime = new Date();
       const formData = new FormData();
-      formData.append('date', formatDateForAPI(date));
-      formData.append('time_in', formatTimeForAPI(timeIn));
+      formData.append('capture_token', captureToken);
+      formData.append('location_captured_at', location.capturedAt);
+      if (location.accuracy != null) formData.append('accuracy', String(location.accuracy));
+      formData.append('date', formatDateForAPI(clockInTime));
+      formData.append('time_in', formatTimeForAPI(clockInTime));
       if (tasks.trim()) formData.append('tasks_completed', tasks.trim());
       if (notes.trim()) formData.append('notes', notes.trim());
       
@@ -180,7 +188,7 @@ export default function NewDTRScreen() {
       
       Alert.alert(
         "✅ Time-In Recorded!",
-        `You clocked in at ${formatTime(timeIn)}.\n\n📍 ${location.address}\n\nYou can now Time-Out when your shift is done.`,
+        `You clocked in at ${formatTime(clockInTime)}.\n\n📍 ${location.address}\n\nYou can now Time-Out when your shift is done.`,
         [
           { 
             text: "View DTR", 
@@ -193,8 +201,6 @@ export default function NewDTRScreen() {
         ]
       );
       
-      setDate(new Date());
-      setTimeIn(new Date());
       setTasks("");
       setNotes("");
       setImageIn(null);
@@ -226,75 +232,23 @@ export default function NewDTRScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Date <Text style={styles.required}>*</Text></Text>
-          <TouchableOpacity
-            style={[styles.pickerButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => setShowDatePicker(true)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="calendar-outline" size={20} color={colors.accent} />
-            <Text style={[styles.pickerText, { color: colors.textPrimary }]}>{formatDate(date)}</Text>
-            <Ionicons name="chevron-down-outline" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-          {showDatePicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={(event, selectedDate) => {
-                setShowDatePicker(false);
-                if (selectedDate) setDate(selectedDate);
-              }}
-            />
-          )}
+          <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Clock-in time</Text>
+          <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>The server records your current date and time when submitted. Use a time-correction request for mistakes; past dates cannot be clocked in here.</Text>
         </View>
 
         <View style={styles.section}>
-          <View style={styles.labelRow}>
-            <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Time In <Text style={styles.required}>*</Text></Text>
-            <TouchableOpacity
-              style={[styles.timeNowButton, { backgroundColor: `${colors.primary}10` }]}
-              onPress={setCurrentTime}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="time-outline" size={16} color={colors.accent} />
-              <Text style={[styles.timeNowText, { color: colors.accent }]}>Now</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={[styles.pickerButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => setShowTimeInPicker(true)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="log-in-outline" size={20} color="#10B981" />
-            <Text style={[styles.pickerText, { color: colors.textPrimary }]}>{formatTime(timeIn)}</Text>
-            <Ionicons name="chevron-down-outline" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-          {showTimeInPicker && (
-            <DateTimePicker
-              value={timeIn}
-              mode="time"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={(event, selectedTime) => {
-                setShowTimeInPicker(false);
-                if (selectedTime) setTimeIn(selectedTime);
-              }}
-            />
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Time-In Photo <Text style={styles.required}>*</Text></Text>
+          <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Time-In Selfie <Text style={styles.required}>*</Text></Text>
           {!imageIn ? (
             <TouchableOpacity
               style={[styles.cameraBox, { borderColor: colors.border, backgroundColor: colors.card }]}
+              disabled={isCapturing}
               onPress={pickImage}
               activeOpacity={0.8}
             >
               <View style={[styles.cameraIconCircle, { backgroundColor: `${colors.primary}15` }]}>
                 <Ionicons name="camera-outline" size={32} color={colors.accent} />
               </View>
-              <Text style={[styles.cameraBoxTitle, { color: colors.textPrimary }]}>Take Time-In Photo</Text>
+              <Text style={[styles.cameraBoxTitle, { color: colors.textPrimary }]}>Take Time-In Selfie</Text>
               <Text style={[styles.cameraBoxSub, { color: colors.textSecondary }]}>Take a photo to verify your time-in</Text>
             </TouchableOpacity>
           ) : (
@@ -307,7 +261,8 @@ export default function NewDTRScreen() {
                 </View>
                 <TouchableOpacity
                   style={[styles.retakeButton, { borderColor: colors.border }]}
-                  onPress={pickImage}
+                  disabled={isCapturing}
+              onPress={pickImage}
                 >
                   <Ionicons name="refresh-outline" size={14} color={colors.accent} />
                   <Text style={[styles.retakeText, { color: colors.accent }]}>Retake</Text>

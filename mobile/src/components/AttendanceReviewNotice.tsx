@@ -1,0 +1,9 @@
+import { Text, View } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import type { DTR } from '../services/dtr.service';
+
+export default function AttendanceReviewNotice({ record }: { record: DTR }) {
+  const { colors } = useTheme();
+  const title = record.company_status === 'disputed' ? 'Company disputed attendance' : record.company_status === 'confirmed' ? (record.status === 'approved' ? 'Company confirmed · Coordinator approved' : 'Company confirmed · Awaiting coordinator') : record.time_out ? 'Awaiting company confirmation' : 'Clock-out still required';
+  return <View style={{ backgroundColor: colors.card, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.border, gap: 8 }}><Text style={{ color: colors.textPrimary, fontWeight: '700' }}>{title}</Text><Text style={{ color: colors.textSecondary }}>{record.on_break ? 'On break · working time paused' : `Break time excluded: ${Math.round((record.break_seconds || 0) / 6) / 10} min`}</Text>{record.break_periods?.map(period => <Text key={period.id} style={{ color: colors.textSecondary }}>{new Date(period.started_at).toLocaleTimeString()} – {period.ended_at ? new Date(period.ended_at).toLocaleTimeString() : 'On break'}</Text>)}{record.company_feedback && <Text style={{ color: colors.textSecondary }}>{record.company_feedback}</Text>}<Text style={{ color: colors.textSecondary, lineHeight: 20 }}>Hours count toward completion only after company confirmation and coordinator final approval.</Text>{(['in', 'out'] as const).map(phase => { const evidence = record[`evidence_${phase}`]; return evidence ? <Text key={phase} style={{ color: colors.textSecondary, lineHeight: 20 }}>Clock-{phase}: {String(evidence.latitude)}, {String(evidence.longitude)}{evidence.accuracy != null ? ` · accuracy ${Math.ceil(Number(evidence.accuracy))} m` : ''}</Text> : null; })}</View>;
+}

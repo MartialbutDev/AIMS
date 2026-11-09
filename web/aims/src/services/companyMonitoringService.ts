@@ -1,3 +1,4 @@
+import type { AttendanceReviewFields } from '../components/AttendanceEvidence'
 import { apiRequest } from './apiClient'
 
 export interface CompanyIntern {
@@ -26,11 +27,13 @@ export interface CompanyInternDetail {
   intern: CompanyIntern
   records_available: boolean
   notice: string | null
-  required_hours: number
+  required_hours: number | null
   approved_hours: number | null
   remaining_hours: number | null
   progress_percent: number | null
-  attendance: Array<{
+  attendance: Array<AttendanceReviewFields & {
+    image_in_available?: boolean
+    image_out_available?: boolean
     id: string
     date: string
     time_in: string

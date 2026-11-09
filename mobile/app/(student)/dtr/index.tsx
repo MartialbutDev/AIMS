@@ -210,7 +210,7 @@ export default function DTRScreen() {
           <Text
             style={[styles.statusText, { color: statusColors[item.status] }]}
           >
-            {statusLabels[item.status]}
+            {item.on_break ? 'On break' : item.company_status === 'disputed' ? 'Company disputed' : item.status === 'submitted' ? (item.company_status === 'confirmed' ? 'Coordinator review' : 'Company review') : statusLabels[item.status]}
           </Text>
         </View>
       </View>

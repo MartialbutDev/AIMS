@@ -1,3 +1,4 @@
+from attendance_fixtures import approved_attendance_fields
 """DTR export term isolation, authorization and workbook totals."""
 import io
 import unittest
@@ -23,7 +24,7 @@ class DtrExportTests(unittest.TestCase):
                                           ('old', '2025-2026', '2', DTRStatus.APPROVED)]:
             self.db.add(DTR(id=id, student_id='s1', academic_year=year, semester=semester,
                             date=datetime.now(), time_in=time(8), time_out=time(16),
-                            total_hours=8, status=status, tasks_completed='=HYPERLINK("unsafe")'))
+                            total_hours=8, status=status, **approved_attendance_fields(), tasks_completed='=HYPERLINK("unsafe")'))
         self.db.commit()
 
     def tearDown(self):

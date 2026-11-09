@@ -1,5 +1,25 @@
 import re
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+class ProgramRequirement(BaseModel):
+    code: str = Field(pattern=r'^[A-Z][A-Z0-9]{1,19}$')
+    name: str = Field(min_length=2,max_length=120)
+    aliases: list[str] = Field(default_factory=list,max_length=30)
+    required_hours: int | None = Field(default=None,ge=1,le=3000,strict=True)
+
+    @field_validator('name')
+    @classmethod
+    def clean_name(cls,value):
+        value=value.strip()
+        if len(value)<2: raise ValueError('Enter a program name')
+        return value
+
+    @field_validator('aliases')
+    @classmethod
+    def clean_aliases(cls,values):
+        result=list(dict.fromkeys(v.strip().upper() for v in values))
+        if any(not v or len(v)>120 for v in result): raise ValueError('Program aliases must contain 1–120 characters')
+        return result
 
 
 class AcademicRequirementInput(BaseModel):
@@ -8,10 +28,27 @@ class AcademicRequirementInput(BaseModel):
     programs: list[str] = Field(min_length=1,max_length=30)
     year_levels: list[int] = Field(min_length=1,max_length=6)
     practicum_subject_codes: list[str] = Field(min_length=1,max_length=30)
-    required_hours: int = Field(ge=1,le=3000,strict=True)
+    required_hours: int | None = Field(default=None,ge=1,le=3000,strict=True)
+    program_requirements: list[ProgramRequirement] | None = Field(default=None,min_length=1,max_length=30)
     expected_version: int = Field(ge=0,strict=True)
     activate: bool = False
     reason: str = Field(min_length=5,max_length=1000)
+
+    @model_validator(mode='after')
+    def validate_program_targets(self):
+        if self.program_requirements is None:
+            if self.required_hours is None: raise ValueError('Provide program targets or a legacy term target')
+            return self
+        seen={}
+        codes=set()
+        for program in self.program_requirements:
+            if program.code in codes: raise ValueError('Program codes must be unique')
+            codes.add(program.code)
+            for alias in [program.code,program.name,*program.aliases]:
+                compact=re.sub(r'[^A-Z0-9]','',alias.upper())
+                if compact in seen and seen[compact]!=program.code: raise ValueError('Program aliases cannot belong to different programs')
+                seen[compact]=program.code
+        return self
 
     @field_validator('academic_year')
     @classmethod

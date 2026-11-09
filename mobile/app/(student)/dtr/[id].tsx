@@ -1,3 +1,5 @@
+import AttendanceBreakControls from '../../../src/components/AttendanceBreakControls';
+import AttendanceReviewNotice from '../../../src/components/AttendanceReviewNotice';
 import DTRCorrectionForm from '../../../src/components/DTRCorrectionForm';
 // app/(student)/dtr/[id].tsx
 import { Ionicons } from "@expo/vector-icons";
@@ -254,7 +256,7 @@ export default function DTRDetailScreen() {
 
             <View style={styles.timeBlock}>
               <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
-                Total Hours
+                Working Hours
               </Text>
               <View style={styles.timeValueRow}>
                 <Ionicons name="time-outline" size={18} color={colors.accent} />
@@ -305,6 +307,8 @@ export default function DTRDetailScreen() {
           </View>
         )}
 
+        <AttendanceBreakControls record={dtr} onChange={setDtr} />
+        <AttendanceReviewNotice record={dtr} />
         {/* ----- feedback ----- */}
         {!!dtr.feedback && (
           <View
@@ -393,7 +397,9 @@ export default function DTRDetailScreen() {
           ]}
         >
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+            disabled={dtr.on_break}
+            accessibilityState={{ disabled: Boolean(dtr.on_break) }}
+            style={[styles.actionButton, { backgroundColor: colors.primary, opacity: dtr.on_break ? .5 : 1 }]}
             onPress={() =>
               router.push(`/(student)/dtr/time-out?id=${dtr.id}` as any)
             }
@@ -405,7 +411,7 @@ export default function DTRDetailScreen() {
               color="#FFFFFF"
               style={{ marginRight: 10 }}
             />
-            <Text style={styles.actionButtonText}>Record Time-Out</Text>
+            <Text style={styles.actionButtonText}>{dtr.on_break ? 'End break before time-out' : 'Record Time-Out'}</Text>
           </TouchableOpacity>
         </View>
       )}
