@@ -1,3 +1,4 @@
+import * as Updates from "expo-updates";
 import { Text, View, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '../../../src/context/ThemeContext';
@@ -66,8 +67,12 @@ export default function AboutScreen() {
   const { colors } = useTheme();
   return <AccountPage title="About AIMS">
     <View style={{ backgroundColor: '#0b0b2f', borderRadius: 24, padding: 24, gap: 16, borderWidth: 1, borderColor: '#303056' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}><Image source={require('../../../assets/images/aims-identity-icon.png')} style={{ width: 68, height: 68, borderRadius: 18 }} accessibilityLabel="AIMS logo" /><View style={{ flex: 1 }}><Text style={{ color: '#FFC629', fontSize: 10, letterSpacing: 1.8, fontWeight: '700' }}>CITC · USTP CDO</Text><Text style={{ color: '#FFFFFF', fontSize: 33, fontWeight: '800', letterSpacing: -1, marginTop: 4 }}>AIMS</Text></View></View>
-      <Text style={{ color: '#FFFFFF', fontSize: 18, lineHeight: 25, fontWeight: '600' }}>{APP_NAME}</Text><Text style={{ color: '#D1D4E8', fontSize: 13, lineHeight: 22 }}>Connecting students, the university and industry partners throughout the internship journey.</Text><Text style={{ color: '#FFC629', fontSize: 12 }}>{APP_VERSION} · Build {APP_BUILD}</Text><Text style={{ color: '#D1D4E8', fontSize: 12, lineHeight: 19 }}>Include this running app version and build when reporting a problem.</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}><Image source={require('../../../assets/images/aims-identity-icon.png')} style={{ width: 68, height: 68, borderRadius: 18 }} accessibilityLabel="AIMS logo" /><View style={{ flex: 1 }}><Text style={{ color: '#FFC629', fontSize: 10, letterSpacing: 1.8, fontWeight: '700' }}>CITC Â· USTP CDO</Text><Text style={{ color: '#FFFFFF', fontSize: 33, fontWeight: '800', letterSpacing: -1, marginTop: 4 }}>AIMS</Text></View></View>
+      <Text style={{ color: '#FFFFFF', fontSize: 18, lineHeight: 25, fontWeight: '600' }}>{APP_NAME}</Text><Text style={{ color: '#D1D4E8', fontSize: 13, lineHeight: 22 }}>Connecting students, the university and industry partners throughout the internship journey.</Text><Text style={{ color: '#FFC629', fontSize: 12 }}>{APP_VERSION} Â· Build {APP_BUILD}</Text><Text style={{ color: '#D1D4E8', fontSize: 12, lineHeight: 19 }}>Include this running app version and build when reporting a problem.</Text>{Updates.channel === 'preview' && (
+        <Text style={{ color: '#D1D4E8', fontSize: 12, lineHeight: 19 }}>
+          {Updates.isEmbeddedLaunch ? 'Preview build' : 'Preview update installed'}
+        </Text>
+      )}
     </View>
     <SectionLabel title="Available features" />
     <Panel><MenuRow icon="school-outline" title="Get eligible and apply" detail="Orientation/COR review, approved forms, document replacement history and application-linked endorsement." /><MenuRow icon="briefcase-outline" title="Acceptance and deployment" detail="Company application decisions, school-arranged placement proposals and coordinator deployment approval." /><MenuRow icon="time-outline" title="Attendance and learning" detail="Photo/location capture, reported-accuracy notices, company attendance confirmation, coordinator final approval, time-correction requests and weekly journals." /><MenuRow icon="ribbon-outline" title="Completion and archive" detail="Eligibility checklist, student request, company confirmation, coordinator final approval and separately released grades." /><MenuRow icon="notifications-outline" title="Account and updates" detail="Notification preferences, supported phone alerts, password reset and sign-in session management." /></Panel>
@@ -78,6 +83,6 @@ export default function AboutScreen() {
     <SectionLabel title="The team behind AIMS" hint="A capstone project developed for the CITC internship." />
     <Panel>{teamMembers.slice(1).map((member, index) => <View key={member.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 12, borderTopWidth: index ? 1 : 0, borderColor: colors.border }}><Image source={member.image} resizeMode="contain" accessibilityLabel={`${member.name} portrait`} style={{ width: 56, height: 92, flexShrink: 0, borderRadius: 12, backgroundColor: '#FFFFFF' }} /><View style={{ flex: 1 }}><Text style={{ color: colors.textPrimary, fontSize: 14, lineHeight: 21, fontWeight: '600' }}>{member.name}</Text><Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 3 }}>{member.role}</Text></View></View>)}</Panel>
     <Panel><MenuRow icon="help-buoy-outline" title="Help & support" onPress={() => router.push('/(student)/settings/help-support')} /><MenuRow icon="shield-checkmark-outline" title="Privacy policy" onPress={() => router.push('/(student)/settings/privacy-policy')} /><MenuRow icon="document-text-outline" title="Terms & conditions" onPress={() => router.push('/(student)/settings/terms')} /></Panel>
-    <Text style={[ui.description, { textAlign: 'center', color: colors.textTertiary }]}>© {new Date().getFullYear()} AIMS Team</Text>
+    <Text style={[ui.description, { textAlign: 'center', color: colors.textTertiary }]}>Â© {new Date().getFullYear()} AIMS Team</Text>
   </AccountPage>;
 }

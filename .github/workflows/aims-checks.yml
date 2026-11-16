@@ -1,0 +1,144 @@
+name: AIMS checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+  workflow_dispatch:
+    inputs:
+      publish_preview:
+        description: Publish a checked Android update to the Expo preview channel
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  EXPO_NO_TELEMETRY: '1'
+  EXPO_NO_DOTENV: '1'
+  EXPO_PUBLIC_BASE_URL: https://3.25.132.153
+  EXPO_PUBLIC_API_URL: https://3.25.132.153/api/v1
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
+          python -m pip install -r requirements.txt
+      - name: Run backend tests
+        env:
+          DEBUG: 'false'
+          DEV_BYPASS_TEST_ONBOARDING: 'false'
+          RUN_NOTIFICATION_SCHEDULER: 'false'
+          PUSH_DELIVERY_ENABLED: 'false'
+          EMAIL_NOTIFICATION_DELIVERY_ENABLED: 'false'
+        run: |
+          export DATABASE_URL="sqlite:///$RUNNER_TEMP/aims-tests.sqlite3"
+          export ASSET_DIR="$RUNNER_TEMP/aims-assets"
+          export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          python -m app.core.config
+          python -m unittest discover -s tests -q
+
+  web:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: web/aims
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.22.0'
+          cache: npm
+          cache-dependency-path: web/aims/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: node --test tests/*.test.mjs
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: ''
+
+  mobile:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.22.0'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx --no-install tsc --noEmit
+      - run: npm run check:launch
+      - run: npm run check:welcome
+      - run: npm run check:attendance-location
+      - run: npx --no-install expo export --platform android --output-dir "$RUNNER_TEMP/aims-android-bundle"
+
+  publish-preview:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_preview && github.ref == 'refs/heads/main'
+    needs: [backend, web, mobile]
+    runs-on: ubuntu-24.04
+    environment: expo-preview
+    concurrency:
+      group: expo-preview-android
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.22.0'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - name: Publish Android preview update
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add EXPO_TOKEN to the expo-preview GitHub environment before publishing."
+            exit 1
+          fi
+          npx --yes eas-cli@27.2.0 fingerprint:generate --platform android --environment preview --json > "$RUNNER_TEMP/aims-fingerprint.json"
+          runtime=$(node -e '
+            const output = require("node:fs").readFileSync(process.argv[1], "utf8");
+            const { hash } = JSON.parse(output.slice(output.indexOf("{")));
+            if (!/^[0-9a-f]{40}$/.test(hash)) process.exit(1);
+            console.log(hash);
+          ' "$RUNNER_TEMP/aims-fingerprint.json")
+          npx --yes eas-cli@27.2.0 build:list --channel preview --platform android --runtime-version "$runtime" --status finished --limit 1 --json --non-interactive > "$RUNNER_TEMP/aims-preview-builds.json"
+          node -e '
+            const builds = require(process.argv[1]);
+            if (builds.length === 0) {
+              console.error("Build and distribute a preview APK for this native runtime first.");
+              process.exit(1);
+            }
+          ' "$RUNNER_TEMP/aims-preview-builds.json"
+          npx --yes eas-cli@27.2.0 update --channel preview --platform android --environment preview --message "AIMS preview ${GITHUB_SHA:0:7}" --non-interactive

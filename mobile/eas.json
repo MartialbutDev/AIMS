@@ -4,7 +4,7 @@
     "appVersionSource": "local"
   },
   "build": {
-    "preview": {
+    "internal-apk": {
       "distribution": "internal",
       "node": "22.22.0",
       "android": {
@@ -15,8 +15,15 @@
         "EXPO_PUBLIC_API_URL": "https://3.25.132.153/api/v1"
       }
     },
+    "preview": {
+      "extends": "internal-apk",
+      "channel": "preview",
+      "environment": "preview"
+    },
     "production": {
-      "extends": "preview"
+      "extends": "internal-apk",
+      "channel": "production",
+      "environment": "production"
     }
   }
 }
