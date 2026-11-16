@@ -1,3 +1,4 @@
+import { submitWithRecovery } from "./submissionRecovery";
 // src/services/dtr.service.ts
 import api from './api';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -94,15 +95,7 @@ export const dtrService = {
   },
 
   async createDTR(formData: FormData): Promise<DTR> {
-    try {
-      const response = await api.post('/dtr/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Create DTR error:', error.response?.data || error.message);
-      throw error;
-    }
+    return (await submitWithRecovery<DTR>('/dtr/', formData)).data;
   },
 
   async getDTRById(id: string): Promise<DTR> {
@@ -116,15 +109,7 @@ export const dtrService = {
   },
 
   async recordTimeOut(dtrId: string, formData: FormData): Promise<DTR> {
-    try {
-      const response = await api.post(`/dtr/${dtrId}/time-out`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Record Time-Out error:', error.response?.data || error.message);
-      throw error;
-    }
+    return (await submitWithRecovery<DTR>(`/dtr/${encodeURIComponent(dtrId)}/time-out`, formData)).data;
   },
 
   async exportDTRToExcel(term?: { academic_year: string; semester: string }, approvedOnly = false): Promise<void> {

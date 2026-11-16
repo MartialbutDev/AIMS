@@ -57,8 +57,20 @@ from app.services.cor_faculty_extraction import (
     extract_cor_course_layout,
 )
 
-from app.services.ocr_service import OCRService
-from app.services.onboarding_eligibility import onboarding_complete, submissions_complete
+from app.core.file_storage import staged_file, stored_file
+from app.core.document_upload_limits import MAX_UPLOAD_BYTES, UPLOAD_SIZE_MESSAGE
+from app.services.ocr_service import (
+    DocumentLimitError,
+    OCRService,
+    check_image_limits,
+    check_pdf_limits,
+)
+from app.services.onboarding_eligibility import (
+    CURRENT_COR_REQUIRED,
+    cor_matches_term,
+    onboarding_blocker,
+    onboarding_submission_blocker,
+)
 from app.services.document_identification import inspect_upload
 
 from app.services.onboarding_validation import (
@@ -75,8 +87,6 @@ router = APIRouter(
 ASSET_ROOT = Path(settings.ASSET_DIR).resolve()
 PRIVATE_DIR = ASSET_ROOT / "onboarding"
 
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-MAX_PDF_PAGES = 6
 
 ALLOWED_EXTENSIONS = {
     ".pdf": "application/pdf",
@@ -192,7 +202,7 @@ def _is_complete(
 
     if not record:
         return False
-    return onboarding_complete(db, record.student_id)
+    return onboarding_blocker(db, record.student_id, get_current_academic_term()) is None
 
 
 def _maybe_assign(
@@ -255,7 +265,14 @@ def _status(
         else None
     )
 
-    complete = submissions_complete(student.id, orientation, cor)
+    current_year, current_semester = get_current_academic_term()
+    term = (current_year, current_semester)
+    complete = onboarding_submission_blocker(student.id, orientation, cor, term) is None
+    cor_needs_replacement = (
+        cor is not None
+        and cor.review_status != "rejected"
+        and not cor_matches_term(cor.validation_result, term)
+    )
 
     if complete:
         next_step = "completed"
@@ -266,7 +283,7 @@ def _status(
     elif orientation.review_status == "rejected":
         next_step = "resubmit_rejected"
 
-    elif cor is None:
+    elif cor is None or cor_needs_replacement:
         next_step = "upload_cor"
 
     elif cor.review_status == "rejected":
@@ -275,7 +292,6 @@ def _status(
     else:
         next_step = "awaiting_review"
 
-    current_year, current_semester = get_current_academic_term()
     assignment = db.query(
         CoordinatorStudentAssignment
     ).filter(
@@ -335,7 +351,10 @@ def _status(
         "onboarding_approved": complete,
         "next_step": next_step,
         "orientation": _submission_data(orientation, include_diagnostics),
-        "cor": _submission_data(cor, include_diagnostics),
+        # The student upload screen treats an empty COR slot as ready for upload.
+        # Keep the old submission available in staff diagnostics and review history.
+        "cor": _submission_data(cor, include_diagnostics)
+        if include_diagnostics or not cor_needs_replacement else None,
         "coordinator_assignment": coordinator_data,
         "development_onboarding_bypass": dev_bypass,
     }
@@ -355,11 +374,6 @@ async def _save_private_upload(
             "Upload a PDF, JPG, or PNG document",
         )
 
-    PRIVATE_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
     path = PRIVATE_DIR / (
         f"{uuid.uuid4().hex}{extension}"
     )
@@ -368,7 +382,7 @@ async def _save_private_upload(
     first_bytes = b""
 
     try:
-        with path.open("wb") as output:
+        with staged_file(path) as output:
             while True:
                 chunk = await file.read(
                     1024 * 1024
@@ -385,7 +399,7 @@ async def _save_private_upload(
                 if size > MAX_UPLOAD_BYTES:
                     raise HTTPException(
                         413,
-                        "Document must be 10 MB or smaller",
+                        UPLOAD_SIZE_MESSAGE,
                     )
 
                 output.write(chunk)
@@ -422,17 +436,9 @@ async def _save_private_upload(
         if extension == ".pdf":
             try:
                 with fitz.open(path) as pdf:
-                    if (
-                        pdf.needs_pass
-                        or not (
-                            1 <= pdf.page_count <= MAX_PDF_PAGES
-                        )
-                    ):
-                        raise HTTPException(
-                            400,
-                            "PDF must be unlocked "
-                            "and contain 1–6 pages",
-                        )
+                    check_pdf_limits(pdf)
+                    if pdf.needs_pass or not pdf.page_count:
+                        raise HTTPException(400, "PDF must be unlocked and contain at least one page.")
 
             except HTTPException:
                 raise
@@ -446,7 +452,11 @@ async def _save_private_upload(
         else:
             try:
                 with Image.open(path) as image:
+                    check_image_limits(image)
                     image.verify()
+
+            except Image.DecompressionBombError as exc:
+                raise DocumentLimitError(413, "Image exceeds the allowed dimensions.") from exc
 
             except (
                 UnidentifiedImageError,
@@ -546,6 +556,7 @@ async def _upload(
     if (
         previous
         and previous.review_status != "rejected"
+        and (kind != "cor" or cor_matches_term(previous.validation_result, get_current_academic_term()))
     ):
         raise HTTPException(
             409,
@@ -854,18 +865,7 @@ def view_submission(
             submission.student_id,
         )
 
-    path = (
-        ASSET_ROOT / submission.file_path
-    ).resolve()
-
-    if (
-        not path.is_relative_to(PRIVATE_DIR)
-        or not path.is_file()
-    ):
-        raise HTTPException(
-            404,
-            "Submission file not found",
-        )
+    path = stored_file(submission.file_path, "onboarding")
 
     return FileResponse(
         str(path),
@@ -1005,6 +1005,8 @@ def review_submission(
 
     if submission.document_kind == "cor" and payload.decision == "verified":
         guard_cor_approval(db, submission.validation_result or {})
+        if not cor_matches_term(submission.validation_result, get_current_academic_term()):
+            raise HTTPException(409, CURRENT_COR_REQUIRED)
 
     submission.review_status = (
         payload.decision

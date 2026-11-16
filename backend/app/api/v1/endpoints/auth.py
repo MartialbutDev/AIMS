@@ -30,6 +30,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User, UserRole
+from app.services import login_throttle
 from app.schemas.user import (
     UserCreate,
     UserResponse,
@@ -118,48 +119,34 @@ def _token_response(user: User, user_agent: str | None = None, remember_me: bool
 
 def _authenticate(
     db: Session,
+    request: Request,
     identifier: str,
     password: str,
-    mobile: bool,
+    mobile: bool | None,
 ) -> User:
     identifier = identifier.strip()
+    if mobile is False and identifier.lower() == "admin":
+        identifier = "admin@aims.local"
 
-    if not identifier:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials",
-        )
-
-    if mobile:
-        user = db.query(User).filter(
-            User.student_id == identifier
-        ).first()
-
+    user = None
+    if identifier:
+        if mobile is True:
+            user = db.query(User).filter(User.student_id == identifier).first()
         if user is None:
-            user = db.query(User).filter(
-                func.lower(User.email) == identifier.lower()
-            ).first()
-    else:
-        if identifier.lower() == "admin":
-            identifier = "admin@aims.local"
+            user = db.query(User).filter(func.lower(User.email) == identifier.lower()).first()
+        if user is None and mobile is None:
+            user = db.query(User).filter(User.student_id == identifier).first()
 
-        user = db.query(User).filter(
-            func.lower(User.email) == identifier.lower()
-        ).first()
+    password_hash = user.hashed_password if user is not None else None
+    reservations = login_throttle.reserve(db, request, identifier, user.id if user is not None else None)
+    if password_hash is None or not verify_password(password, password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if user is None or not verify_password(
-        password, user.hashed_password
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials",
-        )
-
+    login_throttle.refund(db, reservations)
+    if user.hashed_password != password_hash:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     if not user.is_active:
-        raise HTTPException(
-            status_code=403,
-            detail="Account is disabled",
-        )
+        raise HTTPException(status_code=403, detail="Account is disabled")
 
     if mobile and user.role != UserRole.STUDENT:
         raise HTTPException(
@@ -167,7 +154,7 @@ def _authenticate(
             detail="Please use the web application",
         )
 
-    if not mobile and user.role == UserRole.STUDENT:
+    if mobile is False and user.role == UserRole.STUDENT:
         raise HTTPException(
             status_code=403,
             detail="Please use the student workspace or mobile application",
@@ -246,16 +233,17 @@ async def register_student(
 )
 def login_student(
     login_data: LoginRequest,
-    request: Request = None,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     user = _authenticate(
         db,
+        request,
         login_data.email,
         login_data.password,
         mobile=True,
     )
-    return _token_response(user, request.headers.get("user-agent") if request else None, login_data.remember_me)
+    return _token_response(user, request.headers.get("user-agent"), login_data.remember_me)
 
 
 @router.post(
@@ -318,47 +306,26 @@ async def register_web_user(
 )
 def login_web_user(
     login_data: LoginRequest,
-    request: Request = None,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     user = _authenticate(
         db,
+        request,
         login_data.email,
         login_data.password,
         mobile=False,
     )
-    return _token_response(user, request.headers.get("user-agent") if request else None, login_data.remember_me)
+    return _token_response(user, request.headers.get("user-agent"), login_data.remember_me)
 
 
 @router.post("/login/form")
 def login_user_form(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    identifier = form_data.username.strip()
-
-    user = db.query(User).filter(
-        func.lower(User.email) == identifier.lower()
-    ).first()
-
-    if user is None:
-        user = db.query(User).filter(
-            User.student_id == identifier
-        ).first()
-
-    if user is None or not verify_password(
-        form_data.password, user.hashed_password
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials",
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=403,
-            detail="Account is disabled",
-        )
+    user = _authenticate(db, request, form_data.username, form_data.password, mobile=None)
 
     token = _token_response(user)
 

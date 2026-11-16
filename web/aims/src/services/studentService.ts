@@ -1,8 +1,58 @@
+import { readStoredSession } from "./sessionStorage"
 import type { AttendanceReviewFields } from '../components/AttendanceEvidence'
-import { apiRequest, apiRequestBlob } from './apiClient'
+import { ApiResponseError, apiRequest, apiRequestBlob } from './apiClient'
 
 export const studentApi = <T>(path: string, options?: RequestInit) => apiRequest<T>(`/api/v1${path}`, options)
-export const studentWrite = <T>(path: string, body?: FormData | Record<string, unknown>, method = 'POST') => studentApi<T>(path, { method, ...(body ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {}) })
+const recoverableUpload = (path: string) =>
+  ['/documents/upload', '/journals/', '/dtr/'].includes(path) || /^\/dtr\/[^/]+\/time-out$/.test(path)
+
+function submissionKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('')
+  return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-')
+}
+
+function outcomeUnknown(error: unknown) {
+  return error instanceof TypeError ||
+    (error instanceof ApiResponseError && [408, 500, 502, 504].includes(error.status))
+}
+
+export class SubmissionUnconfirmedError extends Error {
+  readonly retry: () => Promise<unknown>
+  constructor(retry: () => Promise<unknown>) {
+    super('Couldn’t confirm whether this submission was saved. Retry the same submission or refresh your records.')
+    this.retry = retry
+  }
+}
+
+export async function studentWrite<T>(path: string, body?: FormData | Record<string, unknown>, method = 'POST') {
+  const options = { method, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined }
+  if (method !== 'POST' || !recoverableUpload(path)) return studentApi<T>(path, options)
+
+  const session = readStoredSession()
+  const headers = { 'Idempotency-Key': submissionKey() }
+  const send = () => studentApi<T>(path, { ...options, headers })
+  const retryUntil = Date.now() + 86_400_000
+  const retry = async (): Promise<T> => {
+    if (!session || readStoredSession()?.accessToken !== session.accessToken || Date.now() >= retryUntil) {
+      throw new Error('Refresh your records before starting a new submission.')
+    }
+    try {
+      return await send()
+    } catch (error) {
+      if (!outcomeUnknown(error) && !(error instanceof ApiResponseError && error.status === 401)) throw error
+      throw new SubmissionUnconfirmedError(retry)
+    }
+  }
+  try {
+    return await send()
+  } catch (error) {
+    if (!outcomeUnknown(error)) throw error
+    return retry()
+  }
+}
 export const filePath = (id: string) => encodeURIComponent(id)
 export async function saveStudentFile(path: string, filename: string) {
   const blob = await apiRequestBlob(`/api/v1${path}`)

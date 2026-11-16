@@ -1,5 +1,5 @@
 from app.services.document_version_service import effective_documents
-from app.services.onboarding_eligibility import onboarding_blocker, onboarding_complete, require_approved_onboarding
+from app.services.onboarding_eligibility import onboarding_blocker, require_approved_onboarding
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -55,7 +55,7 @@ class DeploymentService:
             accepted = accepted.filter(Application.id != exclude_application_id)
         if accepted.first():
             return 'You already have an accepted application for this semester.'
-        return onboarding_blocker(db, student_id, lock=lock_onboarding)
+        return onboarding_blocker(db, student_id, (year, semester), lock=lock_onboarding)
 
     @classmethod
     def require_application_eligibility(cls, db: Session, student_id: str, year: str, semester: str,
@@ -138,7 +138,8 @@ class DeploymentService:
         check('status', 'Awaiting official deployment confirmation', deployment.status == DeploymentStatus.PRE_DEPLOYMENT)
         student = db.get(User, deployment.student_id)
         check('student', 'Student account is active', student and student.is_active and student.role == UserRole.STUDENT)
-        check('onboarding', 'Orientation and COR are approved', onboarding_complete(db, deployment.student_id))
+        check('onboarding', 'Orientation and current-term COR are approved',
+              onboarding_blocker(db, deployment.student_id, (year, semester)) is None)
         application = db.get(Application, deployment.application_id)
         matches = application and application.status == ApplicationStatus.ACCEPTED and (
             application.student_id, application.company_id, application.academic_year, application.semester
@@ -299,7 +300,7 @@ class DeploymentService:
             mode="write",
         )
 
-        require_approved_onboarding(db, deployment.student_id)
+        require_approved_onboarding(db, deployment.student_id, (year, semester))
         approval = cls.get_approval(db, deployment, actor)
         if not approval['ready']:
             raise HTTPException(409, detail={

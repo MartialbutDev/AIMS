@@ -66,15 +66,14 @@ export function ApplicationsPage({ data }: ApplicationsPageProps) {
       <section className="cc-card cc-directory cc-application-records">
         <div className="cc-section-header">
           <div>
-            <span className="cc-section-kicker">APPLICATION RECORDS</span>
-            <h2>Recent Activity</h2>
+            <h2>Recent Application Activity</h2>
             <p>
-              Updates currently available through your dashboard analytics.
+              Search recent application and placement updates from the dashboard.
             </p>
           </div>
 
           <span className="cc-counter">
-            {activities.length} records
+            {activities.length} {activities.length === 1 ? 'update' : 'updates'}
           </span>
         </div>
 

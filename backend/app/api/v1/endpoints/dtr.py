@@ -19,10 +19,13 @@ from datetime import datetime
 import uuid
 import os
 import shutil
+from pathlib import Path
 import math
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.file_storage import staged_file, stored_file
+from app.services.submission_recovery import Submission, SubmissionKey
 from app.core.assignment_access import (
     ensure_coordinator_student_access,
     get_current_academic_term,
@@ -51,11 +54,6 @@ def save_upload_file(
     upload_file: UploadFile,
     folder: str,
 ) -> str:
-    os.makedirs(
-        folder,
-        exist_ok=True,
-    )
-
     file_id = str(uuid.uuid4())
 
     header=upload_file.file.read(8);upload_file.file.seek(0)
@@ -68,7 +66,7 @@ def save_upload_file(
         file_name,
     )
 
-    with open(file_path, "wb") as buffer:
+    with staged_file(Path(file_path)) as buffer:
         shutil.copyfileobj(
             upload_file.file,
             buffer,
@@ -269,7 +267,7 @@ def begin_capture(body: CaptureRequest, db=Depends(get_db), current_user=Depends
     response_model=DTRResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_dtr(
+def create_dtr(
     date: str = Form(...),
     time_in: str = Form(...),
     time_out: Optional[str] = Form(None),
@@ -283,6 +281,7 @@ async def create_dtr(
     location_address: Optional[str] = Form(None),
     image_in: UploadFile = File(...),
     image_out: Optional[UploadFile] = File(None),
+    submission_key: SubmissionKey = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -291,6 +290,10 @@ async def create_dtr(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only students can submit DTR",
         )
+
+    submission = Submission(db, current_user, "clock-in", submission_key)
+    if (previous := submission.replay(DTR)) is not None:
+        return previous
 
     academic_year, semester = get_current_academic_term()
     deployment = DeploymentService.require_active_deployment(db, current_user.id)
@@ -423,19 +426,8 @@ async def create_dtr(
     )
 
     db.add(dtr)
-    db.commit()
-    db.refresh(dtr)
+    return _commit_attendance(db, dtr, current_user, submission, image_in_path)
 
-    _fire_dtr_notification(
-        db,
-        dtr,
-        dtr_status.value,
-    )
-
-    return _to_response(
-        dtr,
-        _student_name(current_user),
-    )
 
 
 # ============================================================
@@ -510,7 +502,7 @@ async def get_my_dtr(
     "/{dtr_id}/time-out",
     response_model=DTRResponse,
 )
-async def record_time_out(
+def record_time_out(
     dtr_id: str,
     time_out: str = Form(...),
     image_out: UploadFile = File(...),
@@ -520,6 +512,7 @@ async def record_time_out(
     latitude: Optional[float] = Form(None),
     longitude: Optional[float] = Form(None),
     location_address: Optional[str] = Form(None),
+    submission_key: SubmissionKey = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -528,6 +521,10 @@ async def record_time_out(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only students can record time-out",
         )
+
+    submission = Submission(db, current_user, f"clock-out:{dtr_id}", submission_key)
+    if (previous := submission.replay(DTR)) is not None:
+        return previous
 
     dtr = (
         db.query(DTR)
@@ -611,27 +608,25 @@ async def record_time_out(
     dtr.submitted_date = datetime.utcnow()
     dtr.updated_at = func.now()
 
+    return _commit_attendance(db, dtr, current_user, submission, image_out_path)
+
+
+def _commit_attendance(db, dtr, user, submission, path):
+    try:
+        db.flush()
+        result = _to_response(dtr, _student_name(user))
+        submission.save(dtr.id, result)
+        db.flush()
+    except Exception:
+        db.rollback()
+        try:
+            (Path(settings.ASSET_DIR) / path).unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
     db.commit()
-    db.refresh(dtr)
-
-    student = (
-        db.query(User)
-        .filter(
-            User.id == dtr.student_id
-        )
-        .first()
-    )
-
-    _fire_dtr_notification(
-        db,
-        dtr,
-        dtr.status.value,
-    )
-
-    return _to_response(
-        dtr,
-        _student_name(student),
-    )
+    _fire_dtr_notification(db, dtr, dtr.status.value)
+    return result
 
 
 # ============================================================
@@ -937,7 +932,6 @@ async def update_dtr_status(dtr_id: str, update_data: DTRUpdate, db: Session=Dep
 
 @router.get("/{dtr_id}/photo/{photo_type}")
 async def get_student_dtr_photo(dtr_id: str, photo_type: str, db: Session=Depends(get_db), current_user: User=Depends(get_current_user)):
-    from pathlib import Path
     from fastapi.responses import FileResponse
     try:
         await get_dtr(dtr_id,db,current_user)
@@ -947,6 +941,7 @@ async def get_student_dtr_photo(dtr_id: str, photo_type: str, db: Session=Depend
     row=db.get(DTR,dtr_id)
     if photo_type not in ('in','out'): raise HTTPException(422,"Choose in or out")
     name=row.image_in_path if photo_type=='in' else row.image_out_path
-    root=Path(settings.ASSET_DIR).resolve();path=(root/(name or '')).resolve()
-    if not name or not path.is_relative_to(root/'dtr_uploads') or not path.is_file(): raise HTTPException(404,"Photo unavailable")
+    if not name or Path(name).parent != Path("dtr_uploads"):
+        raise HTTPException(404, "Photo unavailable")
+    path = stored_file(name, "dtr_uploads")
     return FileResponse(path,headers={'Cache-Control':'no-store'})

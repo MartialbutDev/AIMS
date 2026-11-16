@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { apiRequest } from '../../services/apiClient'
 import { AttendanceEvidence, type AttendanceReviewFields } from '../../components/AttendanceEvidence'
 import { FilePreview } from '../student/StudentUI'
+import { Icon } from '../../components/Icons'
 import './attendance-confirmation.css'
 
 type Entry = AttendanceReviewFields & { id: string; date: string; status: string; time_in: string; time_out: string | null; image_in_available?: boolean; image_out_available?: boolean }
@@ -46,8 +47,8 @@ export function AttendanceConfirmation({ deploymentId, entries, active, refresh 
         </div>
         <div className="ac-evidence"><AttendanceEvidence record={row} /></div>
         <div className="ac-photo-actions" aria-label="Attendance photos">
-          {row.image_in_available && <button type="button" onClick={() => setPreview({ path: `/dtr/${encodeURIComponent(row.id)}/photo/in`, name: 'Clock-in selfie' })}>View clock-in selfie</button>}
-          {row.image_out_available && <button type="button" onClick={() => setPreview({ path: `/dtr/${encodeURIComponent(row.id)}/photo/out`, name: 'Clock-out selfie' })}>View clock-out selfie</button>}
+          {row.image_in_available && <button type="button" onClick={() => setPreview({ path: `/dtr/${encodeURIComponent(row.id)}/photo/in`, name: 'Clock-in selfie' })}><Icon name="user" size={16} />View clock-in selfie</button>}
+          {row.image_out_available && <button type="button" onClick={() => setPreview({ path: `/dtr/${encodeURIComponent(row.id)}/photo/out`, name: 'Clock-out selfie' })}><Icon name="user" size={16} />View clock-out selfie</button>}
         </div>
         {canDecide && <div className="ac-decision">
           <label className="ac-field">Company feedback
@@ -55,8 +56,8 @@ export function AttendanceConfirmation({ deploymentId, entries, active, refresh 
             <span className="ac-hint">Required to dispute an entry. Use at least 5 characters.</span>
           </label>
           <div className="ac-decision-actions">
-            <button type="button" className="ac-primary" disabled={busy} onClick={() => void save(row.id)}>Confirm attendance</button>
-            <button type="button" className="ac-dispute" disabled={busy || (reasons[row.id] || '').trim().length < 5} onClick={() => void save(row.id, 'disputed')}>Dispute attendance</button>
+            <button type="button" className="ac-primary" disabled={busy} onClick={() => void save(row.id)}><Icon name="check" size={16} />Confirm attendance</button>
+            <button type="button" className="ac-dispute" disabled={busy || (reasons[row.id] || '').trim().length < 5} onClick={() => void save(row.id, 'disputed')}><Icon name="close" size={16} />Dispute attendance</button>
           </div>
           <label className="ac-weekly-choice"><input type="checkbox" disabled={busy || row.company_status === 'disputed'} checked={selected.includes(row.id)} onChange={e => setSelected(old => e.target.checked ? [...old, row.id] : old.filter(id => id !== row.id))} /><span>Reviewed for weekly confirmation</span></label>
         </div>}

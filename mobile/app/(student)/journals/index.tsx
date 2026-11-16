@@ -2,7 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -53,6 +53,9 @@ export default function JournalsScreen() {
   const { colors, isDark } = useTheme();
   const { handleScroll } = useAutoHideTab();
   const [summary, setSummary] = useState<JournalSummary | null>(null);
+  const [summaryUnavailable, setSummaryUnavailable] = useState(false);
+  const [isRefreshingSummary, setIsRefreshingSummary] = useState(false);
+  const summaryRequestInFlight = useRef(false);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [selectedWeek, setSelectedWeek] = useState<number | "all">("all");
 
@@ -90,18 +93,28 @@ export default function JournalsScreen() {
     }
   );
 
-  // ✅ Summary
-  useEffect(() => {
-    fetchSummary();
+  const fetchSummary = useCallback(async () => {
+    if (summaryRequestInFlight.current) return;
+    summaryRequestInFlight.current = true;
+    setIsRefreshingSummary(true);
+    try {
+      setSummary(await journalService.getJournalSummary());
+      setSummaryUnavailable(false);
+    } catch {
+      setSummaryUnavailable(true);
+    } finally {
+      summaryRequestInFlight.current = false;
+      setIsRefreshingSummary(false);
+    }
   }, []);
 
-  const fetchSummary = async () => {
-    try {
-      const summaryData = await journalService.getJournalSummary();
-      setSummary(summaryData);
-    } catch (error) {
-      console.error("Error fetching summary:", error);
-    }
+  useEffect(() => {
+    void fetchSummary();
+  }, [fetchSummary]);
+
+  const refreshJournals = () => {
+    void refresh();
+    void fetchSummary();
   };
 
   const filteredJournals = journals.filter((journal) => {
@@ -314,6 +327,27 @@ export default function JournalsScreen() {
         </TouchableOpacity>
       </View>
 
+      {summaryUnavailable && (
+        <View style={[styles.summaryNotice, { backgroundColor: colors.card }]}>
+          <Text accessibilityLiveRegion="polite" style={{ color: colors.textPrimary }}>
+            {summary
+              ? "Couldn’t refresh your journals. Showing the last loaded counts."
+              : "Couldn’t load your journal counts."}
+          </Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isRefreshingSummary, busy: isRefreshingSummary }}
+            disabled={isRefreshingSummary}
+            onPress={refreshJournals}
+            style={styles.summaryRetry}
+          >
+            <Text style={{ color: colors.accent, fontWeight: "600" }}>
+              {isRefreshingSummary ? "Retrying…" : "Try again"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Summary stats */}
       {summary && (
         <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
@@ -397,7 +431,7 @@ export default function JournalsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={refresh}
+            onRefresh={refreshJournals}
             tintColor={colors.accent}
           />
         }
@@ -408,7 +442,7 @@ export default function JournalsScreen() {
         }}
         onEndReachedThreshold={0.3}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
+          summaryUnavailable && journals.length === 0 ? null : <View style={styles.emptyState}>
             <Ionicons name="book-outline" size={64} color={colors.border} />
             <Text
               style={[styles.emptyStateTitle, { color: colors.textPrimary }]}
@@ -467,6 +501,18 @@ const styles = StyleSheet.create({
   },
   addButton: {
     padding: 4,
+  },
+  summaryNotice: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    borderRadius: 12,
+  },
+  summaryRetry: {
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    minHeight: 44,
   },
   statsContainer: {
     flexDirection: "row",

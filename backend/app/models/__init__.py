@@ -84,3 +84,6 @@ from app.models.moa_file import MoaFile
 
 from app.models.dtr_correction import DTRCorrection
 
+from app.models.login_limit import LoginAttemptLimit
+
+from app.models.submission_receipt import SubmissionReceipt

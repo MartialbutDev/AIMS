@@ -67,3 +67,17 @@
 .sr-export label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sr-export select { max-width: 100%; padding: 8px; }
 .sr-export p { flex-basis: 100%; margin: 0; }
+
+.sr-dialog-heading > div, .sr-toolbar > span { min-width: 0; overflow-wrap: anywhere; }
+.sr-close { width: 44px; height: 44px; }
+.sr-time-record header, .sr-journal header { flex-wrap: wrap; }
+.sr-time-record header > div, .sr-journal h3 { min-width: 0; overflow-wrap: anywhere; }
+.sr-status { white-space: normal; }
+@media (max-width: 480px) {
+  .sr-dialog-heading, .sr-body { padding: 16px; }
+  .sr-toolbar { padding: 12px 16px; gap: 8px; }
+  .sr-document-row > div { min-width: 0; flex-basis: calc(100% - 40px); }
+  .sr-time-record, .sr-journal, .sr-totals { padding: 14px; }
+  .sr-totals { grid-template-columns: 1fr; gap: 8px; }
+  .sr-form-actions { flex-wrap: wrap; }
+}

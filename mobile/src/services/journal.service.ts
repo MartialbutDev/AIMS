@@ -1,6 +1,6 @@
 // src/services/journal.service.ts
 import api from "./api";
-import { BASE_URL } from "../config/env";
+import { submitWithRecovery } from "./submissionRecovery";
 
 export interface Journal {
   id: string;
@@ -36,20 +36,8 @@ export interface CreateJournalPayload {
 
 export const journalService = {
   async getJournalSummary(): Promise<JournalSummary> {
-    try {
-      const res = await api.get("/journals/summary");
-      return res.data;
-    } catch (err) {
-      console.error("❌ getJournalSummary error:", err);
-      return {
-        total: 0,
-        draft: 0,
-        submitted: 0,
-        reviewing: 0,
-        approved: 0,
-        rejected: 0,
-      };
-    }
+    const response = await api.get<JournalSummary>("/journals/summary");
+    return response.data;
   },
 
   async createJournal(payload: CreateJournalPayload): Promise<Journal> {
@@ -68,9 +56,7 @@ export const journalService = {
       type: payload.mimeType || "application/pdf",
     } as any);
 
-    const res = await api.post("/journals/", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const res = await submitWithRecovery<Journal>("/journals/", formData);
     return res.data;
   },
 
@@ -105,11 +91,5 @@ export const journalService = {
 
   async deleteJournal(id: string): Promise<void> {
     await api.delete(`/journals/${id}`);
-  },
-
-  getFileUrl(journalId: string, token: string): string {
-    return `${BASE_URL}/api/v1/journals/${journalId}/file?token=${encodeURIComponent(
-      token
-    )}`;
   },
 };

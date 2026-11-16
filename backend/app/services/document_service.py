@@ -31,6 +31,8 @@ from app.models.user import User
 from app.services.ocr_service import OCRService
 from app.services.document_identification import inspect_upload
 from app.services.notification_service import NotificationService
+from app.services.submission_recovery import Submission
+from app.services.student_document_feedback import student_upload_payload
 from app.core.config import settings
 from app.core.assignment_access import get_current_academic_term
 
@@ -650,10 +652,11 @@ class DocumentService:
         document_type: str,
         description: str,
         uploaded_by: str,
+        submission: Submission | None = None,
     ) -> dict:
 
         saved_path = None
-        committed = False
+        commit_started = False
 
         try:
             # --------------------------------------------
@@ -890,28 +893,8 @@ class DocumentService:
                     previous_status='pending', decision='auto_verified',
                     notes='Automatic content validation; no signature authentication.',
                     created_at=datetime.now(timezone.utc).replace(tzinfo=None)))
-            db.commit()
-
-            committed = True
-            db.refresh(document)
-
-            # --------------------------------------------
-            # STEP 8: NOTIFY STUDENT
-            # --------------------------------------------
-
-            cls._fire_document_notification(
-                db=db,
-                user_id=uploaded_by,
-                document_id=document.id,
-                status=status,
-                doc_type_enum=doc_type_enum,
-            )
-
-            # --------------------------------------------
-            # STEP 9: RETURN UPLOAD RESPONSE
-            # --------------------------------------------
-
-            return {
+            db.flush()
+            result = {
                 "verified": status == "verified",
                 "status": status,
                 "document": cls._serialize_document(document),
@@ -932,10 +915,21 @@ class DocumentService:
                 },
             }
 
+            if submission is not None:
+                submission.save(document.id, student_upload_payload(result))
+            db.flush()
+            commit_started = True
+            db.commit()
+            cls._fire_document_notification(
+                db=db, document_id=document.id, user_id=uploaded_by,
+                status=status, doc_type_enum=doc_type_enum,
+            )
+            return result
+
         except HTTPException:
             db.rollback()
 
-            if saved_path and not committed:
+            if saved_path and not commit_started:
                 try:
                     os.remove(saved_path)
                 except OSError:
@@ -946,7 +940,7 @@ class DocumentService:
         except Exception:
             db.rollback()
 
-            if saved_path and not committed:
+            if saved_path and not commit_started:
                 try:
                     os.remove(saved_path)
                 except OSError:

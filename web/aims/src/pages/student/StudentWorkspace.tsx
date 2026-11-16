@@ -1,7 +1,8 @@
 import { AccountMenu } from '../../components/AccountMenu'
+import { Icon, type IconName } from '../../components/Icons'
 import { StudentOnboardingGate } from './StudentOnboardingGate'
 import { sectionCategories } from '../../services/activitySections'
-import { ActivityProvider, ActivityBadges, PageActivity } from '../../components/ActivityIndicators'
+import { ActivityProvider, ActivityBadges, PageActivity, type ActivityCategory } from '../../components/ActivityIndicators'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Brand } from '../../components/Brand'
@@ -19,9 +20,20 @@ import { Heading, Notice, StudentLink } from './StudentUI'
 import { useStudentAction, useStudentLoad } from './studentHooks'
 import './student.css'
 
-const navigation = [
-  { title: 'YOUR INTERNSHIP', links: [['dashboard', 'Overview', '◈'], ['applications', 'Applications', '↗'], ['documents', 'Documents', '▤'], ['attendance', 'Attendance', '◷'], ['journals', 'Journals', '▥']] },
-  { title: 'YOUR ACCOUNT', links: [['profile', 'Profile', '○']] },
+type NavigationLink = [slug: string, label: string, icon: IconName]
+const navigation: { title: string; links: NavigationLink[] }[] = [
+  { title: 'Your internship', links: [
+    ['dashboard', 'Overview', 'grid'],
+    ['applications', 'Applications', 'briefcase'],
+    ['documents', 'Documents', 'file'],
+    ['attendance', 'Attendance', 'clock'],
+    ['journals', 'Journals', 'book'],
+  ] },
+  { title: 'Your account', links: [['profile', 'Profile', 'user']] },
+]
+const onboardingNavigation: typeof navigation = [
+  { title: 'Get started', links: [['onboarding', 'Orientation & COR', 'clipboard']] },
+  { title: 'Your account', links: [['profile', 'Profile', 'user'], ['settings', 'Settings', 'settings'], ['help-center', 'Help & about AIMS', 'help']] },
 ]
 const pageGroups: Record<string, string> = {
   companies: 'applications', 'direct-placements': 'applications', 'pre-deployment': 'applications',
@@ -35,9 +47,14 @@ const pageTitles: Record<string, string> = {
   attendance: 'Attendance & corrections', journals: 'Weekly journals', reports: 'Reports & activity',
   profile: 'Profile', completion: 'Completion & archive', settings: 'Settings', 'help-center': 'Help & about AIMS',
 }
-const relatedPages: Record<string, { label: string; links: [string, string][] }> = {
-  applications: { label: 'Application tools', links: [['applications', 'My applications'], ['companies', 'Find a company'], ['direct-placements', 'School-arranged placements'], ['pre-deployment', 'Pre-deployment checklist']] },
-  documents: { label: 'Document tools', links: [['documents', 'My documents'], ['forms', 'Download approved forms'], ['onboarding', 'Eligibility & onboarding']] },
+const relatedPages: Record<string, { label: string; links: NavigationLink[] }> = {
+  applications: { label: 'Application tools', links: [['applications', 'My applications', 'briefcase'], ['companies', 'Find a company', 'building'], ['direct-placements', 'School-arranged placements', 'users'], ['pre-deployment', 'Pre-deployment checklist', 'clipboard']] },
+  documents: { label: 'Document tools', links: [['documents', 'My documents', 'file'], ['forms', 'Download approved forms', 'download'], ['onboarding', 'Eligibility & onboarding', 'clipboard']] },
+}
+const navigationActivity: Record<string, ActivityCategory[]> = {
+  profile: ['completion', 'grades'],
+  applications: ['applications', 'placements', 'deployment'],
+  documents: ['documents', 'onboarding', 'forms', 'assignments'],
 }
 
 function RelatedPages({ section, parent }: { section: string; parent: string }) {
@@ -45,7 +62,13 @@ function RelatedPages({ section, parent }: { section: string; parent: string }) 
   if (!group) return null
   return <nav className="sw-related" aria-label={group.label}>
     <span>{group.label}</span>
-    <div>{group.links.map(([slug, label]) => <Link key={slug} to={`/student/${slug}`} aria-current={section === slug ? 'page' : undefined}>{label}<ActivityBadges compact categories={sectionCategories[slug] || []} /></Link>)}</div>
+    <div>{group.links.map(([slug, label, icon]) => (
+      <Link key={slug} to={`/student/${slug}`} aria-current={section === slug ? 'page' : undefined}>
+        <Icon name={icon} size={17} />
+        <span className="sw-nav-label">{label}</span>
+        <ActivityBadges compact categories={sectionCategories[slug] || []} />
+      </Link>
+    ))}</div>
   </nav>
 }
 
@@ -59,10 +82,7 @@ function StudentWorkspaceShell({ session, onLogout, onboardingRequired }: { sess
   useEffect(() => { if (!open) return; const old = document.body.style.overflow; document.body.style.overflow = 'hidden'; const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }; window.addEventListener('keydown', escape); return () => { document.body.style.overflow = old; window.removeEventListener('keydown', escape) } }, [open])
   const title = pageTitles[section] || 'Overview'
   const parent = onboardingRequired && section === 'onboarding' ? 'onboarding' : pageGroups[section] || section
-  const visibleNavigation = onboardingRequired ? [
-    { title: 'GET STARTED', links: [['onboarding', 'Orientation & COR', '✓']] },
-    { title: 'YOUR ACCOUNT', links: [['profile', 'Profile', '○'], ['settings', 'Settings', '⚙'], ['help-center', 'Help & about AIMS', '?']] },
-  ] : navigation
+  const visibleNavigation = onboardingRequired ? onboardingNavigation : navigation
   let content
   switch (section) {
     case 'onboarding': content = <StudentOnboarding />; break
@@ -81,7 +101,42 @@ function StudentWorkspaceShell({ session, onLogout, onboardingRequired }: { sess
     case 'help-center': content = <StudentHelp />; break
     default: content = <StudentOverview />
   }
-  return <div className="sw-workspace"><a className="sw-skip" href="#sw-content">Skip to content</a>{open && <button className="sw-scrim" aria-label="Close navigation" onClick={() => setOpen(false)} />}<aside className={`sw-sidebar ${open ? 'open' : ''}`} id="sw-navigation"><div className="sw-sidebar-brand"><Brand /><button className="sw-mobile-close" aria-label="Close navigation" onClick={() => setOpen(false)}>×</button></div><p className="sw-workspace-label">STUDENT WORKSPACE</p><nav aria-label="Student navigation">{visibleNavigation.map(group => <div key={group.title}><p>{group.title}</p>{group.links.map(([slug, label, icon]) => <Link key={slug} to={`/student/${slug}`} className={parent === slug ? 'active' : undefined} aria-current={parent === slug ? (section === slug ? 'page' : 'location') : undefined} onClick={() => { setOpen(false); setNotifications(false) }}><span aria-hidden="true">{icon}</span>{label}<ActivityBadges compact categories={slug === 'profile' ? ['completion', 'grades'] : slug === 'applications' ? ['applications', 'placements', 'deployment'] : slug === 'documents' ? ['documents', 'onboarding', 'forms', 'assignments'] : sectionCategories[slug] || []} /></Link>)}</div>)}</nav><button className="sw-signout" onClick={onLogout}>Sign out</button></aside><div className="sw-main"><header className="sw-topbar"><button className="sw-menu-toggle" aria-label="Open navigation" aria-controls="sw-navigation" aria-expanded={open} onClick={() => setOpen(!open)}>☰</button><div><span>USTP · CITC</span><strong>{title}</strong></div><div className="sw-topbar-actions"><NotificationCenter session={session} open={notifications} onOpenChange={setNotifications} onSettings={() => navigate('/student/settings', { state: { settingsTab: 'notifications' } })} /><AccountMenu session={session} onLogout={onLogout} notificationsOpen={notifications} onOpen={() => { setNotifications(false); setOpen(false) }} /></div></header><main className="sw-content" id="sw-content" key={section}>
+  return <div className="sw-workspace">
+    <a className="sw-skip" href="#sw-content">Skip to content</a>
+    {open && <button className="sw-scrim" aria-label="Close navigation" onClick={() => setOpen(false)} />}
+    <aside className={`sw-sidebar ${open ? 'open' : ''}`} id="sw-navigation">
+      <div className="sw-sidebar-brand">
+        <Brand />
+        <button type="button" className="sw-mobile-close" aria-label="Close navigation" onClick={() => setOpen(false)}><Icon name="close" size={20} /></button>
+      </div>
+      <p className="sw-workspace-label">Student workspace</p>
+      <nav aria-label="Student navigation">
+        {visibleNavigation.map(group => <div key={group.title}>
+          <p>{group.title}</p>
+          {group.links.map(([slug, label, icon]) => (
+            <Link key={slug} to={`/student/${slug}`}
+              className={parent === slug ? 'active' : undefined}
+              aria-current={parent === slug ? (section === slug ? 'page' : 'location') : undefined}
+              onClick={() => { setOpen(false); setNotifications(false) }}>
+              <span className="sw-nav-icon"><Icon name={icon} size={18} /></span>
+              <span className="sw-nav-label">{label}</span>
+              <ActivityBadges compact categories={navigationActivity[slug] || sectionCategories[slug] || []} />
+            </Link>
+          ))}
+        </div>)}
+      </nav>
+      <button type="button" className="sw-signout" onClick={onLogout}><Icon name="logout" size={18} />Sign out</button>
+    </aside>
+    <div className="sw-main">
+      <header className="sw-topbar">
+        <button type="button" className="sw-menu-toggle" aria-label="Open navigation" aria-controls="sw-navigation" aria-expanded={open} onClick={() => setOpen(!open)}><Icon name="menu" size={22} /></button>
+        <div><span>USTP · CITC</span><strong>{title}</strong></div>
+        <div className="sw-topbar-actions">
+          <NotificationCenter session={session} open={notifications} onOpenChange={setNotifications} onSettings={() => navigate('/student/settings', { state: { settingsTab: 'notifications' } })} />
+          <AccountMenu session={session} onLogout={onLogout} notificationsOpen={notifications} onOpen={() => { setNotifications(false); setOpen(false) }} />
+        </div>
+      </header>
+      <main className="sw-content" id="sw-content" key={section}>
         {parent !== section && <Link className="sw-back-link" to={`/student/${parent}`}>← Back to {pageTitles[parent]}</Link>}
         {!onboardingRequired && <RelatedPages section={section} parent={parent} />}
         {onboardingRequired && <p className="sw-notice" role="status"><strong>Complete your orientation and COR first.</strong><br />Both documents must be approved before you can enter the internship dashboard and application pages. Your account and help options remain available.</p>}

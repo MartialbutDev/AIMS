@@ -36,52 +36,52 @@ const NAV_BY_ROLE = {
   admin: [
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Users', slug: 'users', icon: 'users' },
-    { label: 'Company access', slug: 'company-access', icon: 'briefcase' },
+    { label: 'Company access', slug: 'company-access', icon: 'building' },
     { label: 'Activity history', slug: 'activity-history', icon: 'clock' },
-    { label: 'Coordinator designations', slug: 'coordinators', icon: 'users' },
-    { label: 'Onboarding review', slug: 'document-verification', icon: 'check' },
-    { label: 'Assignments', slug: 'assignments', icon: 'file' },
-    { label: 'Completion & archive', slug: 'completion', icon: 'check' },
+    { label: 'Coordinator designations', slug: 'coordinators', icon: 'badge' },
+    { label: 'Onboarding review', slug: 'document-verification', icon: 'clipboard' },
+    { label: 'Assignments', slug: 'assignments', icon: 'route' },
+    { label: 'Completion & archive', slug: 'completion', icon: 'archive' },
     { label: 'Announcements', slug: 'announcements', icon: 'bell' },
   ],
 
   coordinator: [
-    { label: 'DTR corrections', slug: 'dtr-corrections', icon: 'clock' },
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
     { label: 'Students', slug: 'students', icon: 'users' },
-    { label: 'Document review', slug: 'document-verification', icon: 'check' },
+    { label: 'Document review', slug: 'document-verification', icon: 'clipboard' },
     { label: 'Approved forms', slug: 'document-templates', icon: 'file' },
     {
       label: 'History',
       slug: 'historical-students',
-      icon: 'file',
+      icon: 'clock',
     },
-    { label: 'Applications', slug: 'applications', icon: 'file' },
-    { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Direct placements', slug: 'direct-placements', icon: 'briefcase' },
+    { label: 'Applications', slug: 'applications', icon: 'briefcase' },
+    { label: 'Completion & archive', slug: 'completion', icon: 'archive' },
+    { label: 'Direct placements', slug: 'direct-placements', icon: 'route' },
+    { label: 'DTR corrections', slug: 'dtr-corrections', icon: 'clock-edit' },
   ],
 
   dean: [
     { label: 'Program overview', slug: 'dashboard', icon: 'grid' },
-    { label: 'MOA partners', slug: 'moa-partners', icon: 'briefcase' },
-    { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Direct placements', slug: 'direct-placements', icon: 'briefcase' },
+    { label: 'MOA partners', slug: 'moa-partners', icon: 'building' },
+    { label: 'Completion & archive', slug: 'completion', icon: 'archive' },
+    { label: 'Direct placements', slug: 'direct-placements', icon: 'route' },
   ],
 
   career_center: [
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
-    { label: 'Companies', slug: 'companies', icon: 'briefcase' },
-    { label: 'Applications', slug: 'applications', icon: 'file' },
-    { label: 'Completion & archive', slug: 'completion', icon: 'check' },
-    { label: 'Partnership review', slug: 'direct-placements', icon: 'briefcase' },
+    { label: 'Companies', slug: 'companies', icon: 'building' },
+    { label: 'Applications', slug: 'applications', icon: 'briefcase' },
+    { label: 'Completion & archive', slug: 'completion', icon: 'archive' },
+    { label: 'Partnership review', slug: 'direct-placements', icon: 'clipboard' },
   ],
 
   company: [
-    { label: 'DTR corrections', slug: 'dtr-corrections', icon: 'clock' },
     { label: 'Overview', slug: 'dashboard', icon: 'grid' },
-    { label: 'Intern monitoring', slug: 'interns', icon: 'briefcase' },
-    { label: 'Applications', slug: 'applications', icon: 'users' },
-    { label: 'Completion & archive', slug: 'completion', icon: 'check' },
+    { label: 'Intern monitoring', slug: 'interns', icon: 'users' },
+    { label: 'Applications', slug: 'applications', icon: 'briefcase' },
+    { label: 'Completion & archive', slug: 'completion', icon: 'archive' },
+    { label: 'DTR corrections', slug: 'dtr-corrections', icon: 'clock-edit' },
   ],
 } as const
 
@@ -163,7 +163,7 @@ function DashboardWorkspace({
     'help-center': 'Help center',
   }
 
-  const activeNav = sectionLabels[section] ?? 'Overview'
+  const activeNav = navItems.find(item => item.slug === section)?.label ?? sectionLabels[section] ?? 'Overview'
   const firstName = session.name || 'User'
 
   function goTo(nextSection: string) {
@@ -270,7 +270,7 @@ function DashboardWorkspace({
             onClick={() => setMobileNavOpen(false)}
             aria-label="Close navigation"
           >
-            ×
+            <Icon name="close" size={20} />
           </button>
         </div>
 
@@ -317,8 +317,9 @@ function DashboardWorkspace({
               }
               onClick={() => goTo(item.slug)}
             >
-              <Icon name={item.icon} size={18} />
-              <span>{item.label}</span><ActivityBadges compact categories={sectionCategories[item.slug] || []} />
+              <span className="workspace-nav-icon"><Icon name={item.icon} size={18} /></span>
+              <span className="workspace-nav-text">{item.label}</span>
+              <ActivityBadges compact categories={sectionCategories[item.slug] || []} />
             </button>
           ))}
         </nav>
@@ -340,8 +341,8 @@ function DashboardWorkspace({
             }
             onClick={() => goTo('settings')}
           >
-            <Icon name="settings" size={18} />
-            <span>Settings</span>
+            <span className="workspace-nav-icon"><Icon name="settings" size={18} /></span>
+            <span className="workspace-nav-text">Settings</span>
           </button>
 
           <button
@@ -358,8 +359,8 @@ function DashboardWorkspace({
             }
             onClick={() => goTo('help-center')}
           >
-            <Icon name="help" size={18} />
-            <span>Help center</span>
+            <span className="workspace-nav-icon"><Icon name="help" size={18} /></span>
+            <span className="workspace-nav-text">Help center</span>
           </button>
 
           <div className="sidebar-user">

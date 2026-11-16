@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_document_versions as fixtures
 from app.api.v1.endpoints import onboarding
-from app.core.security import get_current_user, get_current_user_from_token
+from app.core.security import get_current_user
 from app.models.document import Document
 from app.models.student_onboarding import StudentOnboardingSubmission
 from app.models.user import User, UserRole
@@ -25,7 +25,6 @@ class StudentDocumentFeedbackTests(unittest.TestCase):
         self.db, self.client = self.f.db, self.f.client
         self.client.app.include_router(onboarding.router)
         self.client.app.dependency_overrides[get_current_user] = lambda: self.db.get(User, self.f.f.actor.id)
-        self.client.app.dependency_overrides[get_current_user_from_token] = lambda: self.db.get(User, self.f.f.actor.id)
         self.doc = self.f.doc('private-feedback', status='pending')
         self.doc.extracted_text = INTERNAL
         self.doc.validation_message = INTERNAL

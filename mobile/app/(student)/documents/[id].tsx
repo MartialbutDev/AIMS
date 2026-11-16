@@ -13,13 +13,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as SecureStore from "expo-secure-store";
-import * as Linking from "expo-linking";
 
+import { openPrivateFile } from "../../../src/services/privateFile.service";
 import { useTheme } from "../../../src/context/ThemeContext";
 import api from "../../../src/services/api";
 import { documentFeedback, type StudentDocumentFeedback } from "../../../src/utils/documentFeedback";
-import { BASE_URL } from "../../../src/config/env";
 
 interface DocumentDetail {
   id: string;
@@ -94,26 +92,9 @@ export default function DocumentDetailScreen() {
     if (!document) return;
     try {
       setOpening(true);
-      const token = await SecureStore.getItemAsync("access_token");
-      if (!token) {
-        Alert.alert("Error", "Session expired. Please log in again.");
-        return;
-      }
-
-      const url = `${BASE_URL}/api/v1/documents/${document.id}/image?token=${encodeURIComponent(
-        token
-      )}`;
-
-      const supported = await Linking.canOpenURL(url);
-      if (!supported) {
-        Alert.alert("Error", "Cannot open this file on this device");
-        return;
-      }
-
-      await Linking.openURL(url);
+      await openPrivateFile(`/documents/${encodeURIComponent(document.id)}/image`, "document");
     } catch (error) {
-      console.error("Preview error:", error);
-      Alert.alert("Error", "Failed to open document");
+      Alert.alert("Couldn’t open document", error instanceof Error ? error.message : "Please try again.");
     } finally {
       setOpening(false);
     }

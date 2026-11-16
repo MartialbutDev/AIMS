@@ -19,14 +19,15 @@ from datetime import datetime
 import math
 import os
 import uuid
-import shutil
+from pathlib import Path
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.file_storage import staged_file, stored_file
+from app.services.submission_recovery import Submission, SubmissionKey
 from app.core.assignment_access import ensure_coordinator_student_access
 from app.core.security import (
     get_current_user,
-    get_current_user_from_token,
     require_role,
 )
 from app.models.user import User, UserRole
@@ -63,43 +64,19 @@ def _save_journal_pdf(
             ),
         )
 
-    content = upload.file.read()
+    if upload.size is not None and upload.size > MAX_JOURNAL_SIZE_BYTES:
+        raise HTTPException(413, "File too large. Max 15 MB")
 
-    if len(content) > MAX_JOURNAL_SIZE_BYTES:
-        raise HTTPException(
-            status_code=400,
-            detail="File too large. Max 15 MB",
-        )
-
+    relative = Path("journal_uploads") / f"{uuid.uuid4()}{ext}"
+    size = 0
     upload.file.seek(0)
-
-    folder = os.path.join(
-        settings.ASSET_DIR,
-        "journal_uploads",
-    )
-
-    os.makedirs(
-        folder,
-        exist_ok=True,
-    )
-
-    filename = f"{uuid.uuid4()}{ext}"
-
-    file_path = os.path.join(
-        folder,
-        filename,
-    )
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(
-            upload.file,
-            buffer,
-        )
-
-    return os.path.join(
-        "journal_uploads",
-        filename,
-    )
+    with staged_file(Path(settings.ASSET_DIR) / relative) as output:
+        while chunk := upload.file.read(1024 * 1024):
+            size += len(chunk)
+            if size > MAX_JOURNAL_SIZE_BYTES:
+                raise HTTPException(413, "File too large. Max 15 MB")
+            output.write(chunk)
+    return relative.as_posix()
 
 
 def _delete_file_if_exists(
@@ -220,12 +197,13 @@ def _authorize_coordinator_journal(db: Session, actor: User, journal: Journal, m
     response_model=JournalResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_journal(
+def create_journal(
     week: int = Form(...),
     title: str = Form(...),
     summary: Optional[str] = Form(None),
     submit: bool = Form(False),
     file: UploadFile = File(...),
+    submission_key: SubmissionKey = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -234,6 +212,10 @@ async def create_journal(
             status_code=403,
             detail="Only students can create journals",
         )
+
+    submission = Submission(db, current_user, "journal", submission_key)
+    if (previous := submission.replay(Journal)) is not None:
+        return previous
 
     academic_year, semester = get_current_academic_term()
     DeploymentService.require_active_deployment(db, current_user.id)
@@ -289,25 +271,20 @@ async def create_journal(
         submitted_date=submitted_date,
     )
 
-    db.add(journal)
+    try:
+        db.add(journal)
+        db.flush()
+        result = _to_response(journal, f"{current_user.first_name} {current_user.last_name}")
+        submission.save(journal.id, result)
+        db.flush()
+    except Exception:
+        db.rollback()
+        _delete_file_if_exists(relative_path)
+        raise
     db.commit()
-    db.refresh(journal)
 
-    _fire_journal_notification(
-        db,
-        journal,
-        journal.status.value,
-    )
-
-    student_name = (
-        f"{current_user.first_name} "
-        f"{current_user.last_name}"
-    )
-
-    return _to_response(
-        journal,
-        student_name,
-    )
+    _fire_journal_notification(db, journal, journal_status.value)
+    return result
 
 
 # ============================================================
@@ -532,9 +509,7 @@ async def get_journal_summary(
 async def get_journal_file(
     journal_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        get_current_user_from_token
-    ),
+    current_user: User = Depends(get_current_user),
 ):
     journal = (
         db.query(Journal)
@@ -571,34 +546,7 @@ async def get_journal_file(
             detail="File not found",
         )
 
-    root = os.path.realpath(
-        settings.ASSET_DIR
-    )
-
-    full_path = os.path.realpath(
-        os.path.join(
-            root,
-            journal.file_path,
-        )
-    )
-
-    try:
-        contained = (
-            os.path.commonpath(
-                (root, full_path)
-            ) == root
-        )
-    except ValueError:
-        contained = False
-
-    if (
-        not contained
-        or not os.path.isfile(full_path)
-    ):
-        raise HTTPException(
-            status_code=404,
-            detail="File not found",
-        )
+    full_path = stored_file(journal.file_path)
 
     return FileResponse(
         full_path,
@@ -897,6 +845,13 @@ async def replace_journal_file(
         file
     )
 
+    new_path = journal.file_path
+    try:
+        db.flush()
+    except Exception:
+        db.rollback()
+        _delete_file_if_exists(new_path)
+        raise
     db.commit()
     db.refresh(journal)
 

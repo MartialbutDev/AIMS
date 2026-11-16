@@ -1,4 +1,5 @@
 // app/(student)/journals/new.tsx
+import { showSubmissionRecovery, submissionErrorMessage } from "../../../src/services/submissionRecovery";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -98,11 +99,11 @@ export default function NewJournalScreen() {
       setTitle("");
       setSummary("");
       setFile(null);
-    } catch (error: any) {
-      console.error("Submit error:", error);
+    } catch (error) {
+      if (showSubmissionRecovery(error, () => router.replace("/(student)/journals"))) return;
       Alert.alert(
         "Error",
-        error.response?.data?.detail || "Failed to submit journal."
+        submissionErrorMessage(error, "Failed to submit journal.")
       );
     } finally {
       setLoading(false);

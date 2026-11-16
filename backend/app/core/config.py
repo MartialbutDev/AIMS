@@ -17,9 +17,12 @@ Centralized settings for:
 """
 
 import os
+import re
+from urllib.parse import urlsplit
 
 from typing import List, Optional
 
+from pydantic import Field
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
@@ -35,7 +38,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "AIMS"
     APP_VERSION: str = "1.0.0"
 
-    DEBUG: bool = True
+    DEBUG: bool = False
     DEV_TEST_STUDENT_ID: str = ""
     DEV_BYPASS_TEST_ONBOARDING: bool = False
 
@@ -66,9 +69,7 @@ class Settings(BaseSettings):
     # JWT AUTHENTICATION
     # ========================================================
 
-    SECRET_KEY: str = (
-        "your-super-secret-key-change-in-production"
-    )
+    SECRET_KEY: str = Field(default="", repr=False)
 
     ALGORITHM: str = "HS256"
 
@@ -189,6 +190,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
 
@@ -197,3 +199,60 @@ class Settings(BaseSettings):
 # ============================================================
 
 settings = Settings()
+
+
+_SIGNING_KEY_ERROR = (
+    "Set SECRET_KEY to an independently generated random key of at least 32 bytes "
+    "before starting AIMS. Example and placeholder keys are rejected."
+)
+
+
+def validate_signing_key(config: Settings) -> None:
+    key = config.SECRET_KEY
+    normalized = re.sub(r"[^a-z0-9]", "", key.lower())
+    placeholder = normalized.startswith((
+        "yoursupersecret", "yoursecretkey", "yourjwtsecret",
+        "replace", "changeme", "example", "placeholder",
+    ))
+    if (
+        len(key.encode("utf-8")) < 32
+        or len(set(key)) < 8
+        or any(char.isspace() for char in key)
+        or placeholder
+    ):
+        raise RuntimeError(_SIGNING_KEY_ERROR)
+
+
+def validate_production_config(config: Settings) -> None:
+    validate_signing_key(config)
+    if config.DEBUG:
+        raise RuntimeError("Set DEBUG=false on EC2.")
+    if config.DEV_BYPASS_TEST_ONBOARDING:
+        raise RuntimeError("Set DEV_BYPASS_TEST_ONBOARDING=false on EC2.")
+    try:
+        target = urlsplit(config.DATABASE_URL)
+        explicit_postgres = (
+            "DATABASE_URL" in config.model_fields_set
+            and target.scheme.split("+", 1)[0] == "postgresql"
+            and bool(target.hostname)
+            and bool(target.path.strip("/"))
+            and target.password not in {"aims_password", "REPLACE_PASSWORD"}
+        )
+    except ValueError:
+        explicit_postgres = False
+    if not explicit_postgres:
+        raise RuntimeError("Configure DATABASE_URL for the EC2 PostgreSQL database with its own credentials.")
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Check AIMS backend settings without showing credential values.")
+    parser.add_argument("--production", action="store_true", help="Also check EC2 debug, onboarding and database settings.")
+    args = parser.parse_args()
+    try:
+        check = validate_production_config if args.production else validate_signing_key
+        check(settings)
+    except RuntimeError as error:
+        parser.exit(1, f"Configuration check failed. {error}\n")
+    print("AIMS configuration check passed.")

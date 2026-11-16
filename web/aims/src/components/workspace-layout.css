@@ -14,3 +14,66 @@
 @media(max-width:700px){.aims-campus-workspace .dashboard-content{padding:20px 16px 28px}.aims-campus-workspace .dashboard-content>:is(.workspace-page,.co-page,.coordinator-page,.co-review-page,.dv-page,.cc-page){padding:0}.aims-campus-workspace .topbar{gap:10px;padding:12px 16px}.aims-campus-workspace .topbar-actions{gap:12px}.aims-campus-workspace :is(.assignment-form,.form-two-columns,.evaluation-fields){grid-template-columns:minmax(0,1fr)}.aims-campus-workspace .completion-filters label{flex-wrap:wrap}.aims-campus-workspace .completion-layout{grid-template-columns:minmax(0,1fr)}}
 
 .aims-campus-workspace .aims-reporting-term{padding:18px 22px;line-height:1.8}.aims-reporting-term>strong,.aims-reporting-term>small{display:block}.aims-reporting-term>p{margin:8px 0;font-size:13px}.aims-reporting-term>small{margin-top:6px;font-size:11px;color:#666d80}
+
+.aims-campus-workspace .sidebar {
+  --workspace-nav-gold: #f5b818;
+  background: linear-gradient(160deg, var(--aims-navy) 38%, #181842);
+  padding-inline: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: #565675 transparent;
+}
+.aims-campus-workspace .sidebar-brand { padding-bottom: 14px; }
+.aims-campus-workspace .citc-sidebar-subtitle { margin-bottom: 16px; padding-bottom: 14px; }
+.aims-campus-workspace .workspace-switcher { margin-bottom: 16px; }
+.aims-campus-workspace .side-nav { gap: 4px; margin-top: 8px; }
+.aims-campus-workspace .sidebar .nav-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-inline-start: 3px solid transparent;
+  border-radius: 9px;
+  color: #d5d9e7;
+  font-size: 13px;
+}
+.aims-campus-workspace .workspace-nav-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
+  background: #ffffff0d;
+  color: #c8cde1;
+}
+.aims-campus-workspace .sidebar .nav-item > .activity-badges {
+  max-width: 64px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.aims-campus-workspace .sidebar .nav-item:hover { color: #fff; background: #ffffff10; }
+.aims-campus-workspace .sidebar .nav-item--active,
+.aims-campus-workspace .sidebar .nav-item--active:hover {
+  color: #fff;
+  background: #f5b81817;
+  border-color: #f5b81844;
+  border-inline-start-color: var(--workspace-nav-gold);
+  font-weight: 750;
+}
+.aims-campus-workspace .nav-item--active .workspace-nav-icon {
+  background: var(--workspace-nav-gold);
+  color: var(--aims-navy);
+}
+.aims-campus-workspace .sidebar :focus-visible {
+  outline: 2px solid var(--workspace-nav-gold);
+  outline-offset: -2px;
+}
+.aims-campus-workspace .sidebar-bottom { padding-top: 16px; }
+.aims-campus-workspace .sidebar-bottom .nav-label { border-top: 1px solid #ffffff24; padding-top: 12px; }
+.aims-campus-workspace .sidebar-bottom .nav-item { margin-top: 4px; }
+@media (max-width: 1000px) {
+  .aims-campus-workspace .mobile-menu,
+  .aims-campus-workspace .mobile-close { min-width: 44px; min-height: 44px; }
+}

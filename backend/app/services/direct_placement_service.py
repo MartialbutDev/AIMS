@@ -124,7 +124,7 @@ def release_application(db, placement, actor_id):
         InternshipDeployment.status != DeploymentStatus.CANCELLED).first()
     if existing or deployment:
         raise HTTPException(409, 'Another active application or placement exists. Resolve it before releasing this proposal.')
-    require_approved_onboarding(db, placement.student_id)
+    require_approved_onboarding(db, placement.student_id, get_current_academic_term())
     application = Application(id=str(uuid.uuid4()), student_id=placement.student_id, company_id=placement.company_id,
         academic_year=placement.academic_year, semester=placement.semester, position=placement.position,
         cover_letter='SCHOOL-ARRANGED DIRECT PLACEMENT\n'+placement.reason,

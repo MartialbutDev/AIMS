@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import { errorText, human } from './studentHooks'
 import { apiRequestBlob } from '../../services/apiClient'
 
-export function Notice({ error, message }: { error?: string; message?: string }) { return <>{error && <p className="sw-notice error" role="alert">{error}</p>}{message && <p className="sw-notice success" role="status">{message}</p>}</> }
+export function Notice({ error, message, retry, retrying }: { error?: string; message?: string; retry?: () => void; retrying?: boolean }) {
+  return <>{error && <p className="sw-notice error" role="alert">{error}</p>}{retry && <button disabled={retrying} onClick={retry}>Retry previous submission</button>}{message && <p className="sw-notice success" role="status">{message}</p>}</>
+}
 export function Badge({ value }: { value?: string | null }) { return <span className={`sw-badge ${['verified', 'approved', 'accepted', 'deployed', 'completed', 'current_approved'].includes(value || '') ? 'good' : ['rejected', 'declined', 'withdrawn', 'approval_revoked'].includes(value || '') ? 'bad' : 'neutral'}`}>{human(value)}</span> }
 export function Heading({ eyebrow = 'YOUR INTERNSHIP', title, description, children }: { eyebrow?: string; title: string; description: string; children?: ReactNode }) { return <header className="sw-heading"><div><p className="sw-eyebrow">{eyebrow}</p><h1>{title}</h1><p>{description}</p></div>{children}</header> }
 export function Empty({ children }: { children: ReactNode }) { return <p className="sw-empty">{children}</p> }

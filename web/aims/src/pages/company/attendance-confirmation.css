@@ -30,6 +30,9 @@
 .ac-photo-actions, .ac-decision-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr)); gap:10px; }
 .attendance-confirmation button { min-height:44px; max-width:100%; padding:11px 16px; border:1px solid #cdd0de; border-radius:8px; background:#fff; color:#0b0b2f; font:inherit; font-size:12px; font-weight:600; line-height:1.5; white-space:normal; overflow-wrap:anywhere; cursor:pointer; }
 .attendance-confirmation button:hover:not(:disabled) { background:#f0f0f6; border-color:#9d9fb5; }
+.ac-photo-actions button, .ac-decision-actions button { display:flex; justify-content:center; align-items:center; gap:8px; }
+.ac-photo-actions button svg, .ac-decision-actions button svg { flex:none; }
+.ac-photo-actions:empty { display:none; }
 .attendance-confirmation button.ac-primary { background:#0b0b2f; border-color:#0b0b2f; color:#fff; }
 .attendance-confirmation button.ac-primary:hover:not(:disabled) { background:#24244e; }
 .attendance-confirmation button.ac-dispute { color:#a23843; border-color:#e1bfc5; }
@@ -54,4 +57,9 @@
   .ac-evidence { padding:12px; }
   .ac-batch button { width:100%; }
   .ac-notice, .ac-error, .ac-empty { margin:16px; }
+}
+@container (max-width:320px) {
+  .ac-toolbar, .ac-entries, .ac-batch { padding-inline:12px; }
+  .ac-entry { padding:12px; }
+  .ac-photo-actions, .ac-decision-actions { grid-template-columns:minmax(0,1fr); }
 }

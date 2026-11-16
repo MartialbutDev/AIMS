@@ -1,18 +1,22 @@
 """Real endpoint regressions for onboarding gates and rejected-write atomicity."""
+from datetime import datetime, timezone
 import json
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from tempfile import TemporaryDirectory
+from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import test_direct_placements as fixtures
 from app.api.v1.endpoints import auth, onboarding
+from app.core.assignment_access import get_current_academic_term
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.models.academic_requirement import AcademicRequirement
 from app.models.application import Application, ApplicationStatus
 from app.models.direct_placement import DirectPlacement, DirectPlacementEvent
 from app.models.internship_deployment import InternshipDeployment, DeploymentStatus
@@ -143,6 +147,66 @@ class OnboardingWorkflowGateTests(unittest.TestCase):
         response = self.client.post('/applications/', json=self.body)
         self.assertEqual(response.status_code, 201, response.text)
         self.assertEqual(self.db.query(Application).count(), 1)
+
+    def test_term_rollover_blocks_old_cor_and_accepts_verified_replacement(self):
+        self.db.add(AcademicRequirement(
+            academic_year="2026-2027", semester="2", programs=["BSIT"], year_levels=[4],
+            practicum_subject_codes=["IT421"], required_hours=486, is_active=True,
+            updated_at=datetime.now(timezone.utc),
+        ))
+        self.db.commit()
+        old_cor_id = self.record().cor_submission_id
+        old_orientation_id = self.record().orientation_submission_id
+        # The shared fixture pins term 1, so point it at the real policy resolver.
+        with (
+            patch.object(fixtures.applications, "_current_term", side_effect=self.active_term),
+            patch.object(onboarding, "get_current_academic_term", side_effect=self.active_term),
+        ):
+            status = self.client.get("/onboarding/me").json()
+            self.assertFalse(status["onboarding_approved"])
+            self.assertEqual(status["next_step"], "upload_cor")
+            self.assertIsNone(status["cor"])
+            self.assertIn("current academic term", self.client.get("/applications/eligibility").json()["reason"])
+            self.deny("post", "/applications/", json=self.body)
+
+            with TemporaryDirectory() as folder:
+                path = Path(folder) / "current.pdf"
+                path.write_bytes(b"fixture")
+                inspection = {"text": "COR", "ocr_error": None,
+                              "identification": {"status": "matched"}, "full_content_checked": True}
+                validation = {"automatic_result": "matched", "details": {
+                    "detected_academic_year": "2026-2027", "detected_semester": "2"}}
+                with (
+                    patch.object(onboarding, "ASSET_ROOT", Path(folder)),
+                    patch.object(onboarding, "_save_private_upload", new=AsyncMock(return_value=(path, "application/pdf"))),
+                    patch.object(onboarding, "inspect_upload", return_value=inspection),
+                    patch.object(onboarding, "validate_cor", return_value=validation),
+                    patch.object(onboarding, "guard_cor_approval"),
+                ):
+                    result = self.client.post("/onboarding/cor", files={"file": ("current.pdf", b"fixture", "application/pdf")})
+                self.assertEqual(result.status_code, 200, result.text)
+                self.assertTrue(result.json()["onboarding_approved"])
+
+            self.assertEqual(self.record().orientation_submission_id, old_orientation_id)
+            self.assertIsNotNone(self.db.get(StudentOnboardingSubmission, old_cor_id))
+            self.assertNotEqual(self.record().cor_submission_id, old_cor_id)
+            self.assertTrue(self.client.get("/applications/eligibility").json()["allowed"])
+            result = self.client.post("/applications/", json=self.body)
+            self.assertEqual(result.status_code, 201, result.text)
+            self.assertEqual(self.db.query(Application).one().semester, "2")
+
+    def active_term(self):
+        return get_current_academic_term(self.db)
+
+    def test_approval_with_wrong_year_or_missing_term_evidence_blocks_application(self):
+        for details in (
+            {"detected_academic_year": "2025-2026", "detected_semester": "1"},
+            {"expected_academic_year": "2026-2027", "expected_semester": "1"},
+        ):
+            with self.subTest(details=details):
+                self.submission("cor").validation_result = {"details": details}
+                self.db.commit()
+                self.deny("post", "/applications/", json=self.body)
 
     def test_existing_application_cannot_be_reviewed_or_forwarded_after_approval_changes(self):
         self.application()

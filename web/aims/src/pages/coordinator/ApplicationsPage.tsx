@@ -189,11 +189,13 @@ export function ApplicationsPage() {
 
       <section className="co-review-panel" aria-label="Student review records">
         <div className="co-review-toolbar">
-          <div className="co-review-tabs" role="group" aria-label="Review category">
+          <div className="workspace-page-tabs" role="group" aria-label="Review category">
             {(['applications', 'dtrs', 'journals'] as const).map((value) => (
-              <button key={value} type="button" className={tab === value ? 'is-active' : ''} aria-pressed={tab === value}
+              <button key={value} type="button" aria-pressed={tab === value}
                 onClick={() => { setTab(value); setFilter('pending'); setExpandedId(null) }}>
-                {TAB_LABELS[value]} <span>{counts[value]}</span><ActivityBadges compact categories={[value === 'dtrs' ? 'attendance' : value]} />
+                <Icon name={value === 'applications' ? 'briefcase' : value === 'dtrs' ? 'clock' : 'book'} />
+                <span>{TAB_LABELS[value]}</span><span className="workspace-tab-count" aria-label={`${counts[value]} awaiting review`}>{counts[value]}</span>
+                <ActivityBadges compact categories={[value === 'dtrs' ? 'attendance' : value]} />
               </button>
             ))}
           </div>
@@ -297,7 +299,7 @@ export function ApplicationsPage() {
 
       {preview && <div className="co-review-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null) }}>
         <section className="co-review-preview" role="dialog" aria-modal="true" aria-label={preview.title}>
-          <header><strong>{preview.title}</strong><button type="button" onClick={() => setPreview(null)} aria-label="Close preview">×</button></header>
+          <header><strong>{preview.title}</strong><button type="button" onClick={() => setPreview(null)} aria-label="Close preview"><Icon name="close" size={20} /></button></header>
           {preview.contentType === 'application/pdf' ? <iframe title={preview.title} src={preview.url} /> : preview.contentType.startsWith('image/') ? <img src={preview.url} alt={preview.title} /> : <p className="co-review-preview-unsupported">Preview is unavailable for this file format.</p>}
         </section>
       </div>}

@@ -14,10 +14,6 @@
 .co-review-summary-total span { opacity: .8; }
 .co-review-panel { background: #fff; border: 1px solid #e6eaf2; border-radius: 16px; overflow: hidden; }
 .co-review-toolbar { padding: 20px; display: flex; flex-direction: column; gap: 16px; border-bottom: 1px solid #edf0f6; }
-.co-review-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
-.co-review-tabs button { background: #f4f6fb; border: 1px solid transparent; border-radius: 10px; padding: 11px 14px; color: #4b5d79; font-size: 12px; font-weight: 700; cursor: pointer; }
-.co-review-tabs button.is-active { background: #eaf0ff; color: #244db6; border-color: #b8ccfb; }
-.co-review-tabs button span { margin-left: 8px; padding: 3px 7px; background: rgba(36,77,182,.09); border-radius: 6px; font-size: 10px; }
 .co-review-filters { display: flex; gap: 10px; }
 .co-review-search { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 0 12px; border: 1px solid #dde4ef; border-radius: 9px; color: #7889a3; }
 .co-review-search:focus-within { border-color: #7fa6ee; box-shadow: 0 0 0 3px rgba(37,99,235,.09); }

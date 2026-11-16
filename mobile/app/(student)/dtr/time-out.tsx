@@ -1,4 +1,5 @@
 import { assessLocationAccuracy } from '../../../src/utils/locationAccuracy';
+import { showSubmissionRecovery, submissionErrorMessage } from "../../../src/services/submissionRecovery";
 import { LocationAccuracyNotice, confirmAttendanceLocation } from '../../../src/components/LocationAccuracyNotice';
 // app/(student)/dtr/time-out.tsx
 // Records Time-Out for a PENDING DTR entry, uploads photo + location, submits for review.
@@ -173,7 +174,7 @@ export default function TimeOutDTRScreen() {
 
       Alert.alert(
         "✅ Time-Out Recorded!",
-        `You clocked out at ${timeStr}.\n\n📍 ${location.address}\n\nYour DTR is awaiting company confirmation, then coordinator approval.`,
+        `Your clock-out was recorded.\n\n📍 ${location.address}\n\nYour DTR is awaiting company confirmation, then coordinator approval.`,
         [
           {
             text: "View DTR",
@@ -182,11 +183,9 @@ export default function TimeOutDTRScreen() {
         ],
         { cancelable: false }
       );
-    } catch (error: any) {
-      console.error("Time-Out error:", error);
-      const errorMessage =
-        error.response?.data?.detail ||
-        "Failed to record Time-Out. Please try again.";
+    } catch (error) {
+      if (showSubmissionRecovery(error, () => router.replace("/(student)/dtr"))) return;
+      const errorMessage = submissionErrorMessage(error, "Failed to record Time-Out. Please try again.");
       Alert.alert("Error", errorMessage);
     } finally {
       submissionInFlight.current = false;

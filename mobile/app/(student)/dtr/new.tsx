@@ -1,4 +1,5 @@
 import { assessLocationAccuracy } from '../../../src/utils/locationAccuracy';
+import { showSubmissionRecovery, submissionErrorMessage } from "../../../src/services/submissionRecovery";
 import { LocationAccuracyNotice, confirmAttendanceLocation } from '../../../src/components/LocationAccuracyNotice';
 // app/(student)/dtr/new.tsx
 import { Ionicons } from "@expo/vector-icons";
@@ -25,11 +26,9 @@ import { dtrService } from "../../../src/services/dtr.service";
 
 export default function NewDTRScreen() {
   const { colors, isDark } = useTheme();
-  const [loading, setLoading] = useState(false);
 
 
   const [tasks, setTasks] = useState("");
-  const [notes, setNotes] = useState("");
   const [imageIn, setImageIn] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -47,12 +46,6 @@ export default function NewDTRScreen() {
   const [captureToken, setCaptureToken] = useState<string | null>(null);
   const locationNeedsCaution = Boolean(location && assessLocationAccuracy(location.accuracy).caution);
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
 
   const formatDateForAPI = (d: Date) => {
     const year = d.getFullYear();
@@ -170,7 +163,6 @@ export default function NewDTRScreen() {
       formData.append('date', formatDateForAPI(clockInTime));
       formData.append('time_in', formatTimeForAPI(clockInTime));
       if (tasks.trim()) formData.append('tasks_completed', tasks.trim());
-      if (notes.trim()) formData.append('notes', notes.trim());
       
       formData.append('latitude', String(location.latitude));
       formData.append('longitude', String(location.longitude));
@@ -188,7 +180,7 @@ export default function NewDTRScreen() {
       
       Alert.alert(
         "✅ Time-In Recorded!",
-        `You clocked in at ${formatTime(clockInTime)}.\n\n📍 ${location.address}\n\nYou can now Time-Out when your shift is done.`,
+        `Your clock-in was recorded.\n\n📍 ${location.address}\n\nYou can now Time-Out when your shift is done.`,
         [
           { 
             text: "View DTR", 
@@ -202,15 +194,14 @@ export default function NewDTRScreen() {
       );
       
       setTasks("");
-      setNotes("");
       setImageIn(null);
       setLocation(null);
       
       router.push("/(student)/dtr");
       
-    } catch (error: any) {
-      console.error('Time-In error:', error);
-      const errorMessage = error.response?.data?.detail || "Failed to record Time-In. Please try again.";
+    } catch (error) {
+      if (showSubmissionRecovery(error, () => router.replace("/(student)/dtr"))) return;
+      const errorMessage = submissionErrorMessage(error, "Failed to record Time-In. Please try again.");
       Alert.alert("Error", errorMessage);
     } finally {
       submissionInFlight.current = false;
@@ -305,7 +296,7 @@ export default function NewDTRScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Tasks Completed</Text>
+          <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Planned tasks</Text>
           <TextInput
             style={[styles.textArea, { backgroundColor: colors.card, color: colors.textPrimary, borderColor: colors.border }]}
             placeholder="List the tasks you plan to complete today..."
@@ -314,20 +305,6 @@ export default function NewDTRScreen() {
             onChangeText={setTasks}
             multiline
             numberOfLines={4}
-            textAlignVertical="top"
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Notes (Optional)</Text>
-          <TextInput
-            style={[styles.textArea, { backgroundColor: colors.card, color: colors.textPrimary, borderColor: colors.border }]}
-            placeholder="Any additional notes..."
-            placeholderTextColor={colors.textSecondary}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
             textAlignVertical="top"
           />
         </View>

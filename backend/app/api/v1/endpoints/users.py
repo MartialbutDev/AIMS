@@ -8,10 +8,10 @@ from typing import List, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, Query, status
 from pydantic import BaseModel, Field, ValidationError
+from PIL import Image
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 import os
-import shutil
 from datetime import datetime, timezone
 from sqlalchemy import func, select, or_
 from app.core.database import Base
@@ -19,6 +19,7 @@ from app.models.auth_session import AuthSession, AuthSessionCutoff
 from app.models.push import PushDevice
 from app.models.password_reset import PasswordResetChallenge
 
+from app.core.avatar_images import MAX_AVATAR_BYTES, encode_avatar
 from app.core.database import get_db
 from app.core.assignment_access import get_current_academic_term
 from app.core.security import get_current_user, get_password_hash, require_role
@@ -465,120 +466,77 @@ async def delete_user(
 
 # ✅ Upload Avatar - Any authenticated user
 @router.post("/avatar", response_model=UserResponse)
-async def upload_avatar(
+def upload_avatar(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Upload user avatar image - Any authenticated user"""
-    
-    # Validate file type
-    allowed_types = ["image/jpeg", "image/png", "image/jpg", "image/heic"]
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type not allowed. Allowed: {', '.join(allowed_types)}"
-        )
-    
-    # Read file to check size
-    content = await file.read()
-    file_size = len(content)
-    await file.seek(0)
-    
-    # Validate file size (max 5MB)
-    if file_size > 5 * 1024 * 1024:
-        raise HTTPException(
-            status_code=400,
-            detail="File too large. Maximum size: 5MB"
-        )
-    
+    """Replace the authenticated user's avatar with a decoded raster image."""
+    content = file.file.read(MAX_AVATAR_BYTES + 1)
+    if len(content) > MAX_AVATAR_BYTES:
+        raise HTTPException(status_code=413, detail="Profile photos must be 5 MB or smaller.")
+
     try:
-        # Create avatar directory
-        avatar_dir = os.path.join(settings.ASSET_DIR, "avatars")
-        os.makedirs(avatar_dir, exist_ok=True)
-        
-        # Generate unique filename
-        file_extension = os.path.splitext(file.filename)[1].lower()
-        filename = f"avatar_{current_user.id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}{file_extension}"
-        file_path = os.path.join(avatar_dir, filename)
-        
-        # Save file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # Delete old avatar if exists
-        if current_user.avatar_url:
-            old_path = os.path.join(settings.ASSET_DIR, current_user.avatar_url)
-            if os.path.exists(old_path):
-                os.remove(old_path)
-        
-        # Update user with avatar URL (relative path)
-        relative_path = f"avatars/{filename}"
-        current_user.avatar_url = relative_path
+        encoded, extension = encode_avatar(content)
+    except (OSError, ValueError, SyntaxError, Image.DecompressionBombError):
+        raise HTTPException(
+            status_code=400,
+            detail="Choose a valid JPEG, PNG, or WebP photo with no more than 20 megapixels.",
+        ) from None
+
+    avatar_dir = (Path(settings.ASSET_DIR) / "avatars").resolve()
+    prefix = f"avatar_{current_user.id}_"
+    filename = f"{prefix}{uuid.uuid4().hex}{extension}"
+    path = avatar_dir / filename
+    logger = logging.getLogger(__name__)
+    try:
+        # Serialize replacements for this user, and keep the old photo until commit.
+        db.refresh(current_user, with_for_update=True)
+        old_url = current_user.avatar_url
+        avatar_dir.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(encoded)
+        current_user.avatar_url = f"avatars/{filename}"
         db.commit()
-        db.refresh(current_user)
-        
-        return current_user
-        
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to upload avatar: {str(e)}"
-        )
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("Unable to remove an uncommitted avatar")
+        logger.exception("Unable to update avatar")
+        raise HTTPException(status_code=500, detail="Could not update your profile photo.") from None
+
+    _remove_previous_avatar(db, current_user.id, old_url)
+    return current_user
 
 
-# ✅ Delete Avatar - DELETE method
+def _remove_previous_avatar(db: Session, user_id: str, old_url: str | None) -> None:
+    if not old_url:
+        return
+
+    try:
+        avatar_dir = (Path(settings.ASSET_DIR) / "avatars").resolve()
+        old_path = (Path(settings.ASSET_DIR) / old_url).resolve()
+        if old_path.parent != avatar_dir or not old_path.name.startswith(f"avatar_{user_id}_"):
+            return
+        if not db.query(User.id).filter(User.avatar_url == old_url).first():
+            old_path.unlink(missing_ok=True)
+    except Exception:
+        logging.getLogger(__name__).exception("Unable to clean up the previous avatar")
+
+
 @router.delete("/avatar")
-async def delete_avatar(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Delete user avatar - Any authenticated user"""
-    
-    print(f"🔍 DELETE avatar called by user: {current_user.id}, role: {current_user.role}")
-    
-    if not current_user.avatar_url:
-        raise HTTPException(
-            status_code=404,
-            detail="No avatar found"
-        )
-    
-    # Delete file
-    file_path = os.path.join(settings.ASSET_DIR, current_user.avatar_url)
-    if os.path.exists(file_path):
-        os.remove(file_path)
-    
-    # Remove from database
-    current_user.avatar_url = None
-    db.commit()
-    
-    return {"message": "Avatar deleted successfully"}
-
-
-# ✅ Delete Avatar - POST method (fallback)
 @router.post("/avatar/delete")
-async def delete_avatar_post(
+def delete_avatar(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Delete user avatar - POST version (fallback)"""
-    
-    print(f"🔍 POST avatar/delete called by user: {current_user.id}, role: {current_user.role}")
-    
-    if not current_user.avatar_url:
-        raise HTTPException(
-            status_code=404,
-            detail="No avatar found"
-        )
-    
-    # Delete file
-    file_path = os.path.join(settings.ASSET_DIR, current_user.avatar_url)
-    if os.path.exists(file_path):
-        os.remove(file_path)
-    
-    # Remove from database
+    db.refresh(current_user, with_for_update=True)
+    old_url = current_user.avatar_url
+    if not old_url:
+        raise HTTPException(status_code=404, detail="No avatar found")
+
     current_user.avatar_url = None
     db.commit()
-    
+    _remove_previous_avatar(db, current_user.id, old_url)
     return {"message": "Avatar deleted successfully"}

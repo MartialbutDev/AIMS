@@ -13,9 +13,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as SecureStore from "expo-secure-store";
-import * as Linking from "expo-linking";
 
+import { openPrivateFile } from "../../../src/services/privateFile.service";
 import { useTheme } from "../../../src/context/ThemeContext";
 import { journalService, Journal } from "../../../src/services/journal.service";
 
@@ -42,6 +41,7 @@ export default function JournalDetailScreen() {
 
   const [loading, setLoading] = useState(true);
   const [journal, setJournal] = useState<Journal | null>(null);
+  const [opening, setOpening] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(
@@ -69,26 +69,14 @@ export default function JournalDetailScreen() {
   );
 
   const handleOpenPDF = async () => {
-    if (!journal) return;
+    if (!journal || opening) return;
+    setOpening(true);
     try {
-      const token = await SecureStore.getItemAsync("access_token");
-      if (!token) {
-        Alert.alert("Error", "Session expired. Please log in again.");
-        return;
-      }
-
-      const url = journalService.getFileUrl(journal.id, token);
-      const supported = await Linking.canOpenURL(url);
-
-      if (!supported) {
-        Alert.alert("Error", "Cannot open PDF on this device");
-        return;
-      }
-
-      await Linking.openURL(url);
+      await openPrivateFile(`/journals/${encodeURIComponent(journal.id)}/file`, "journal");
     } catch (error) {
-      console.error("Open PDF error:", error);
-      Alert.alert("Error", "Failed to open PDF");
+      Alert.alert("Couldn’t open PDF", error instanceof Error ? error.message : "Please try again.");
+    } finally {
+      setOpening(false);
     }
   };
 
@@ -349,10 +337,11 @@ export default function JournalDetailScreen() {
             <TouchableOpacity
               style={[styles.openPdfButton, { backgroundColor: colors.primary }]}
               onPress={handleOpenPDF}
+              disabled={opening}
               activeOpacity={0.85}
             >
               <Ionicons name="open-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.openPdfButtonText}>Open PDF</Text>
+              <Text style={styles.openPdfButtonText}>{opening ? "Opening…" : "Open PDF"}</Text>
             </TouchableOpacity>
           </View>
 

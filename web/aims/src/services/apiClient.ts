@@ -3,6 +3,11 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 function getAccessToken(): string | undefined { return readStoredSession()?.accessToken }
 
+export class ApiResponseError extends Error {
+  readonly status: number
+  constructor(message: string, status: number) { super(message); this.status = status }
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
@@ -37,11 +42,12 @@ export async function apiRequest<T>(
     } catch {
       // Keep the HTTP status message when the response does not contain JSON.
     }
-    throw new Error(message)
+    throw new ApiResponseError(message, response.status)
   }
 
   if (options.method && !['GET', 'HEAD'].includes(options.method.toUpperCase()) && !path.startsWith('/api/v1/notifications/')) window.dispatchEvent(new Event('aims-workflow-changed'))
 
+  if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 
@@ -51,7 +57,8 @@ export async function apiRequestBlob(path: string): Promise<Blob> {
   if (token) headers.set('Authorization', `Bearer ${token}`)
   const response = await fetch(`${API_BASE_URL}${path}`, { headers })
   if (!response.ok) {
-    throw new Error(`Could not load file (${response.status}): ${response.statusText}`)
+    const body: { detail?: unknown } | null = await response.json().catch(() => null)
+    throw new Error(typeof body?.detail === 'string' ? body.detail : `Could not load file (${response.status}): ${response.statusText}`)
   }
   return response.blob()
 }

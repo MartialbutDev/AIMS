@@ -10,6 +10,27 @@ Use Python and Node versions compatible with requirements.txt and mobile/package
 4. Start web/aims with `npm run dev`. Its proxy now defaults to localhost:8000. VITE_API_BASE_URL should be blank for the local proxy; an explicit environment override still takes priority.
 5. For mobile, copy mobile/.env.example to mobile/.env.local and replace the example IP with this PC's LAN IPv4. Set both EXPO_PUBLIC_BASE_URL and EXPO_PUBLIC_API_URL. Restart Expo with `npx expo start --go --clear`. Use a compatible SDK 54 Expo Go for supported screens. The installed preview APK continues to use EC2; local source changes do not update that APK. Push needs an AIMS native development/release build.
 
+## Signing key and configuration checks
+
+The API requires its own random signing key in both debug and normal mode. Use a different key on each environment. Restart the backend after any key change. Existing sessions and signed links issued with the previous key will require a fresh sign-in or link.
+
+On a new local checkout, check that `.env` is ignored by Git and configure the local database in it. If the file has no `SECRET_KEY` line, run these commands from `backend` in PowerShell. If it already contains a placeholder, remove that line first. Keep a working random key as is.
+
+```powershell
+$aimsSigningKey = .\venv\Scripts\python.exe -c "import secrets; print(secrets.token_urlsafe(64))"
+Add-Content -LiteralPath .env -Value ("SECRET_KEY=" + $aimsSigningKey)
+Remove-Variable aimsSigningKey
+.\venv\Scripts\python.exe -m app.core.config
+```
+
+On EC2, configure the service with its own generated `SECRET_KEY`, an explicit production `DATABASE_URL`, `DEBUG=false`, and `DEV_BYPASS_TEST_ONBOARDING=false`. Use the same working directory, Python environment, and environment overrides as the running service when checking the candidate. Run this from the deployed `backend` folder before restarting the updated service:
+
+```bash
+./venv/bin/python -m app.core.config --production
+```
+
+The check shows pass/fail messages without printing credentials or connecting to the database. A passing check confirms the configured values meet these checks. It does not verify network connectivity or that two environments use different keys.
+
 ## A genuinely new database
 
 Create a dedicated empty PostgreSQL database owned by the application role and configure backend/.env. Install requirements, then run:

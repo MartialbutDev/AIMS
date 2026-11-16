@@ -6,10 +6,11 @@ import { assessLocationAccuracy } from '../utils/locationAccuracy';
 export function LocationAccuracyNotice({ accuracy }: { accuracy: number | null | undefined }) {
   const { colors } = useTheme();
   const notice = assessLocationAccuracy(accuracy);
+  if (!notice.caution) return null;
   return <View accessibilityLiveRegion="polite" style={{ padding: 14, marginTop: 10, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, gap: 8 }}>
-    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}><Ionicons name={notice.caution ? 'warning-outline' : 'information-circle-outline'} size={19} color={notice.caution ? colors.warning : colors.accent} /><Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600', flex: 1 }}>{notice.label}</Text></View>
+    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}><Ionicons name="warning-outline" size={19} color={colors.warning} /><Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600', flex: 1 }}>{notice.label}</Text></View>
     <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 19 }}>{notice.message}</Text>
-    {notice.caution && <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 19 }}>You will be asked to confirm before submitting this reading. Location alone does not verify attendance.</Text>}
+    <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 19 }}>You will be asked to confirm before submitting this reading. Location alone does not verify attendance.</Text>
   </View>;
 }
 

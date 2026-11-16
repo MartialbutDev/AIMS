@@ -3,7 +3,6 @@
 
 from datetime import datetime, timezone
 from pathlib import Path
-import mimetypes
 import logging
 import tempfile
 from starlette.concurrency import run_in_threadpool
@@ -28,7 +27,6 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import (
     get_current_user,
-    get_current_user_from_token,
 )
 from app.core.assignment_access import (
     ensure_coordinator_student_access,
@@ -44,7 +42,10 @@ from app.models.coordinator_assignment import (
 )
 from app.services.document_service import DocumentService
 from app.services.student_document_feedback import student_document_payload, student_upload_payload
-from app.services.ocr_service import OCRService
+from app.core.file_storage import stored_file
+from app.services.submission_recovery import Submission, SubmissionKey
+from app.core.document_upload_limits import MAX_UPLOAD_BYTES, UPLOAD_SIZE_MESSAGE
+from app.services.ocr_service import DocumentLimitError, OCRService, ocr_budget
 from app.services.document_identification import identify_header, identify_from_body
 from app.utils.official_document_evidence import OFFICIAL_TYPES, official_evidence
 from app.services.document_version_service import annotate, current_approved, review_times
@@ -176,24 +177,19 @@ def _coordinator_document_payload(
 
 
 def _document_file(document: Document) -> FileResponse:
-    asset_dir = Path(settings.ASSET_DIR).resolve()
+    full_path = stored_file(document.file_path)
 
-    full_path = (
-        asset_dir / document.file_path
-    ).resolve()
-
-    if (
-        not full_path.is_relative_to(asset_dir)
-        or not full_path.is_file()
-    ):
-        raise HTTPException(
-            status_code=404,
-            detail="File not found",
-        )
-
-    content_type, _ = mimetypes.guess_type(
-        str(full_path)
-    )
+    content_type = {
+        ".pdf": "application/pdf",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".bmp": "image/bmp",
+        ".tif": "image/tiff",
+        ".tiff": "image/tiff",
+        ".heic": "image/heic",
+        ".webp": "image/webp",
+    }.get(full_path.suffix.lower())
 
     return FileResponse(
         str(full_path),
@@ -204,9 +200,10 @@ def _document_file(document: Document) -> FileResponse:
             document.original_filename
             or full_path.name
         ),
-        content_disposition_type="inline",
+        content_disposition_type="inline" if content_type else "attachment",
         headers={
             "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
         },
     )
 
@@ -359,24 +356,29 @@ async def identify_document_type(
             with path.open('wb') as output:
                 while chunk := await file.read(1024 * 1024):
                     size += len(chunk)
-                    if size > 10 * 1024 * 1024:
-                        raise HTTPException(413, 'Type suggestions support files up to 10 MB. Choose the type manually for larger files.')
+                    if size > MAX_UPLOAD_BYTES:
+                        raise HTTPException(413, UPLOAD_SIZE_MESSAGE)
                     output.write(chunk)
             if size == 0:
                 raise HTTPException(400, 'The selected file is empty')
-            try:
-                header = await run_in_threadpool(OCRService.extract_header, str(path), file_type)
-            except Exception:
-                return {'status': 'unavailable', 'suggested_type': None,
-                        'message': 'Could not read the header. Choose the document type manually.',
-                        }
-            result = identify_header(header, 'document')
-            if not result['candidates']:
+            with ocr_budget():
                 try:
-                    body = await run_in_threadpool(OCRService.extract_text, str(path), file_type)
-                    result = identify_from_body(result, body or '')
+                    header = await run_in_threadpool(OCRService.extract_header, str(path), file_type)
+                except DocumentLimitError:
+                    raise
                 except Exception:
-                    pass  # The user can still choose a type manually.
+                    return {'status': 'unavailable', 'suggested_type': None,
+                            'message': 'Could not read the header. Choose the document type manually.',
+                            }
+                result = identify_header(header, 'document')
+                if not result['candidates']:
+                    try:
+                        body = await run_in_threadpool(OCRService.extract_text, str(path), file_type)
+                        result = identify_from_body(result, body or '')
+                    except DocumentLimitError:
+                        raise
+                    except Exception:
+                        pass  # The user can still choose a type manually.
             detected = result['detected_type']
             supported = {'resume', 'application_letter', 'waiver', 'medical_certificate',
                          'internship_plan', 'insurance', 'endorsement_letter',
@@ -398,10 +400,11 @@ async def identify_document_type(
 
 
 @documents_router.post("/upload")
-async def upload_document(
+def upload_document(
     file: UploadFile = File(...),
     document_type: str = Form(...),
     description: str = Form(""),
+    submission_key: SubmissionKey = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -411,12 +414,17 @@ async def upload_document(
             detail="Student access required for uploads",
         )
 
+    submission = Submission(db, current_user, "document", submission_key)
+    if (previous := submission.replay(Document)) is not None:
+        return previous
+
     return student_upload_payload(DocumentService.upload_document(
         db=db,
         file=file,
         document_type=document_type,
         description=description,
         uploaded_by=current_user.id,
+        submission=submission,
     ))
 
 
@@ -560,9 +568,7 @@ async def get_student_document_file_for_review(
     student_id: str,
     document_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        get_current_user_from_token
-    ),
+    current_user: User = Depends(get_current_user),
 ):
     document = _get_document_or_404(
         db,
@@ -616,9 +622,7 @@ async def get_document(
 async def get_document_image(
     document_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        get_current_user_from_token
-    ),
+    current_user: User = Depends(get_current_user),
 ):
     document = _get_document_or_404(
         db,

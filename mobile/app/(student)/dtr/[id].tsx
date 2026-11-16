@@ -289,7 +289,7 @@ export default function DTRDetailScreen() {
         {!!dtr.tasks_completed && (
           <View style={[styles.sectionCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-              Tasks Completed
+              Planned tasks
             </Text>
             <Text style={[styles.sectionText, { color: colors.textSecondary }]}>
               {dtr.tasks_completed}

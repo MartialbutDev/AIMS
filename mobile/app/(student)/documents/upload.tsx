@@ -1,4 +1,5 @@
 // app/(student)/documents/upload.tsx
+import { submitWithRecovery, showSubmissionRecovery, submissionErrorMessage } from "../../../src/services/submissionRecovery";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -206,10 +207,7 @@ export default function UploadDocumentScreen() {
       formData.append("document_type", selectedType);
       formData.append("description", description || "");
 
-      const response = await api.post("/documents/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+      const response = await submitWithRecovery<any>("/documents/upload", formData, {
         timeout: 120000,
         onUploadProgress: (progressEvent: any) => {
           if (progressEvent.total) {
@@ -253,7 +251,8 @@ export default function UploadDocumentScreen() {
       setSelectedType(presetType);
       setDescription("");
     } catch (error: any) {
-      const detail = error.response?.data?.detail;
+      if (showSubmissionRecovery(error, () => router.replace("/(student)/documents"))) return;
+      const detail = submissionErrorMessage(error, "Couldn’t upload the document. Please try again.");
       const reupload = typeof detail === "string" && detail.startsWith("Re-upload required: ");
       Alert.alert(
         reupload ? "Re-upload required" : "Upload failed",

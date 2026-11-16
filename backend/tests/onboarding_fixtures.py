@@ -2,13 +2,14 @@
 from app.models.student_onboarding import StudentOnboarding, StudentOnboardingSubmission
 
 
-def approve_onboarding(db, student_id):
+def approve_onboarding(db, student_id, term=("2026-2027", "1")):
     orientation = StudentOnboardingSubmission(
         student_id=student_id, document_kind="orientation", review_status="verified",
         original_filename="synthetic-orientation.pdf", file_path="fixture.pdf", media_type="application/pdf",
     )
     cor = StudentOnboardingSubmission(
         student_id=student_id, document_kind="cor", review_status="verified",
+        validation_result={"details": {"detected_academic_year": term[0], "detected_semester": term[1]}},
         original_filename="synthetic-cor.pdf", file_path="fixture.pdf", media_type="application/pdf",
     )
     db.add_all([orientation, cor])

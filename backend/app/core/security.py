@@ -4,7 +4,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import Depends, HTTPException, Query, Request, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -23,12 +23,6 @@ pwd_context = CryptContext(
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login/form"
 )
-
-optional_oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/v1/auth/login/form",
-    auto_error=False
-)
-
 
 def verify_password(
     plain_password: str,
@@ -141,33 +135,6 @@ def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     return _user_from_access_token(token, db, request.headers.get("user-agent", ""))
-
-
-def get_current_user_from_token(
-    request: Request,
-    token: Optional[str] = Query(default=None),
-    header_token: Optional[str] = Depends(
-        optional_oauth2_scheme
-    ),
-    db: Session = Depends(get_db)
-) -> User:
-    """
-    Legacy image endpoints.
-
-    Prefer Authorization headers.
-    Query-string tokens should be phased out because
-    they can leak through URLs and server logs.
-    """
-
-    chosen = header_token or token
-
-    if not chosen:
-        raise HTTPException(
-            status_code=401,
-            detail="Not authenticated"
-        )
-
-    return _user_from_access_token(chosen, db, request.headers.get("user-agent", ""))
 
 
 def require_role(required_role: str):

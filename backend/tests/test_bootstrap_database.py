@@ -8,6 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import create_engine,inspect,text
+from alembic import command
+from alembic.config import Config
 from alembic.operations import Operations
 from alembic.migration import MigrationContext
 from bootstrap_database import bootstrap
@@ -61,10 +63,25 @@ class BootstrapTests(unittest.TestCase):
     def test_empty_database_registers_all_models_and_is_stamped_at_head(self):
         e=create_engine('sqlite://')
         with e.begin() as c:
-            bootstrap(c);self.assertTrue({'internship_deployments','internship_completion_cases','auth_sessions'}<=set(inspect(c).get_table_names()))
+            bootstrap(c);self.assertTrue({'internship_deployments','internship_completion_cases','auth_sessions','login_attempt_limits','submission_receipts'}<=set(inspect(c).get_table_names()))
             self.assertTrue({'academic_requirements','academic_requirement_events'}<=set(inspect(c).get_table_names()))
-            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'p26f80bd72fb')
+            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'r48b02df94bd')
         e.dispose()
+    def test_login_throttle_migration_creates_expiry_index_on_existing_installation(self):
+        engine = create_engine("sqlite://")
+        self.addCleanup(engine.dispose)
+        config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.stamp(config, "p26f80bd72fb")
+            command.upgrade(config, "head")
+            indexes = inspect(connection).get_indexes("login_attempt_limits")
+            self.assertIn(["expires_at"], [index["column_names"] for index in indexes])
+            self.assertEqual(
+                connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
+                "r48b02df94bd",
+            )
+
     def test_existing_database_is_refused_without_stamping_or_changing_records(self):
         e=create_engine('sqlite://')
         with e.begin() as c:

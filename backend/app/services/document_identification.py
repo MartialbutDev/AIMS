@@ -1,6 +1,6 @@
 """Conservative header-first identification; content matching is not authenticity."""
 import re
-from app.services.ocr_service import OCRService
+from app.services.ocr_service import DocumentLimitError, OCRService, ocr_budget
 from app.utils.untitled_documents import body_candidates
 from app.utils.official_document_evidence import OFFICIAL_TYPES, official_evidence
 
@@ -123,10 +123,13 @@ def identify_from_body(identification: dict, text: str) -> dict:
     return identification
 
 
+@ocr_budget()
 def inspect_upload(path: str, file_type: str, expected_type: str) -> dict:
     header_error = None
     try:
         header = OCRService.extract_header(path, file_type)
+    except DocumentLimitError:
+        raise
     except Exception:
         header = ''
         header_error = 'Header extraction failed; coordinator review required.'
@@ -146,6 +149,8 @@ def inspect_upload(path: str, file_type: str, expected_type: str) -> dict:
     try:
         text = OCRService.extract_text(path, file_type) or ''
         error = None
+    except DocumentLimitError:
+        raise
     except Exception:
         text = ''
         error = 'OCR extraction failed; manual review required.'

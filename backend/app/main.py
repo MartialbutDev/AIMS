@@ -8,10 +8,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 
-from app.core.config import settings
+from app.core.avatar_images import AvatarStaticFiles
+from app.core.config import settings, validate_signing_key
+from app.core.document_upload_limits import DocumentUploadLimitMiddleware
+from app.core.file_storage import STORAGE_UNAVAILABLE, storage_root
 from app.core.database import Base, engine
 import app.models
 from app.api.v1 import router as api_v1_router
@@ -29,7 +31,7 @@ def ensure_database_schema() -> None:
     from app.models.password_reset import PASSWORD_RESET_TABLES
     from app.models.internship_completion import COMPLETION_TABLES
     from app.models.auth_session import SESSION_TABLES
-    Base.metadata.create_all(bind=engine, tables=[t for t in Base.metadata.sorted_tables if t.name not in (TEMPLATE_TABLES | DIRECT_PLACEMENT_TABLES | DELIVERY_TABLES | PASSWORD_RESET_TABLES | COMPLETION_TABLES | SESSION_TABLES | {'academic_requirements', 'academic_requirement_events', 'company_moa_files', 'dtr_corrections'})])
+    Base.metadata.create_all(bind=engine, tables=[t for t in Base.metadata.sorted_tables if t.name not in (TEMPLATE_TABLES | DIRECT_PLACEMENT_TABLES | DELIVERY_TABLES | PASSWORD_RESET_TABLES | COMPLETION_TABLES | SESSION_TABLES | {'academic_requirements', 'academic_requirement_events', 'company_moa_files', 'dtr_corrections', 'login_attempt_limits', 'submission_receipts'})])
 
     inspector = inspect(engine)
 
@@ -74,14 +76,7 @@ def ensure_database_schema() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if (
-        not settings.DEBUG
-        and settings.SECRET_KEY
-        == "your-super-secret-key-change-in-production"
-    ):
-        raise RuntimeError(
-            "Set a secure SECRET_KEY before running AIMS in production"
-        )
+    validate_signing_key(settings)
 
     ensure_database_schema()
 
@@ -113,6 +108,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.add_middleware(DocumentUploadLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -139,7 +135,7 @@ os.makedirs(
 
 app.mount(
     "/static/avatars",
-    StaticFiles(directory=avatar_dir),
+    AvatarStaticFiles(directory=avatar_dir),
     name="public_avatars",
 )
 
@@ -182,6 +178,19 @@ async def db_health_check():
             status_code=503,
             detail="Database is unavailable",
         )
+
+
+@app.get("/api/v1/health/storage")
+def storage_health_check():
+    root = storage_root()
+    try:
+        for name in ("", "uploads", "journal_uploads", "dtr_uploads", "onboarding"):
+            folder = root / name
+            if folder.exists() and (not folder.is_dir() or not os.access(folder, os.R_OK | os.W_OK | os.X_OK)):
+                raise HTTPException(503, STORAGE_UNAVAILABLE)
+    except OSError as exc:
+        raise HTTPException(503, STORAGE_UNAVAILABLE) from exc
+    return {"status": "healthy", "storage": "accessible"}
 
 
 if __name__ == "__main__":
