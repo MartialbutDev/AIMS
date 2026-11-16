@@ -44,6 +44,8 @@ jobs:
         env:
           DEBUG: 'false'
           DEV_BYPASS_TEST_ONBOARDING: 'false'
+          CURRENT_ACADEMIC_YEAR: '2026-2027'
+          CURRENT_SEMESTER: '1'
           RUN_NOTIFICATION_SCHEDULER: 'false'
           PUSH_DELIVERY_ENABLED: 'false'
           EMAIL_NOTIFICATION_DELIVERY_ENABLED: 'false'

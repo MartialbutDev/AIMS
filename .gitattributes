@@ -1,0 +1,2 @@
+# Expo hashes this Firebase client config as raw bytes. Match the signed preview build on every OS.
+/mobile/google-services.json text eol=crlf
