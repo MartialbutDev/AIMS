@@ -1,2 +1,4 @@
 # Expo hashes this Firebase client config as raw bytes. Match the signed preview build on every OS.
 /mobile/google-services.json text eol=crlf
+# Keep Android update fingerprints consistent with the signed APK on every OS.
+/mobile/eas.json text eol=crlf
