@@ -51,7 +51,7 @@ def deployments(db, actor, year, semester):
 
 
 def completion_counts(db, query):
-    counts={key:0 for key in ('pre_deployment','deployed','requested','company_confirmed','returned','completed','completed_legacy','grade_released')}
+    counts={key:0 for key in ('pre_deployment','deployed','requested','company_confirmed','returned','completed','completed_legacy')}
     has_cases=inspect(db.connection()).has_table(Case.__tablename__)
     records=query.all()
     cases={c.deployment_id:c for c in db.query(Case).filter(Case.deployment_id.in_([d.id for d in records]))} if has_cases and records else {}
@@ -60,7 +60,6 @@ def completion_counts(db, query):
         if record.status==DeploymentStatus.COMPLETED:
             approved=bool(case and case.status=='completed' and case.approved_by and case.approved_at)
             counts['completed' if approved else 'completed_legacy']+=1
-            if approved and case.grade_released_at and case.released_grade: counts['grade_released']+=1
         elif record.status==DeploymentStatus.DEPLOYED:
             counts['deployed']+=1
             if case and case.status in ('requested','company_confirmed','returned'):counts[case.status]+=1

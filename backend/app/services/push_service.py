@@ -9,6 +9,8 @@ from app.models.push import PushDevice, PushDelivery
 from app.models.notification import Notification
 from app.models.notification_settings import NotificationSettings
 from app.models.user import User
+from app.services.notification_scope import destinations, value
+from app.services.internship_reminders import REMINDERS, SOURCE, reminder_is_current
 
 logger = logging.getLogger(__name__)
 ROUTES = {'/(student)/completion','/(student)/documents','/(student)/dtr','/(student)/journals','/(student)/applications','/(student)/applications/direct-placements','/(student)/notifications','/(student)/documents/templates','/(student)/pre-deployment','/onboarding'}
@@ -29,15 +31,19 @@ def push_allowed(db, user_id, notification=None, channel='push'):
     preferences = db.query(NotificationSettings).filter(NotificationSettings.user_id == user_id).first()
     if not user or (channel == 'push' and preferences is not None and not preferences.push_enabled):
         return False
-    if preferences is None or notification is None:
+    if notification is None:
         return True
-    try:
-        data = json.loads(notification.data or '{}')
-        if not isinstance(data,dict):
-            data = {}
-    except (ValueError,TypeError):
-        data = {}
+    data = _notification_data(notification)
+    if data.get('source') == SOURCE:
+        kind = data.get('reminder_kind')
+        if not isinstance(kind, str) or kind not in REMINDERS:
+            return False
+        if preferences is not None and not getattr(preferences, REMINDERS[kind].preference):
+            return False
+        return reminder_is_current(db, user_id, data)
     if data.get('source') == 'message': return False
+    if preferences is None:
+        return True
     kind = getattr(notification.type,'value',notification.type)
     status = data.get('status')
     reminder = data.get('source') == 'coordinator_reminder'
@@ -53,13 +59,112 @@ def push_allowed(db, user_id, notification=None, channel='push'):
         field = 'system_announcements'
     return bool(getattr(preferences,field))
 
-def notification_route(notification):
+INBOX_ROUTE = '/(student)/notifications'
+
+CATEGORY_PREVIEWS = {
+    'application': ('Application update', 'Check Applications for the latest status.'),
+    'dtr': ('Attendance update', 'Check your attendance records in AIMS.'),
+    'journal': ('Journal update', 'Check Weekly journals for the latest status.'),
+    'document': ('Document update', 'Check Documents for the latest review status.'),
+    'announcement': ('New AIMS announcement', 'Read the announcement in Notifications.'),
+    'system': ('New AIMS notice', 'Read the notice in Notifications.'),
+}
+
+STATUS_PREVIEWS = {
+    'application': {
+        'pending': ('Application submitted', 'Track your submission in Applications.'),
+        'reviewing': ('Application under review', 'Check Applications for updates.'),
+        'endorsed': ('Application endorsed', 'Check Applications for the next step.'),
+        'interview': ('Interview invitation', 'Check Applications for details.'),
+        'accepted': ('Application accepted', 'Check Applications for the next step.'),
+        'rejected': ('Application decision available', 'Check Applications for the decision.'),
+        'withdrawn': ('Application withdrawn', 'View your application history in AIMS.'),
+    },
+    'dtr': {
+        'pending': ('Clock-in recorded', 'Remember to clock out when you finish your shift.'),
+        'submitted': ('Attendance submitted', 'Track your review status in Attendance.'),
+        'approved': ('Attendance approved', 'Your approved hours are available in AIMS.'),
+        'rejected': ('Attendance needs attention', 'Check the review result in Attendance.'),
+    },
+    'document': {
+        'uploaded': ('Document uploaded', 'Check Documents to track its review.'),
+        'pending': ('Document awaiting review', 'Check Documents for updates.'),
+        'verified': ('Document verified', 'Check Documents for the review result.'),
+        'rejected': ('Document needs attention', 'Check the review feedback in AIMS.'),
+        'returned': ('Document needs attention', 'Check the review feedback in AIMS.'),
+        'revoked': ('Document needs attention', 'Check the review feedback in AIMS.'),
+    },
+    'journal': {
+        'submitted': ('Journal submitted', 'Track its review in Weekly journals.'),
+        'reviewing': ('Journal under review', 'Check Weekly journals for updates.'),
+        'approved': ('Journal approved', 'View the result in Weekly journals.'),
+        'rejected': ('Journal needs attention', 'Check the review feedback in AIMS.'),
+    },
+}
+
+SOURCE_PREVIEWS = {
+    'attendance_review': ('Workplace attendance reviewed', 'Check Attendance for the company decision.'),
+    'attendance_absence': ('Absence request updated', 'Check Attendance for the latest status.'),
+    'dtr_correction': ('Attendance correction update', 'Check Attendance for the latest status.'),
+    'direct_placement': ('Placement proposal updated', 'Check School-arranged placements for the next step.'),
+    'completion': ('Internship completion update', 'Check Completion & archive for the next step.'),
+    'deployment': ('Internship deployment updated', 'Check Pre-deployment for the latest status.'),
+    'document_template': ('Approved forms updated', 'Check Approved forms for the current versions.'),
+    'onboarding': ('Onboarding review update', 'Check your orientation and COR status in AIMS.'),
+}
+
+REMINDER_PREVIEWS = {
+    'dtr': ('Attendance reminder', 'Check your attendance records in AIMS.'),
+    'document': ('Document reminder', 'Check Documents for any outstanding requirements.'),
+    'journal': ('Journal reminder', 'Check Weekly journals for any outstanding submissions.'),
+}
+
+
+def _notification_data(notification):
     try:
         data = json.loads(notification.data or '{}')
     except (ValueError, TypeError):
-        data = {}
-    route = data.get('route') if isinstance(data,dict) else None
-    return route if isinstance(route,str) and route in ROUTES else '/(student)/notifications'
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def notification_route(notification):
+    data = _notification_data(notification)
+    if 'campaign_id' in data:
+        return INBOX_ROUTE
+    if 'route' in data:
+        route = data['route']
+        return route if isinstance(route, str) and route in ROUTES else INBOX_ROUTE
+    return destinations('student', value(notification.type), value(data.get('source', 'workflow')))['route']
+
+
+def phone_preview(notification):
+    """Choose fixed text. Never copy a stored title, message, or data into the preview."""
+    data = _notification_data(notification)
+    kind = value(notification.type)
+    source = value(data.get('source'))
+    status = value(data.get('status'))
+
+    if source == SOURCE:
+        reminder = data.get('reminder_kind')
+        if isinstance(reminder, str) and reminder in REMINDERS:
+            return REMINDERS[reminder].title, REMINDERS[reminder].message
+    if 'campaign_id' in data:
+        return CATEGORY_PREVIEWS['announcement']
+    if source == 'coordinator_reminder' and kind in REMINDER_PREVIEWS:
+        return REMINDER_PREVIEWS[kind]
+    if source == 'onboarding' and status in {'rejected', 'returned', 'needs_revision'}:
+        return ('Onboarding needs attention', 'Check your orientation and COR feedback in AIMS.')
+    if source == 'deployment' and status == 'deployed':
+        return ('Internship deployment approved', 'Check your placement details in AIMS.')
+    if source == 'completion' and value(data.get('action')) == 'completed':
+        return ('Internship completion approved', 'View your completed record in AIMS.')
+    if kind == 'document' and value(data.get('action')) == 'approval_revoked':
+        return STATUS_PREVIEWS['document']['revoked']
+    if source in SOURCE_PREVIEWS:
+        return SOURCE_PREVIEWS[source]
+    return STATUS_PREVIEWS.get(kind, {}).get(status) or CATEGORY_PREVIEWS.get(kind, CATEGORY_PREVIEWS['system'])
+
 
 def process_push_deliveries(db):
     if not settings.PUSH_DELIVERY_ENABLED:
@@ -98,7 +203,15 @@ def process_push_deliveries(db):
                 result = receipt
             else:
                 # Keep student records off the lock screen and third-party payload.
-                result = expo_request('send', {'to':device.token, 'title':'AIMS update', 'body':'Open AIMS to view your notification.', 'sound':'default', 'channelId':'aims', 'data':{'notification_id':notification.id, 'route':notification_route(notification)}})
+                title, body = phone_preview(notification)
+                result = expo_request('send', {
+                    'to': device.token,
+                    'title': title,
+                    'body': body,
+                    'sound': 'default',
+                    'channelId': 'aims',
+                    'data': {'notification_id': notification.id, 'route': notification_route(notification)},
+                })
             if result.get('status') == 'ok':
                 if delivery.status == 'ticketed':
                     delivery.status = 'sent'

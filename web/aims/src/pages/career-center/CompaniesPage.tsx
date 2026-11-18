@@ -474,11 +474,6 @@ export function CompaniesPage({
     <main className="cc-page">
       <header className="cc-page-header">
         <div>
-          <div className="cc-eyebrow">
-            <span className="cc-eyebrow-dot" />
-            CAREER CENTER · PARTNERSHIP MANAGEMENT
-          </div>
-
           <h1>Company Management</h1>
           <p>
             Manage host training establishments, maintain company profiles,
@@ -576,9 +571,6 @@ export function CompaniesPage({
           <div>
             <span className="cc-section-kicker">PARTNER DIRECTORY</span>
             <h2>Registered Companies</h2>
-            <p>
-              Search, review, and update internship partner records.
-            </p>
           </div>
 
           <span className="cc-counter">
@@ -769,9 +761,7 @@ export function CompaniesPage({
         <article className="cc-card cc-info-card">
           <div className="cc-section-header">
             <div>
-              <span className="cc-section-kicker">QUICK ACCESS</span>
-              <h2>Career Center Workspace</h2>
-              <p>Continue managing internship placements.</p>
+              <h2>Quick links</h2>
             </div>
           </div>
 
@@ -917,7 +907,6 @@ export function CompaniesPage({
                 <div className="cc-modal-content">
                   <div className="cc-form-section">
                     <h3>Company Information</h3>
-                    <p>Basic details of the Host Training Establishment.</p>
 
                     <div className="cc-form-grid">
                       <div className="cc-field-full">
@@ -990,7 +979,6 @@ export function CompaniesPage({
 
                   <div className="cc-form-section">
                     <h3>Memorandum of Agreement</h3>
-                    <p>Record the current partnership agreement.</p>
 
                     <label className="cc-toggle-row">
                       <span>

@@ -3,7 +3,7 @@ import api from './api';
 
 export interface SummaryStats {
   academic_year: string; semester: string
-  completion: { deployed: number; requested: number; company_confirmed: number; returned: number; completed: number; completed_legacy: number; grade_released: number }
+  completion: { deployed: number; requested: number; company_confirmed: number; returned: number; completed: number; completed_legacy: number }
   applications: number;
   dtr_count: number;
   journals: number;

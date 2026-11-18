@@ -18,11 +18,11 @@
 .dean-oversight button:focus-visible,.dean-oversight select:focus-visible{outline:3px solid #a47700;outline-offset:3px}
 .dean-oversight__caption{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--dean-muted)}
 .dean-oversight__cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.dean-oversight__metric{background:#fff;border:1px solid #e1e3ed;border-radius:14px;padding:23px;display:flex;flex-direction:column;gap:10px;border-top:3px solid #d5b13b}
+.dean-oversight__metric{background:#fff;border:1px solid #e1e3ed;border-radius:14px;padding:23px;display:flex;flex-direction:column;gap:10px}
 .dean-oversight__metric>span{font-size:13px;font-weight:700;line-height:1.5}
 .dean-oversight__metric>strong{font-size:38px;letter-spacing:-1px;line-height:1.2}
 .dean-oversight__metric small{margin-top:auto}
-.dean-oversight__metric--primary{background:var(--dean-navy);color:white;border-color:var(--dean-navy);border-top-color:var(--dean-gold)}
+.dean-oversight__metric--primary{background:var(--dean-navy);color:white;border-color:var(--dean-navy)}
 .dean-oversight__metric--primary small{color:#c9cbdc}
 .dean-oversight__panel{border:1px solid #e1e3ed;border-radius:16px;padding:25px;background:white;min-width:0}
 .dean-oversight__section-heading{display:flex;justify-content:space-between;gap:16px;margin-bottom:24px;align-items:start}

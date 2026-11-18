@@ -15,6 +15,7 @@ from app.models.user import User, UserRole
 from app.models.application import Application, ApplicationStatus
 from app.models.notification import Notification, NotificationType
 from app.models.notification_settings import NotificationSettings
+from app.models.push import PushDevice
 from app.models.notification_delivery import NotificationDeliveryPreference, NotificationEmailDelivery
 from app.models.document import Document, DocumentType
 from app.models.journal import Journal, JournalStatus
@@ -156,6 +157,55 @@ class NotificationTests(unittest.TestCase):
         self.seed_email(); self.db.add(NotificationSettings(user_id='s1', push_enabled=False)); self.db.commit()
         self.assertFalse(push_service.push_allowed(self.db, 's1', self.notices()[0]))
         self.assertTrue(push_service.push_allowed(self.db, 's1', self.notices()[0], channel='email'))
+
+    def test_phone_previews_use_fixed_text_and_link_to_owned_records(self):
+        events = [
+            ('dtr', {'status': 'approved'}, 'Attendance approved', '/(student)/dtr'),
+            ('document', {'status': 'rejected'}, 'Document needs attention', '/(student)/documents'),
+            ('application', {'status': 'accepted'}, 'Application accepted', '/(student)/applications'),
+            ('journal', {'status': 'approved'}, 'Journal approved', '/(student)/journals'),
+            ('document', {'source': 'onboarding', 'status': 'rejected'},
+             'Onboarding needs attention', '/onboarding'),
+            ('application', {'source': 'deployment', 'status': 'deployed'},
+             'Internship deployment approved', '/(student)/pre-deployment'),
+            ('system', {'source': 'completion', 'action': 'completed'},
+             'Internship completion approved', '/(student)/completion'),
+            ('dtr', {'source': 'coordinator_reminder'}, 'Attendance reminder', '/(student)/dtr'),
+            ('application', {'campaign_id': 'campaign'}, 'New AIMS announcement', '/(student)/notifications'),
+        ]
+        private = 'Synthetic private name, feedback, photo URL and location'
+        self.db.add(PushDevice(
+            id='device', user_id='s1', token='ExpoPushToken[test_device]', active=True,
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1),
+        ))
+        for index, (kind, data, _, _) in enumerate(events):
+            self.db.add(Notification(
+                id=f'phone-{index}', user_id='s1', type=NotificationType(kind),
+                title=private, message=private, data=json.dumps({**data, 'private_field': private}),
+                is_read=False,
+            ))
+        self.db.commit()
+
+        with patch.object(settings, 'PUSH_DELIVERY_ENABLED', True), patch.object(
+            push_service, 'expo_request', return_value={'status': 'ok', 'id': 'ticket'},
+        ) as transport:
+            self.assertEqual(push_service.process_push_deliveries(self.db), len(events))
+        previews = {call.args[1]['data']['notification_id']: call.args[1] for call in transport.call_args_list}
+        for index, (_, _, title, route) in enumerate(events):
+            nid = f'phone-{index}'
+            with self.subTest(title=title):
+                payload = previews[nid]
+                self.assertEqual(payload['title'], title)
+                self.assertTrue(payload['body'])
+                self.assertNotIn(private, json.dumps(payload))
+                self.assertEqual(payload['data'], {'notification_id': nid, 'route': route})
+                response = self.client.get(f'/notifications/detail/{nid}')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()['data']['route'], route)
+                self.assertEqual(response.json()['message'], private)
+
+        self.as_user('s2')
+        self.assertEqual(self.client.get('/notifications/detail/phone-0').status_code, 404)
 
     def test_safe_routes_and_no_client_supplied_action_links(self):
         self.assertEqual(destinations('hte_supervisor', 'application')['web_path'], '/company/applications')

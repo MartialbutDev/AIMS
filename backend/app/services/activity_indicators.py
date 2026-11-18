@@ -109,7 +109,7 @@ def summary(db, actor):
         'journals': 'Awaiting school review' if role == 'student' else 'Pending review',
         'onboarding': 'Awaiting review' if role == 'student' else 'Pending review',
         'completion': 'Needs your attention' if role == 'student' else 'Awaiting final review' if role in {'dean','admin','career_center'} else 'Pending confirmation' if role == 'hte_supervisor' else 'Pending review',
-        'grades': 'Awaiting grade release', 'placements': 'Awaiting placement review' if role == 'dean' else 'Pending partnership review' if role == 'career_center' else 'Needs your attention',
+        'placements': 'Awaiting placement review' if role == 'dean' else 'Pending partnership review' if role == 'career_center' else 'Needs your attention',
         'corrections': 'Awaiting review' if role == 'student' else 'Pending review',
     }
     sections, students = {}, {}
@@ -130,7 +130,6 @@ def summary(db, actor):
             elif category in {'attendance','journals'}: pending = role != 'hte_supervisor' and status in {'submitted','reviewing'}
             elif category == 'completion':
                 pending = status == 'returned' if role == 'student' else status == 'requested' if role == 'hte_supervisor' else status in {'requested','company_confirmed'}
-                if role == 'coordinator' and status == 'completed' and not row.grade_released_at: add('grades', sid, pending=row.deployment_id)
                 rid = row.deployment_id
             elif category == 'placements':
                 pending = status in {'pending','released'} and (row.partnership_status == 'pending' if role == 'career_center' else row.student_decision == 'pending' if role == 'student' else status == 'pending')
@@ -149,6 +148,7 @@ def summary(db, actor):
         category = rid = sid = None
         source = data.get('source')
         if source == 'completion':
+            if data.get('action') == 'grade_released': continue
             rid = data.get('deployment_id')
             found = completion_deployments.get(rid)
             if found: category, sid = 'completion', found[1]

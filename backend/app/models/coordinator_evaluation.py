@@ -69,10 +69,8 @@ class CoordinatorEvaluation(Base):
     # EVALUATION INFORMATION
     # ========================================================
 
-    grade = Column(
-        Numeric(3, 2),
-        nullable=False,
-    )
+    # Retain historical values. Current reviews record notes only.
+    grade = Column(Numeric(3, 2), nullable=True)
 
     notes = Column(
         Text,

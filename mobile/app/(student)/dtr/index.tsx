@@ -23,6 +23,9 @@ import { useAutoHideTab } from "../../../src/hooks/useAutoHideTab";
 import { dtrService, DTR, DTRSummary } from "../../../src/services/dtr.service";
 import { usePaginatedData } from "../../../src/hooks/usePaginatedData";
 import api from "../../../src/services/api";
+import { StudentAbsenceRequests } from "../../../src/components/StudentAbsenceRequests";
+import { useTodaySchedule } from "../../../src/hooks/useTodaySchedule";
+import { TodaySchedule } from "../../../src/components/TodaySchedule";
 import { SkeletonDTRList } from "../../../src/components/common/Skeleton";
 
 const { width } = Dimensions.get("window");
@@ -51,6 +54,9 @@ const statusLabels: Record<string, string> = {
 export default function DTRScreen() {
   const { colors, isDark } = useTheme();
   const { handleScroll } = useAutoHideTab();
+  const [scheduleRevision, setScheduleRevision] = useState(0);
+  const today = useTodaySchedule(scheduleRevision);
+  const deployed = Boolean(today.schedule && today.schedule.status !== 'not_deployed');
   const [summary, setSummary] = useState<DTRSummary | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [exporting, setExporting] = useState(false);
@@ -422,10 +428,17 @@ export default function DTRScreen() {
         renderItem={renderDTRCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={<>
+          <TodaySchedule today={today} formatTime={formatTime} />
+          <StudentAbsenceRequests active={deployed} revision={scheduleRevision} />
+        </>}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={refresh}
+            onRefresh={() => {
+              void refresh();
+              setScheduleRevision(value => value + 1);
+            }}
             tintColor={colors.accent}
           />
         }

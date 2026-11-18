@@ -46,7 +46,7 @@ export function AcademicRequirements() {
   const targets=draft?.program_requirements||[]
   const existingCodes=new Set(items.find(item=>item.id===draft?.id)?.program_requirements?.map(p=>p.code)||[])
   return <section className="panel aims-settings-panel academic-requirements">
-    <div className="academic-heading"><div><span className="stake-kicker">ACADEMIC GOVERNANCE</span><h2>Academic requirements</h2><p>Set each program’s internship hours for the selected term. Leave a target blank until CITC confirms it.</p></div>
+    <div className="academic-heading"><div><h2>Academic requirements</h2><p>Leave each program’s required hours blank until CITC confirms them.</p></div>
       {current&&<div className="academic-current"><strong>Active term</strong><span>{current.academic_year} · Semester {current.semester}</span><small>{current.program_requirements ? `${current.program_requirements.length} programs · ${current.program_requirements.filter(p=>p.required_hours==null).length} targets pending` : 'Existing shared-hours policy'}</small></div>}</div>
     {error&&<p role="alert" className="academic-error">{error}</p>}{message&&<p role="status">{message}</p>}
     {!ready&&!busy&&<p className="aims-settings-note">Database activation is required before saving.</p>}
@@ -64,7 +64,7 @@ export function AcademicRequirements() {
           <label className="academic-wide">Practicum subject codes<input required value={codes} onChange={e=>setCodes(e.target.value)}/><small>Separate accepted codes with commas. Retain existing codes for a term already in use.</small></label>
         </div>
         <div className="academic-levels" role="group" aria-label="Accepted year levels"><strong>Accepted year levels</strong>{[1,2,3,4,5,6].map(level=><label key={level}><input type="checkbox" checked={draft.year_levels.includes(level)} onChange={e=>setDraft({...draft,year_levels:e.target.checked?[...draft.year_levels,level]:draft.year_levels.filter(v=>v!==level)})}/>{level}</label>)}</div>
-        <div className="academic-program-heading"><h3>Hours by program</h3><p>Attendance can be approved while targets are pending. Only configured targets unlock completion eligibility.</p></div>
+        <div className="academic-program-heading"><h3>Hours by program</h3><p>You can approve attendance now. Completion requests need a saved hours target.</p></div>
         <div className="academic-program-add"><label>Program<select aria-label="Program to add" value={addCode} onChange={e=>setAddCode(e.target.value)}>{PROGRAM_CATALOG.map(p=><option key={p.code} value={p.code}>{p.code} · {p.name}</option>)}</select></label><button type="button" disabled={targets.some(p=>p.code===addCode)} onClick={()=>{const program=PROGRAM_CATALOG.find(p=>p.code===addCode);if(program)setDraft({...draft,program_requirements:[...targets,{...program,aliases:[...program.aliases]}]})}}>Add program</button></div>
         <div className="academic-program-list">{targets.map(program=><article className="academic-program" key={program.code}>
           <header><div><strong>{program.code}</strong><p>{program.name}</p></div><span className={program.required_hours==null?'is-pending':'is-configured'}>{program.required_hours==null?'Not configured':'Configured'}</span></header>

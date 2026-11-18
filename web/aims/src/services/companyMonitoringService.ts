@@ -23,10 +23,28 @@ export interface CompanyInternPage {
   semester: string
 }
 
+export interface AttendanceSchedule {
+  workdays: number[]
+  clock_in_at: string
+  clock_out_at: string
+  enabled: boolean
+}
+
+export type AttendanceExceptionKind = 'holiday' | 'approved_absence' | 'shift_change'
+
+export interface AttendanceScheduleException {
+  workday: string
+  kind: AttendanceExceptionKind
+  clock_in_at: string | null
+  clock_out_at: string | null
+}
+
 export interface CompanyInternDetail {
   intern: CompanyIntern
   records_available: boolean
   notice: string | null
+  reminder_schedule: AttendanceSchedule | null
+  reminder_exceptions?: AttendanceScheduleException[]
   required_hours: number | null
   approved_hours: number | null
   remaining_hours: number | null
@@ -65,4 +83,42 @@ export function getCompanyInterns(page: number, search: string, status: string, 
 export function getCompanyInternDetail(id: string, attendancePage: number, journalPage: number, signal: AbortSignal) {
   const params = new URLSearchParams({ attendance_page: String(attendancePage), journal_page: String(journalPage), limit: '10' })
   return apiRequest<CompanyInternDetail>(`/api/v1/company/interns/${encodeURIComponent(id)}?${params}`, { signal })
+}
+
+export function saveCompanyAttendanceSchedule(deploymentId: string, schedule: AttendanceSchedule) {
+  return apiRequest<AttendanceSchedule>(
+    `/api/v1/company/interns/${encodeURIComponent(deploymentId)}/attendance/reminder-schedule`,
+    { method: 'PUT', body: JSON.stringify(schedule) },
+  )
+}
+
+function reminderExceptionPath(deploymentId: string, workday: string) {
+  return `/api/v1/company/interns/${encodeURIComponent(deploymentId)}/attendance/reminder-exceptions/${encodeURIComponent(workday)}`
+}
+
+export function saveCompanyAttendanceException(deploymentId: string, workday: string, exception: Omit<AttendanceScheduleException, 'workday'>) {
+  return apiRequest<AttendanceScheduleException>(reminderExceptionPath(deploymentId, workday), {
+    method: 'PUT', body: JSON.stringify(exception),
+  })
+}
+
+export function removeCompanyAttendanceException(deploymentId: string, workday: string) {
+  return apiRequest<void>(reminderExceptionPath(deploymentId, workday), { method: 'DELETE' })
+}
+
+export interface CompanyHolidaySchedule {
+  company_id: string
+  company_name: string
+  holidays: string[]
+}
+
+export function getCompanyAttendanceHolidays(signal: AbortSignal) {
+  return apiRequest<CompanyHolidaySchedule[]>('/api/v1/company/attendance/holidays', { signal })
+}
+
+export function updateCompanyAttendanceHoliday(companyId: string, date: string, method: 'PUT' | 'DELETE') {
+  return apiRequest<void>(
+    `/api/v1/company/attendance/holidays/${encodeURIComponent(companyId)}/${encodeURIComponent(date)}`,
+    { method },
+  )
 }

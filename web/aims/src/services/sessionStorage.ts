@@ -13,7 +13,13 @@ function parseSession(raw: string | null): UserSession | null {
       const claims = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
       if (typeof claims.exp === 'number' && claims.exp * 1000 <= Date.now()) return null
     }
-    return { name: value.name, email: value.email, role: value.role, accessToken: value.accessToken }
+    return {
+      name: value.name,
+      email: value.email,
+      role: value.role,
+      accessToken: value.accessToken,
+      avatarPath: typeof value.avatarPath === 'string' ? value.avatarPath : null,
+    }
   } catch { return null }
 }
 
@@ -48,6 +54,16 @@ export function saveStoredSession(session: UserSession, rememberMe?: boolean) {
   // Never fall back to persistent storage if session storage is unavailable.
   destination.setItem(SESSION_KEY, JSON.stringify({ ...session, rememberMe: persistent }))
   other.removeItem(SESSION_KEY)
+}
+
+export function updateCurrentSession(
+  accessToken: string,
+  details: Partial<Pick<UserSession, 'name' | 'avatarPath'>>,
+) {
+  const current = readStoredSession()
+  if (current?.accessToken !== accessToken) return
+  saveStoredSession({ ...current, ...details })
+  window.dispatchEvent(new Event('aims-session-updated'))
 }
 
 export function clearStoredSession() {

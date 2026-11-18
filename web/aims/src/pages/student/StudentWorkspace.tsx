@@ -4,8 +4,9 @@ import { StudentOnboardingGate } from './StudentOnboardingGate'
 import { sectionCategories } from '../../services/activitySections'
 import { ActivityProvider, ActivityBadges, PageActivity, type ActivityCategory } from '../../components/ActivityIndicators'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Brand } from '../../components/Brand'
+import { SidebarAccount } from '../../components/SidebarAccount'
 import { NotificationCenter } from '../../components/NotificationCenter'
 import { WorkspaceSettings } from '../shared/WorkspaceSettings'
 import { CompletionPage } from '../shared/CompletionPage'
@@ -20,28 +21,34 @@ import { Heading, Notice, StudentLink } from './StudentUI'
 import { useStudentAction, useStudentLoad } from './studentHooks'
 import './student.css'
 
-type NavigationLink = [slug: string, label: string, icon: IconName]
+type NavigationLink = [slug: string, label: string, icon: IconName, tab?: 'notifications']
+const accountNavigation = { title: 'Your account', links: [
+  ['profile', 'Profile', 'user'],
+  ['settings', 'Settings', 'settings'],
+  ['settings', 'Notification preferences', 'bell', 'notifications'],
+  ['help-center', 'Help & about AIMS', 'help'],
+] satisfies NavigationLink[] }
 const navigation: { title: string; links: NavigationLink[] }[] = [
   { title: 'Your internship', links: [
-    ['dashboard', 'Overview', 'grid'],
+    ['dashboard', 'Dashboard', 'grid'],
     ['applications', 'Applications', 'briefcase'],
     ['documents', 'Documents', 'file'],
     ['attendance', 'Attendance', 'clock'],
     ['journals', 'Journals', 'book'],
   ] },
-  { title: 'Your account', links: [['profile', 'Profile', 'user']] },
+  accountNavigation,
 ]
 const onboardingNavigation: typeof navigation = [
   { title: 'Get started', links: [['onboarding', 'Orientation & COR', 'clipboard']] },
-  { title: 'Your account', links: [['profile', 'Profile', 'user'], ['settings', 'Settings', 'settings'], ['help-center', 'Help & about AIMS', 'help']] },
+  accountNavigation,
 ]
 const pageGroups: Record<string, string> = {
   companies: 'applications', 'direct-placements': 'applications', 'pre-deployment': 'applications',
   onboarding: 'documents', forms: 'documents',
-  completion: 'profile', settings: 'profile', 'help-center': 'profile', reports: 'dashboard',
+  completion: 'profile', reports: 'dashboard',
 }
 const pageTitles: Record<string, string> = {
-  dashboard: 'Overview', applications: 'Applications', companies: 'Partner companies',
+  dashboard: 'Dashboard', applications: 'Applications', companies: 'Partner companies',
   'direct-placements': 'School-arranged placements', 'pre-deployment': 'Pre-deployment',
   documents: 'Documents', onboarding: 'Eligibility & onboarding', forms: 'Approved forms',
   attendance: 'Attendance & corrections', journals: 'Weekly journals', reports: 'Reports & activity',
@@ -52,7 +59,7 @@ const relatedPages: Record<string, { label: string; links: NavigationLink[] }> =
   documents: { label: 'Document tools', links: [['documents', 'My documents', 'file'], ['forms', 'Download approved forms', 'download'], ['onboarding', 'Eligibility & onboarding', 'clipboard']] },
 }
 const navigationActivity: Record<string, ActivityCategory[]> = {
-  profile: ['completion', 'grades'],
+  profile: ['completion'],
   applications: ['applications', 'placements', 'deployment'],
   documents: ['documents', 'onboarding', 'forms', 'assignments'],
 }
@@ -79,8 +86,10 @@ export function StudentWorkspace(props: { session: UserSession; onLogout: () => 
 function StudentWorkspaceShell({ session, onLogout, onboardingRequired }: { session: UserSession; onLogout: () => void; onboardingRequired: boolean }) {
   const { section = 'dashboard' } = useParams(), [open, setOpen] = useState(false), [notifications, setNotifications] = useState(false)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const settingsTab = searchParams.get('tab') === 'notifications' ? 'notifications' : undefined
   useEffect(() => { if (!open) return; const old = document.body.style.overflow; document.body.style.overflow = 'hidden'; const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }; window.addEventListener('keydown', escape); return () => { document.body.style.overflow = old; window.removeEventListener('keydown', escape) } }, [open])
-  const title = pageTitles[section] || 'Overview'
+  const title = pageTitles[section] || 'Dashboard'
   const parent = onboardingRequired && section === 'onboarding' ? 'onboarding' : pageGroups[section] || section
   const visibleNavigation = onboardingRequired ? onboardingNavigation : navigation
   let content
@@ -109,37 +118,38 @@ function StudentWorkspaceShell({ session, onLogout, onboardingRequired }: { sess
         <Brand />
         <button type="button" className="sw-mobile-close" aria-label="Close navigation" onClick={() => setOpen(false)}><Icon name="close" size={20} /></button>
       </div>
-      <p className="sw-workspace-label">Student workspace</p>
+      <SidebarAccount session={session} />
       <nav aria-label="Student navigation">
         {visibleNavigation.map(group => <div key={group.title}>
           <p>{group.title}</p>
-          {group.links.map(([slug, label, icon]) => (
-            <Link key={slug} to={`/student/${slug}`}
-              className={parent === slug ? 'active' : undefined}
-              aria-current={parent === slug ? (section === slug ? 'page' : 'location') : undefined}
+          {group.links.map(([slug, label, icon, tab]) => {
+            const to = `/student/${slug}${tab ? '?tab=notifications' : ''}`
+            const active = parent === slug && (slug !== 'settings' || settingsTab === tab)
+            return <Link key={to} to={to}
+              className={active ? 'active' : undefined}
+              aria-current={active ? (section === slug ? 'page' : 'location') : undefined}
               onClick={() => { setOpen(false); setNotifications(false) }}>
               <span className="sw-nav-icon"><Icon name={icon} size={18} /></span>
               <span className="sw-nav-label">{label}</span>
               <ActivityBadges compact categories={navigationActivity[slug] || sectionCategories[slug] || []} />
             </Link>
-          ))}
+          })}
         </div>)}
       </nav>
-      <button type="button" className="sw-signout" onClick={onLogout}><Icon name="logout" size={18} />Sign out</button>
     </aside>
     <div className="sw-main">
       <header className="sw-topbar">
         <button type="button" className="sw-menu-toggle" aria-label="Open navigation" aria-controls="sw-navigation" aria-expanded={open} onClick={() => setOpen(!open)}><Icon name="menu" size={22} /></button>
         <div><span>USTP · CITC</span><strong>{title}</strong></div>
         <div className="sw-topbar-actions">
-          <NotificationCenter session={session} open={notifications} onOpenChange={setNotifications} onSettings={() => navigate('/student/settings', { state: { settingsTab: 'notifications' } })} />
+          <NotificationCenter session={session} open={notifications} onOpenChange={setNotifications} onSettings={() => navigate('/student/settings?tab=notifications')} />
           <AccountMenu session={session} onLogout={onLogout} notificationsOpen={notifications} onOpen={() => { setNotifications(false); setOpen(false) }} />
         </div>
       </header>
       <main className="sw-content" id="sw-content" key={section}>
         {parent !== section && <Link className="sw-back-link" to={`/student/${parent}`}>← Back to {pageTitles[parent]}</Link>}
         {!onboardingRequired && <RelatedPages section={section} parent={parent} />}
-        {onboardingRequired && <p className="sw-notice" role="status"><strong>Complete your orientation and COR first.</strong><br />Both documents must be approved before you can enter the internship dashboard and application pages. Your account and help options remain available.</p>}
+        {onboardingRequired && <p className="sw-notice" role="status">Upload your orientation certificate and current-term COR. Both must be approved to access the dashboard and apply.</p>}
         <PageActivity section={section} />
         {content}
       </main><footer className="sw-footer">Academic Internship Management System · CITC, USTP Cagayan de Oro</footer></div></div>
@@ -149,6 +159,6 @@ function StudentProfile({ session, onboardingRequired }: { session: UserSession;
   const state = useStudentLoad(() => studentApi<Profile>('/auth/me')), action = useStudentAction(state.refresh)
   const avatar = state.data?.avatar_url?.split('/').pop()
   const avatarUrl = avatar ? `${import.meta.env.VITE_API_BASE_URL ?? ''}/static/avatars/${encodeURIComponent(avatar)}` : ''
-  return <><Heading title="Your profile" description="Your academic identity, account and completed internship records." /><Notice error={state.error || action.error} message={action.message} /><div className="sw-two-col"><section className="sw-card sw-profile"><div className="sw-profile-avatar">{avatarUrl ? <img alt="Your profile" src={avatarUrl} /> : session.name.slice(0, 1)}</div><h2>{state.data ? [state.data.first_name, state.data.middle_name, state.data.last_name].filter(Boolean).join(' ') : session.name}</h2><p>{session.email}</p><dl><dt>Student number</dt><dd>{state.data?.student_id || '—'}</dd><dt>Phone</dt><dd>{state.data?.phone || 'Not provided'}</dd></dl><form className="sw-form" onSubmit={e => { e.preventDefault(); const form = e.currentTarget; void action.run(() => studentWrite('/users/avatar', new FormData(form)), 'Profile photo updated.').then(ok => { if (ok) form.reset() }) }}><label>Profile photo<input type="file" name="file" accept="image/jpeg,image/png" required /></label><button disabled={action.busy}>Update photo</button></form>{avatar && <button className="sw-danger" disabled={action.busy} onClick={() => void action.run(() => studentWrite('/users/avatar', undefined, 'DELETE'), 'Profile photo removed.')}>Remove photo</button>}<StudentLink to="settings">Edit profile & account security</StudentLink></section><section className="sw-card">{!onboardingRequired && <><p className="sw-eyebrow">YOUR ACADEMIC RECORD</p><h2>Completion & archive</h2><p>Review your completion checklist, request final confirmation and access your released grade and archived internship records.</p><StudentLink to="completion">Open completion & archive <ActivityBadges categories={['completion', 'grades']} /></StudentLink><hr /></>}<h2>Account & preferences</h2><StudentLink to="settings">Password, sessions & notification settings</StudentLink><StudentLink to="onboarding">Orientation & COR review status <ActivityBadges categories={['onboarding','assignments']} /></StudentLink><StudentLink to="help-center">Help & about AIMS</StudentLink></section></div></>
+  return <><Heading title="Your profile" description="Your academic identity, account and completed internship records." /><Notice error={state.error || action.error} message={action.message} /><div className="sw-two-col"><section className="sw-card sw-profile"><div className="sw-profile-avatar">{avatarUrl ? <img alt="Your profile" src={avatarUrl} /> : session.name.slice(0, 1)}</div><h2>{state.data ? [state.data.first_name, state.data.middle_name, state.data.last_name].filter(Boolean).join(' ') : session.name}</h2><p>{session.email}</p><dl><dt>Student number</dt><dd>{state.data?.student_id || '—'}</dd><dt>Phone</dt><dd>{state.data?.phone || 'Not provided'}</dd></dl><form className="sw-form" onSubmit={e => { e.preventDefault(); const form = e.currentTarget; void action.run(() => studentWrite('/users/avatar', new FormData(form)), 'Profile photo updated.').then(ok => { if (ok) form.reset() }) }}><label>Profile photo<input type="file" name="file" accept="image/jpeg,image/png" required /></label><button disabled={action.busy}>Update photo</button></form>{avatar && <button className="sw-danger" disabled={action.busy} onClick={() => void action.run(() => studentWrite('/users/avatar', undefined, 'DELETE'), 'Profile photo removed.')}>Remove photo</button>}<StudentLink to="settings">Edit profile & account security</StudentLink></section><section className="sw-card">{!onboardingRequired && <><p className="sw-eyebrow">YOUR ACADEMIC RECORD</p><h2>Completion & archive</h2><p>Review your completion checklist, request final confirmation and access your archived internship records.</p><StudentLink to="completion">Open completion & archive <ActivityBadges categories={['completion']} /></StudentLink><hr /></>}<h2>Account & preferences</h2><StudentLink to="settings">Password, sessions & notification settings</StudentLink><StudentLink to="onboarding">Orientation & COR review status <ActivityBadges categories={['onboarding','assignments']} /></StudentLink><StudentLink to="help-center">Help & about AIMS</StudentLink></section></div></>
 }
-function StudentHelp() { return <><Heading title="Help & about AIMS" description="A guide to your internship journey at CITC, USTP Cagayan de Oro." /><section className="sw-card"><h2>Your journey, step by step</h2><ol className="sw-timeline"><li><strong>Get eligible</strong><p>Upload your orientation certificate and current-term COR. Wait for approval and coordinator assignment.</p></li><li><strong>Prepare and apply</strong><p>Upload your resume and application letter. Use approved versions when applying to a company.</p></li><li><strong>Get endorsed</strong><p>Upload the school-issued endorsement letter. Your coordinator reviews it before forwarding the application to the company.</p></li><li><strong>Get accepted and deployed</strong><p>The company decides on your application. After acceptance, complete the pre-deployment checklist. Your coordinator authorizes deployment.</p></li><li><strong>Record your internship</strong><p>Clock in and out with photos, submit weekly journals and check review feedback. Time corrections go to the company, then coordinator.</p></li><li><strong>Complete and archive</strong><p>Request completion after satisfying your checklist. The company confirms completion; the coordinator approves and releases your final grade.</p></li></ol></section><div className="sw-two-col"><section className="sw-card"><h2>When something needs attention</h2><details><summary>My document is pending or rejected</summary><p>Read the review notes in Documents. Uncertain documents need human review. A new upload does not replace a current approved version until approved.</p></details><details><summary>A submission failed or the connection dropped</summary><p>Refresh the relevant record list before retrying. Your submission may have reached the server even when the browser could not confirm it.</p></details><details><summary>Who can help?</summary><p>Your assigned coordinator handles requirements, endorsement, attendance reviews and completion. The career center handles company partnerships. Contact the administrator for account access problems.</p></details></section><section className="sw-card"><h2>About AIMS</h2><p>The Academic Internship Management System connects students, coordinators, companies, the career center, dean and administrator throughout the internship process.</p><p>Your web and mobile accounts share the same backend records. Student pages show your own records; approval actions remain with the responsible stakeholder.</p><p>Document text extraction assists validation and classification. It does not verify the authenticity of signatures.</p><StudentLink to="settings">Privacy, active sessions & notifications</StudentLink></section></div></> }
+function StudentHelp() { return <><Heading title="Help & about AIMS" description="A guide to your internship journey at CITC, USTP Cagayan de Oro." /><section className="sw-card"><h2>Your journey, step by step</h2><ol className="sw-timeline"><li><strong>Get eligible</strong><p>Upload your orientation certificate and current-term COR. Wait for approval and coordinator assignment.</p></li><li><strong>Prepare and apply</strong><p>Upload your resume and application letter. Use approved versions when applying to a company.</p></li><li><strong>Get endorsed</strong><p>Upload the school-issued endorsement letter. Your coordinator reviews it before forwarding the application to the company.</p></li><li><strong>Get accepted and deployed</strong><p>The company decides on your application. After acceptance, complete the pre-deployment checklist. Your coordinator authorizes deployment.</p></li><li><strong>Record your internship</strong><p>Clock in and out with photos, submit weekly journals and check review feedback. Time corrections go to the company, then coordinator.</p></li><li><strong>Complete and archive</strong><p>Request completion after satisfying your checklist. The company confirms completion; the coordinator approves completion. Check USTP PRISM for your official internship grade.</p></li></ol></section><div className="sw-two-col"><section className="sw-card"><h2>When something needs attention</h2><details><summary>My document is pending or rejected</summary><p>Read the review notes in Documents. Uncertain documents need human review. A new upload does not replace a current approved version until approved.</p></details><details><summary>A submission failed or the connection dropped</summary><p>Refresh the relevant record list before retrying. Your submission may have reached the server even when the browser could not confirm it.</p></details><details><summary>Who can help?</summary><p>Your assigned coordinator handles requirements, endorsement, attendance reviews and completion. The career center handles company partnerships. Contact the administrator for account access problems.</p></details></section><section className="sw-card"><h2>About AIMS</h2><p>The Academic Internship Management System connects students, coordinators, companies, the career center, dean and administrator throughout the internship process.</p><p>Your web and mobile accounts share the same backend records. Student pages show your own records; approval actions remain with the responsible stakeholder.</p><p>Document text extraction assists validation and classification. It does not verify the authenticity of signatures.</p><StudentLink to="settings">Privacy, active sessions & notifications</StudentLink></section></div></> }

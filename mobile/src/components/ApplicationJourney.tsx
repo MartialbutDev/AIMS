@@ -23,7 +23,7 @@ const guidance: Record<string, { step: number; title: string; description: strin
   pre_deployment: { step: 3, title: 'Complete your pre-deployment checklist', description: 'The company accepted your application. Upload the requirements shown in Pre-deployment and address coordinator feedback.' },
   deployment_approval: { step: 4, title: 'Wait for coordinator deployment approval', description: 'Your required pre-deployment documents are verified. Your coordinator must confirm deployment before you start recording attendance.' },
   deployed: { step: 5, title: 'Your internship is deployed', description: 'Record your daily attendance and submit weekly journals. Track your approved hours on the dashboard.' },
-  completed: { step: 6, title: 'Internship completed', description: 'Open Completion & Archive in Profile to review your completion record and released grade.' },
+  completed: { step: 6, title: 'Internship completed', description: 'Open Completion & Archive in Profile to review your archived internship records.' },
 }
 
 export function ApplicationJourney({ applicationId }: { applicationId: string }) {

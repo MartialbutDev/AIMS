@@ -13,7 +13,6 @@ import { CareerDashboardPage } from './CareerDashboardPage'
 import { CompaniesPage } from './CompaniesPage'
 import { ApplicationsPage } from './ApplicationsPage'
 import { NotificationsPage } from './NotificationsPage'
-import { DeveloperInfoPage } from './DeveloperInfoPage'
 
 // ========================================
 // CAREER CENTER PAGE PROPS
@@ -53,7 +52,6 @@ export function CareerCenterPages({
       return (
         <CareerDashboardPage
           data={data}
-          name={session.name}
           onNavigate={onNavigate}
         />
       )
@@ -88,13 +86,6 @@ export function CareerCenterPages({
       return <NotificationsPage />
 
     // ========================================
-    // DEVELOPER INFORMATION
-    // ========================================
-
-    case 'developer-info':
-      return <DeveloperInfoPage />
-
-    // ========================================
     // ACCOUNT SETTINGS
     // ========================================
 
@@ -125,7 +116,6 @@ export function CareerCenterPages({
       return (
         <CareerDashboardPage
           data={data}
-          name={session.name}
           onNavigate={onNavigate}
         />
       )

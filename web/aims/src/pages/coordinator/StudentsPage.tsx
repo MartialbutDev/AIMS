@@ -1,5 +1,5 @@
 import { ActivityBadges, ActivityViewed } from '../../components/ActivityIndicators'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { Icon } from '../../components/Icons'
 import { StudentRecordDialog } from './StudentRecordDialog'
 import { DeploymentApprovalPanel } from './DeploymentApprovalPanel'
@@ -7,7 +7,6 @@ import type { ReminderCategory } from '../../services/coordinatorReminderService
 import {
   getCoordinatorStudentDetail,
   getCoordinatorStudents,
-  saveCoordinatorEvaluation,
   type CoordinatorStudent,
   type CoordinatorStudentDetail,
 } from '../../services/coordinatorService'
@@ -30,60 +29,7 @@ function ProgressBar({ value, label }: { value: number; label: string }) {
   )
 }
 
-function EvaluationPanel({
-  studentId,
-  academicYear,
-  semester,
-  evaluation,
-  onSaved,
-}: {
-  studentId: string
-  academicYear: string
-  semester: '1' | '2'
-  evaluation: CoordinatorStudentDetail['evaluation']
-  onSaved: (grade: number, notes: string) => void
-}) {
-  const [grade, setGrade] = useState(evaluation ? evaluation.grade.toFixed(2) : '')
-  const [notes, setNotes] = useState(evaluation?.notes ?? '')
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setIsSaving(true)
-    setError('')
-    setSaved(false)
-    try {
-      const result = await saveCoordinatorEvaluation(studentId, academicYear, semester, Number(grade), notes)
-      onSaved(result.grade, result.notes ?? '')
-      setSaved(true)
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Could not save the evaluation.')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  return (
-    <form className="panel coordinator-evaluation" onSubmit={submit}>
-      <div className="panel-heading"><div><h2>Coordinator assessment</h2><p>Internal assessment: 1.00 is highest; 5.00 is lowest. Use Completion & archive to release the official final grade.</p></div></div>
-      <div className="evaluation-fields">
-        <label>Assessment grade
-          <input aria-label="Internal assessment grade" type="number" min="1" max="5" step="0.01" required value={grade} onChange={(event) => setGrade(event.target.value)} placeholder="e.g. 1.25" />
-        </label>
-        <label>Evaluation notes
-          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={5000} rows={3} placeholder="Add a concise OJT performance summary…" />
-        </label>
-      </div>
-      {error && <p className="form-error" role="alert">{error}</p>}
-      {saved && <p className="evaluation-saved" role="status">Evaluation saved.</p>}
-      <button className="primary-button" type="submit" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save assessment'} <Icon name="check" size={15} /></button>
-    </form>
-  )
-}
-
-function StudentDetails({ detail, onEvaluationSaved }: { detail: CoordinatorStudentDetail; onEvaluationSaved: (grade: number, notes: string) => void }) {
+function StudentDetails({ detail }: { detail: CoordinatorStudentDetail }) {
   const [section, setSection] = useState<ReminderCategory | null>(null)
   const { student, journey } = detail
   const fullName = student.first_name + ' ' + student.last_name
@@ -94,19 +40,15 @@ function StudentDetails({ detail, onEvaluationSaved }: { detail: CoordinatorStud
           <span className="student-profile-avatar">{student.first_name.slice(0, 1)}{student.last_name.slice(0, 1)}</span>
           <div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> STUDENT SUMMARY</span><h2>{fullName}</h2><p>{student.student_id || 'No student ID'} · {student.email}</p></div>
         </div>
-        <div className="journey-progress-heading"><span>OJT completion</span><strong>{journey.progress_percent == null ? "Required hours awaiting configuration" : `${journey.progress_percent}% complete`}</strong></div>
-        {journey.progress_percent != null && <ProgressBar value={journey.progress_percent} label="OJT completion" />}
+        <div className="journey-progress-heading"><span>Internship hours progress</span><strong>{journey.progress_percent == null ? "Required hours awaiting configuration" : `${journey.progress_percent}% complete`}</strong></div>
+        {journey.progress_percent != null && <ProgressBar value={journey.progress_percent} label="Internship hours progress" />}
         <div className="journey-stats">
-          <div><strong>{journey.approved_hours.toLocaleString()}h</strong><span>approved</span></div>
-          <div><strong>{journey.remaining_hours == null ? "—" : `${journey.remaining_hours.toLocaleString()}h`}</strong><span>hours remaining</span></div>
-          <div><strong>{journey.estimated_days_left ?? '—'}</strong><span>estimated working days left</span></div>
+          <div><strong>{journey.approved_hours.toLocaleString()}h</strong><span>Approved hours</span></div>
+          <div><strong>{journey.remaining_hours == null ? "—" : `${journey.remaining_hours.toLocaleString()}h`}</strong><span>Hours remaining</span></div>
           <div><strong>{journey.pending_dtr_count}</strong><span>DTRs awaiting review</span></div>
         </div>
-        <p className="journey-estimate-note">{journey.required_hours == null ? "Required hours awaiting configuration. Approved attendance continues to accumulate." : journey.average_approved_hours_per_day
-          ? `Days estimate uses the student's approved-record average of ${journey.average_approved_hours_per_day} hours per working day.`
-          : journey.remaining_hours
-            ? 'A days-left estimate will appear after approved DTR hours are recorded.'
-            : 'Required OJT hours are complete.'}</p>
+        {journey.required_hours == null && <p className="journey-status-note">Approved hours still count while the hours target is pending.</p>}
+        {journey.remaining_hours === 0 && <p className="journey-status-note">Required internship hours completed.</p>}
       </section>
 
       <section className="panel coordinator-subpanel">
@@ -118,10 +60,9 @@ function StudentDetails({ detail, onEvaluationSaved }: { detail: CoordinatorStud
     <section className="sr-summary-grid" aria-label="Student review sections">
       <button type="button" onClick={() => setSection('documents')}><span className="sr-summary-icon"><Icon name="file" size={23} /></span><strong>Required documents</strong><ActivityBadges categories={['documents']} studentId={student.id} academicYear={detail.academic_year} semester={detail.semester} /><span>{verified} of {detail.document_statuses.length} verified</span><small>Checklist, status, and file previews <Icon name="arrow" size={15} /></small></button>
       <button type="button" onClick={() => setSection('dtr')}><span className="sr-summary-icon"><Icon name="clock" size={23} /></span><strong>DTR summary & photos</strong><ActivityBadges categories={['attendance']} studentId={student.id} academicYear={detail.academic_year} semester={detail.semester} /><span>{journey.pending_dtr_count} awaiting review · {journey.rejected_dtr_count} rejected</span><small>Attendance, work logs, and photo pairs <Icon name="arrow" size={15} /></small></button>
-      <button type="button" onClick={() => setSection('journals')}><span className="sr-summary-icon"><Icon name="book" size={23} /></span><strong>OJT journals</strong><ActivityBadges categories={['journals']} studentId={student.id} academicYear={detail.academic_year} semester={detail.semester} /><span>{detail.journals.filter(item => item.status !== 'draft').length} submitted or reviewed</span><small>Weekly reflections and journal previews <Icon name="arrow" size={15} /></small></button>
+      <button type="button" onClick={() => setSection('journals')}><span className="sr-summary-icon"><Icon name="book" size={23} /></span><strong>Internship journals</strong><ActivityBadges categories={['journals']} studentId={student.id} academicYear={detail.academic_year} semester={detail.semester} /><span>{detail.journals.filter(item => item.status !== 'draft').length} submitted or reviewed</span><small>Weekly reflections and journal previews <Icon name="arrow" size={15} /></small></button>
     </section>
     <DeploymentApprovalPanel key={`deployment-${student.id}`} studentId={student.id} studentName={fullName} />
-    <EvaluationPanel key={student.id} studentId={student.id} academicYear={detail.academic_year} semester={detail.semester} evaluation={detail.evaluation} onSaved={onEvaluationSaved} />
     {section && <StudentRecordDialog key={student.id + section} detail={detail} category={section} onClose={() => setSection(null)} />}
   </div>
 }
@@ -192,17 +133,9 @@ export function StudentsPage() {
     setSelectedId(studentId)
   }
 
-  function handleEvaluationSaved(grade: number, notes: string) {
-    setDetail((current) => current ? {
-      ...current,
-      evaluation: { grade, notes, updated_at: new Date().toISOString() },
-    } : current)
-    setStudents((current) => current.map((student) => student.id === selectedId ? { ...student, grade } : student))
-  }
-
   return (
     <section className="workspace-page coordinator-workspace">
-      <div className="workspace-page-heading"><div><span className="welcome-eyebrow"><span className="eyebrow-dot" /> COORDINATOR WORKSPACE</span><h1>Students</h1><p>Review student documents, applications, OJT hours, DTR photos, and evaluations.</p></div><span className="coordinator-student-count">{total.toLocaleString()} students</span></div>
+      <div className="workspace-page-heading"><div><h1>Students</h1><p>Review student documents, applications, internship hours, DTR photos, and weekly journals.</p></div><span className="coordinator-student-count">{total.toLocaleString()} students</span></div>
       {error && <p className="form-error user-import-error" role="alert">{error}</p>}
       <div className="coordinator-columns">
         <aside className="panel coordinator-student-list">
@@ -212,11 +145,10 @@ export function StudentsPage() {
         </aside>
         <div className="coordinator-detail-column">
           {selectedId && detail?.student.id !== selectedId && !error && <div className="panel empty-state">Loading selected student…</div>}
-          {detail?.student.id === selectedId && <StudentDetails key={detail.student.id} detail={detail} onEvaluationSaved={handleEvaluationSaved} />}
-          {!selectedId && !isLoadingList && <div className="panel empty-state">Select a student to view their OJT record.</div>}
+          {detail?.student.id === selectedId && <StudentDetails key={detail.student.id} detail={detail} />}
+          {!selectedId && !isLoadingList && <div className="panel empty-state">Select a student to view their internship record.</div>}
         </div>
       </div>
     </section>
   )
 }
-

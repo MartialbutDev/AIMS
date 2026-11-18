@@ -45,7 +45,7 @@ class DeanOversightTests(unittest.TestCase):
 
     def test_scoped_unique_counts_and_detail_boundaries(self):
         data = self.get().json()
-        self.assertEqual(data['overview'], dict(students_in_oversight=1, awaiting_deployment=0, active_interns=1, pending_completion=0, approved_completion=0, grades_released=0))
+        self.assertEqual(data['overview'], dict(students_in_oversight=1, awaiting_deployment=0, active_interns=1, pending_completion=0, approved_completion=0))
         self.assertEqual(sum(row['count'] for row in data['stages']), 1)
         self.assertNotIn('_details', data)
         self.assertEqual([w['coordinator_id'] for w in data['workloads']], ['c1'])
@@ -106,13 +106,11 @@ class DeanOversightTests(unittest.TestCase):
         self.assertEqual(self.snapshot()['workloads'][0]['completion_reviews'], 1)
         self.assertEqual(self.f.action('return', reason='Please correct the records.').status_code, 200)
         self.assertIn('returned_completion', self.snapshot()['_details'][0]['issues'])
-        self.f.request(); self.f.company(); self.f.action('approve'); self.f.action('grade', grade=1.25, notes='Private grade notes'); self.f.action('release-grade')
+        self.f.request(); self.f.company(); self.f.action('approve')
         data = self.snapshot()
         self.assertEqual(data['overview']['approved_completion'], 1)
-        self.assertEqual(data['overview']['grades_released'], 1)
+        self.assertNotIn('grades_released', data['overview'])
         self.assertEqual(data['overview']['active_interns'], 0)
-        self.assertNotIn('Private grade notes', str(data))
-        self.assertNotIn('1.25', str(data))
 
     def test_legacy_completed_records_are_separate(self):
         self.f.deployment.status = DeploymentStatus.COMPLETED

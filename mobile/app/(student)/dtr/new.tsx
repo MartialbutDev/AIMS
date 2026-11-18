@@ -21,11 +21,14 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 
+import { useTodaySchedule } from '../../../src/hooks/useTodaySchedule';
 import { useTheme } from "../../../src/context/ThemeContext";
 import { dtrService } from "../../../src/services/dtr.service";
 
 export default function NewDTRScreen() {
   const { colors, isDark } = useTheme();
+  const { schedule, retry: refreshSchedule } = useTodaySchedule();
+  const clockInBlock = schedule?.clock_in_block_reason;
 
 
   const [tasks, setTasks] = useState("");
@@ -66,7 +69,7 @@ export default function NewDTRScreen() {
     try {
       setIsGettingLocation(true);
       setLocation(null);
-      
+
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Location permission is required for DTR verification.');
@@ -102,7 +105,7 @@ export default function NewDTRScreen() {
   };
 
   const pickImage = async () => {
-    if (captureInFlight.current || submissionInFlight.current) return;
+    if (clockInBlock || captureInFlight.current || submissionInFlight.current) return;
     captureInFlight.current = true;
     setIsCapturing(true);
     try {
@@ -117,7 +120,11 @@ export default function NewDTRScreen() {
     setLocation(null);
     let ticket: { capture_token: string };
     try { ticket = await dtrService.beginCapture('in'); }
-    catch { Alert.alert('Capture unavailable', 'Check your connection and active deployment, then try again.'); return; }
+    catch (error) {
+      refreshSchedule();
+      Alert.alert('Capture unavailable', submissionErrorMessage(error, 'Check your connection and active deployment, then try again.'));
+      return;
+    }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
@@ -136,7 +143,7 @@ export default function NewDTRScreen() {
   };
 
   const handleTimeIn = async () => {
-    if (submissionInFlight.current || captureInFlight.current || isGettingLocation) return;
+    if (clockInBlock || submissionInFlight.current || captureInFlight.current || isGettingLocation) return;
     if (!imageIn) {
       Alert.alert("Time-In Selfie Required", "Please take your Time-In verification photo first.");
       return;
@@ -163,7 +170,7 @@ export default function NewDTRScreen() {
       formData.append('date', formatDateForAPI(clockInTime));
       formData.append('time_in', formatTimeForAPI(clockInTime));
       if (tasks.trim()) formData.append('tasks_completed', tasks.trim());
-      
+
       formData.append('latitude', String(location.latitude));
       formData.append('longitude', String(location.longitude));
       formData.append('location_address', location.address);
@@ -177,30 +184,31 @@ export default function NewDTRScreen() {
       });
 
       const response = await dtrService.createDTR(formData);
-      
+
       Alert.alert(
         "✅ Time-In Recorded!",
         `Your clock-in was recorded.\n\n📍 ${location.address}\n\nYou can now Time-Out when your shift is done.`,
         [
-          { 
-            text: "View DTR", 
+          {
+            text: "View DTR",
             onPress: () => router.push(`/(student)/dtr/${response.id}` as any)
           },
-          { 
-            text: "OK", 
-            style: "default" 
+          {
+            text: "OK",
+            style: "default"
           }
         ]
       );
-      
+
       setTasks("");
       setImageIn(null);
       setLocation(null);
-      
+
       router.push("/(student)/dtr");
-      
+
     } catch (error) {
       if (showSubmissionRecovery(error, () => router.replace("/(student)/dtr"))) return;
+      refreshSchedule();
       const errorMessage = submissionErrorMessage(error, "Failed to record Time-In. Please try again.");
       Alert.alert("Error", errorMessage);
     } finally {
@@ -225,6 +233,7 @@ export default function NewDTRScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Clock-in time</Text>
           <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>The server records your current date and time when submitted. Use a time-correction request for mistakes; past dates cannot be clocked in here.</Text>
+          {clockInBlock && <Text accessibilityLiveRegion="polite" style={{ color: colors.textPrimary, lineHeight: 21 }}>{clockInBlock}</Text>}
         </View>
 
         <View style={styles.section}>
@@ -232,7 +241,7 @@ export default function NewDTRScreen() {
           {!imageIn ? (
             <TouchableOpacity
               style={[styles.cameraBox, { borderColor: colors.border, backgroundColor: colors.card }]}
-              disabled={isCapturing}
+              disabled={isCapturing || Boolean(clockInBlock)}
               onPress={pickImage}
               activeOpacity={0.8}
             >
@@ -252,7 +261,7 @@ export default function NewDTRScreen() {
                 </View>
                 <TouchableOpacity
                   style={[styles.retakeButton, { borderColor: colors.border }]}
-                  disabled={isCapturing}
+                  disabled={isCapturing || Boolean(clockInBlock)}
               onPress={pickImage}
                 >
                   <Ionicons name="refresh-outline" size={14} color={colors.accent} />
@@ -313,10 +322,10 @@ export default function NewDTRScreen() {
           style={[
             styles.submitButton,
             { backgroundColor: colors.primary },
-            (!imageIn || !location || isSubmitting || isGettingLocation) && styles.submitButtonDisabled,
+            (clockInBlock || !imageIn || !location || isSubmitting || isGettingLocation) && styles.submitButtonDisabled,
           ]}
           onPress={handleTimeIn}
-          disabled={!imageIn || !location || isSubmitting || isGettingLocation}
+          disabled={Boolean(clockInBlock) || !imageIn || !location || isSubmitting || isGettingLocation}
           activeOpacity={0.8}
         >
           {isSubmitting ? (

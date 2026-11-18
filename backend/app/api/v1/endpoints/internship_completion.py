@@ -1,6 +1,5 @@
-"""Completion requests, company certificates and explicit grade release."""
+"""Completion requests, company certificates and coordinator approval."""
 from datetime import date
-from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, ConfigDict
@@ -26,11 +25,6 @@ class Request(Version):
 
 class Reason(Version):
     reason:str=Field(min_length=10,max_length=2000)
-
-
-class Grade(Version):
-    grade:Decimal=Field(ge=1,le=5,max_digits=3,decimal_places=2)
-    notes:str=Field(default='',max_length=2000)
 
 
 @router.get('')
@@ -116,20 +110,6 @@ def return_request(id:str,payload:Reason,db:Session=Depends(get_db),actor:User=D
 def approve(id:str,payload:Version,db:Session=Depends(get_db),actor:User=Depends(get_current_user)):
     obj=service.deployment(db,actor,id,True,UserRole.COORDINATOR)
     service.approve(db,obj,service.case_for(db,obj),actor,payload.version)
-    return service.serialize(db,obj,actor,True)
-
-
-@router.put('/{id}/grade')
-def draft_grade(id:str,payload:Grade,db:Session=Depends(get_db),actor:User=Depends(get_current_user)):
-    obj=service.deployment(db,actor,id,True,UserRole.COORDINATOR)
-    service.save_grade(db,obj,service.case_for(db,obj),actor,payload.version,payload.grade,payload.notes)
-    return service.serialize(db,obj,actor,True)
-
-
-@router.post('/{id}/release-grade')
-def release_grade(id:str,payload:Version,db:Session=Depends(get_db),actor:User=Depends(get_current_user)):
-    obj=service.deployment(db,actor,id,True,UserRole.COORDINATOR)
-    service.release_grade(db,obj,service.case_for(db,obj),actor,payload.version)
     return service.serialize(db,obj,actor,True)
 
 

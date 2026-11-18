@@ -295,17 +295,8 @@ export function UsersPage({
 
       <div className="workspace-page-heading">
         <div>
-          <span className="welcome-eyebrow">
-            <span className="eyebrow-dot" />
-            ACCESS MANAGEMENT
-          </span>
-
           <h1>User Management</h1>
 
-          <p>
-            Manage user accounts, workspace roles,
-            and account access.
-          </p>
         </div>
 
         <div className="user-actions">

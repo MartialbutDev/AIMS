@@ -14,7 +14,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case, and_
 from typing import List, Optional
-from datetime import datetime
+from datetime import date, datetime, time
 
 import uuid
 import os
@@ -37,6 +37,7 @@ from app.schemas.dtr import DTRResponse, DTRUpdate
 from app.schemas.pagination import PaginatedResponse
 from app.services.notification_service import NotificationService
 from app.services.deployment_service import DeploymentService
+from app.services.internship_reminders import AttendanceDayStatus, attendance_day_for_deployment, student_attendance_today
 from app.services import attendance_review as attendance
 from app.services.attendance_breaks import net_hours, instant, LOCAL
 from pydantic import BaseModel
@@ -252,14 +253,22 @@ def record_break(dtr_id: str, body: BreakRequest, db=Depends(get_db), current_us
     db.commit(); db.refresh(row)
     return _to_response(row, _student_name(current_user))
 
+def _require_clock_in_day(db: Session, deployment, workday: date):
+    if reason := attendance_day_for_deployment(db, deployment, workday).clock_in_block_reason:
+        raise HTTPException(status_code=409, detail=reason)
+
+
 @router.post("/capture")
 def begin_capture(body: CaptureRequest, db=Depends(get_db), current_user=Depends(get_current_user)):
     if current_user.role != UserRole.STUDENT: raise HTTPException(403,"Student access required")
-    DeploymentService.require_active_deployment(db,current_user.id)
+    deployment = DeploymentService.require_active_deployment(db, current_user.id)
     if body.phase == "out":
         row=db.query(DTR).filter_by(id=body.dtr_id,student_id=current_user.id).first()
         if not row or row.status != DTRStatus.PENDING: raise HTTPException(409,"Open clock-in not found")
-    elif body.dtr_id is not None: raise HTTPException(422,"Clock-in cannot reference another attendance record")
+    else:
+        if body.dtr_id is not None:
+            raise HTTPException(422, "Clock-in cannot reference another attendance record")
+        _require_clock_in_day(db, deployment, attendance.local_now().date())
     return {"capture_token":attendance.capture_ticket(current_user,body.phase,body.dtr_id),"expires_in":300}
 
 @router.post(
@@ -334,11 +343,12 @@ def create_dtr(
         )
 
     if time_out or image_out: raise HTTPException(422,"Clock in first, then capture a separate clock-out selfie")
-    server_time=attendance.local_now()
-    date_obj,time_in_obj=server_time.date(),server_time.time().replace(microsecond=0)
     db.query(type(deployment)).filter_by(id=deployment.id).with_for_update().one()
+    server_time = attendance.local_now()
+    date_obj, time_in_obj = server_time.date(), server_time.time().replace(microsecond=0)
     if date_obj < deployment.deployment_date:
         raise HTTPException(status_code=403, detail="DTR date precedes official deployment")
+    _require_clock_in_day(db, deployment, date_obj)
 
     existing = (
         db.query(DTR)
@@ -685,6 +695,25 @@ async def get_all_dtr(
 # ============================================================
 # STUDENT: DTR SUMMARY
 # ============================================================
+
+class TodayAttendanceSchedule(BaseModel):
+    date: date
+    status: AttendanceDayStatus
+    clock_in_at: time | None
+    clock_out_at: time | None
+    clock_in_block_reason: str | None
+
+
+@router.get("/today-schedule", response_model=TodayAttendanceSchedule)
+def get_today_attendance_schedule(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Only students can view their attendance schedule.")
+    today, schedule = student_attendance_today(db, current_user.id)
+    return TodayAttendanceSchedule(date=today, clock_in_block_reason=schedule.clock_in_block_reason, **schedule._asdict())
+
 
 @router.get("/summary")
 async def get_dtr_summary(

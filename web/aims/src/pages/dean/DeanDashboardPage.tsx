@@ -9,7 +9,6 @@ const cards: { key: keyof DeanAnalytics['overview']; label: string; caption: str
   { key: 'active_interns', label: 'Active interns', caption: 'Includes interns completing final review' },
   { key: 'pending_completion', label: 'Pending completion', caption: 'Requested, returned or company-confirmed' },
   { key: 'approved_completion', label: 'Coordinator-approved completion', caption: 'Official approval recorded' },
-  { key: 'grades_released', label: 'Grades released', caption: 'Subset of approved completions' },
 ]
 type Selection = { category: AttentionCategory; title: string; coordinator: string }
 
@@ -87,7 +86,7 @@ export function DeanDashboardPage() {
 
   return <div className="dean-oversight">
     <header className="dean-oversight__hero">
-      <div><span className="dean-oversight__eyebrow">CITC · DEAN'S OFFICE</span><h1>Internship oversight</h1><p>A clear view of placement, progress and official completion.</p></div>
+      <div><h1>Internship oversight</h1></div>
       <span className="dean-oversight__badge">Read-only oversight</span>
     </header>
     <section className="dean-oversight__term" aria-label="Dashboard academic term">
@@ -109,12 +108,12 @@ export function DeanDashboardPage() {
       </section>
       {!data.overview.students_in_oversight && <p className="dean-oversight__notice">No assigned students are available in your oversight scope for this term. Coordinator designations are managed by the administrator.</p>}
       <section className="dean-oversight__panel" aria-labelledby="dean-stage-heading">
-        <div className="dean-oversight__section-heading"><div><h2 id="dean-stage-heading">Where students are now</h2><p>Each student appears in one stage. Completion in progress is included in the active-intern overview card.</p></div><span>{data.overview.students_in_oversight} students</span></div>
+        <div className="dean-oversight__section-heading"><div><h2 id="dean-stage-heading">Internship stages</h2><p>Each student appears in one stage. The Active interns card includes students completing final review.</p></div><span>{data.overview.students_in_oversight} students</span></div>
         <div className="dean-oversight__chart">{data.stages.map(stage => <div className="dean-oversight__bar-row" key={stage.key}><span>{stage.label}</span><div className="dean-oversight__track" role="img" aria-label={`${stage.label}: ${stage.count} students`}><span style={{ width: `${stage.count / maxStage * 100}%` }} /></div><strong>{stage.count}</strong></div>)}</div>
         <p className="dean-oversight__footnote">Historical completed records without recorded coordinator approval are shown separately. Conflicting records require reconciliation before they count as active or approved.</p>
       </section>
       <section className="dean-oversight__panel" aria-labelledby="dean-workload-heading">
-        <div className="dean-oversight__section-heading"><div><h2 id="dean-workload-heading">Coordinator workload</h2><p>Assigned students and outstanding review items in the selected term.</p></div><span>{data.workloads.length} coordinators</span></div>
+        <div className="dean-oversight__section-heading"><div><h2 id="dean-workload-heading">Coordinator workload</h2></div><span>{data.workloads.length} coordinators</span></div>
         <div className="dean-oversight__table-wrap"><table><caption className="dean-oversight__sr-only">Coordinator workload for {termLabel(data)}</caption><thead><tr><th scope="col">Coordinator</th><th scope="col">Assigned students</th><th scope="col">Active interns</th><th scope="col">Documents</th><th scope="col">DTRs</th><th scope="col">Journals</th><th scope="col">Final approvals</th><th scope="col">Total review items</th></tr></thead><tbody>
           {data.workloads.map(row => <tr key={row.coordinator_id}><th scope="row">{row.coordinator_name}</th><td>{row.assigned_students}</td><td>{row.active_interns}</td><td>{row.document_reviews}</td><td>{row.dtr_reviews}</td><td>{row.journal_reviews}</td><td>{row.completion_reviews}</td><td><strong>{row.total_reviews}</strong>{row.total_reviews > 0 && <button className="dean-oversight__link" onClick={() => openDetails(row.completion_reviews > 0 ? 'coordinator_approval' : 'pending_reviews', `Review details · ${row.coordinator_name}`, row.coordinator_id)}>View details</button>}</td></tr>)}
           {!data.workloads.length && <tr><td colSpan={8}>No active coordinator designations for this term.</td></tr>}
@@ -122,9 +121,9 @@ export function DeanDashboardPage() {
         <p className="dean-oversight__footnote">Review counts are items, not students. DTRs count only after clock-out submission; journals count when submitted or in review. Approved archives are excluded.</p>
       </section>
       <section className="dean-oversight__panel" aria-labelledby="dean-attention-heading">
-        <div className="dean-oversight__section-heading"><div><h2 id="dean-attention-heading">Attention needed</h2><p>Identify follow-up needs without changing student records.</p></div></div>
+        <div className="dean-oversight__section-heading"><div><h2 id="dean-attention-heading">Attention needed</h2><p>View issues that need follow-up. Details are read-only.</p></div></div>
         <div className="dean-oversight__attention">{data.attention.map(item => <article key={item.key}><div><strong>{item.student_count}</strong><h3>{item.label}</h3><small>{item.student_count === 1 ? 'student' : 'students'} requiring follow-up</small></div><button className="dean-oversight__button" disabled={!item.student_count} onClick={() => openDetails(item.key, item.label)}>View details</button></article>)}</div>
-        <p className="dean-oversight__footnote">A student may appear in more than one attention category. Requirements use the existing deployment checklist; company confirmation follows a student completion request.</p>
+        <p className="dean-oversight__footnote">Categories may overlap. Company confirmation follows a student’s completion request.</p>
       </section>
     </>}
     <dialog className="dean-oversight__dialog" ref={dialog} aria-labelledby="dean-detail-title" onCancel={event => { event.preventDefault(); closeDetails() }}>

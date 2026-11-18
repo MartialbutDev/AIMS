@@ -68,7 +68,7 @@ export function DirectPlacementsPage({ role }: { role: UserRole }) {
   const readyToConfirm = role === 'coordinator' && active && !started && selected?.coordinator_ready && selected?.partnership_ready && selected?.application_status === 'accepted' && selected?.deployment?.checklist?.ready_for_deployment
   const canClear = selected?.company_id ? selected.moa.ready : options?.companies.find(c => c.id === linkedCompany)?.moa_ready
   return <div className="dp-workspace">
-    <header className="dp-hero"><div><span className="dp-kicker">CITC · SCHOOL-ARRANGED INTERNSHIPS</span><h1>{role === 'career_center' ? 'Partnership review.' : 'Direct company placement.'}</h1><p>{role === 'career_center' ? 'Verify company records and MOA readiness before proposed placements move forward.' : 'Arrange placements through direct coordination while keeping student acknowledgement, company acceptance and school approval accountable.'}</p></div><Icon name="briefcase" size={42} /></header>
+    <header className="dp-hero"><div><h1>{role === 'career_center' ? 'Partnership review.' : 'Direct company placement.'}</h1><p>{role === 'career_center' ? 'Verify company records and MOA readiness before proposed placements move forward.' : 'Arrange placements through direct coordination while keeping student acknowledgement, company acceptance and school approval accountable.'}</p></div><Icon name="briefcase" size={42} /></header>
     <div className="dp-toolbar"><div><h2>{role === 'career_center' ? 'Placement review queue' : 'Placement proposals'}</h2><p>{options ? `${options.academic_year} · Semester ${options.semester}` : 'Current academic term'} · {result?.total ?? 0} records</p></div>{canPropose && <button className="dp-primary" disabled={busy || !options?.can_propose} onClick={() => { setCreating(true); setError(''); window.setTimeout(() => editor.current?.querySelector<HTMLInputElement>('input')?.focus(), 0) }}>Propose a placement<Icon name="arrow" size={16} /></button>}</div>
     <div className="dp-toolbar"><span className="dp-muted">{canPropose && options && !options.can_propose ? 'An active current-term designation and eligible assignment scope are required to propose placements.' : 'Previous records stay in the decision history.'}</span><button className="dp-secondary" disabled={busy || loading} onClick={() => { setError(''); setRevision(v => v + 1); if (selected) void select(selected.id) }}>Refresh</button></div>
     {error && <p className="dp-error" role="alert">{error}</p>}{notice && <p className="dp-notice" role="status">{notice}</p>}
@@ -97,4 +97,3 @@ export function DirectPlacementsPage({ role }: { role: UserRole }) {
     </div>
   </div>
 }
-

@@ -49,7 +49,7 @@ const faqs = [
   {
     "id": "complete",
     "question": "How do I finish and see my grade?",
-    "answer": "Open Profile → Completion & archive, or the dashboard Internship Progress shortcut. Complete the checklist and request completion. Your company confirms it; the coordinator makes final approval and releases the grade separately. Enough hours alone do not complete the process."
+    "answer": "Open Profile → Completion & archive, or the dashboard Internship Progress shortcut. Complete the checklist and request completion. Your company confirms it; your coordinator approves completion. Check USTP PRISM for your official internship grade. Enough hours alone do not complete the process."
   },
   {
     "id": "retry",
@@ -101,7 +101,7 @@ const guides = [
   {
     "id": "6",
     "title": "Completion and archive",
-    "detail": "Checklist, company confirmation, final approval and grade release",
+    "detail": "Checklist, company confirmation, final approval and archive",
     "icon": "ribbon-outline"
   }
 ] as const;

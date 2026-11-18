@@ -536,7 +536,7 @@ def validate_orientation(
 
             "mentions_orientation": (
 
-                "OJT/Internship Orientation event "
+                "Internship orientation "
 
                 "is not identified"
 

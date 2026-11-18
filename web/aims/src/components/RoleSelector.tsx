@@ -15,9 +15,9 @@ export function RoleSelector({ onSelectRole }: RoleSelectorProps) {
       <section className="citc-workspace" aria-labelledby="workspace-heading">
         <header className="citc-workspace-top"><span>CITC INTERNSHIP PORTAL</span><span className="citc-access-label"><span />Authorized access</span></header>
         <div className="citc-workspace-content">
-          <p className="citc-overline">YOUR WORKSPACE</p>
+          <p className="citc-overline">CHOOSE YOUR ROLE</p>
           <h1 id="workspace-heading">Welcome to AIMS<span>.</span></h1>
-          <p className="citc-intro">One internship journey. A shared commitment.<br />Choose your role to access your workspace.</p>
+          <p className="citc-intro">One internship journey. A shared commitment.</p>
           <div className="citc-role-list">
             {roles.map((role, index) => (
               <button className="citc-role" type="button" key={role} onClick={() => onSelectRole(role)}>

@@ -1,3 +1,4 @@
+import { internshipMetrics } from '../../services/analyticsService'
 
 import { Icon } from '../../components/Icons'
 import type { DashboardData } from '../../types/dashboard'
@@ -42,11 +43,6 @@ export function AdminDashboardPage({
 
       <div className="workspace-page-heading admin-dashboard-header">
         <div>
-          <span className="welcome-eyebrow">
-            <span className="eyebrow-dot" />
-            CITC / SYSTEM ADMINISTRATION
-          </span>
-
           <h1>
             Administration desk
           </h1>
@@ -67,7 +63,7 @@ export function AdminDashboardPage({
       </div>
 
       <section className="stake-admin-desk" aria-label="Administration priorities">
-        <div className="stake-admin-desk-title"><span className="stake-kicker">THE ACADEMIC OPERATIONS DESK</span><h2>One system.<br />Every stakeholder connected.</h2><p>Maintain accounts, coordinator rosters, and student onboarding in one workspace.</p></div>
+        <div className="stake-admin-desk-title"><h2>Accounts and assignments</h2></div>
         <div className="stake-admin-register">
           <button type="button" onClick={() => onNavigate('users')}><span>01</span><div><strong>Account directory</strong><small>Stakeholder accounts and user imports</small></div><Icon name="arrow" size={18} /></button>
           <button type="button" onClick={() => onNavigate('assignments')}><span>02</span><div><strong>Assignment register</strong><small>Student-to-coordinator rosters</small></div><Icon name="arrow" size={18} /></button>
@@ -81,7 +77,7 @@ export function AdminDashboardPage({
         className="admin-dashboard-metrics"
         aria-label="Dashboard metrics"
       >
-        {data.metrics.map((metric, index) => (
+        {[...data.metrics, ...internshipMetrics(data)].map((metric, index) => (
           <article
             className="panel admin-dashboard-metric"
             key={`${metric.label}-${index}`}
@@ -196,7 +192,6 @@ export function AdminDashboardPage({
                 {data.tasksTitle || 'Tasks and Reminders'}
               </h2>
 
-              <p>Important administrative priorities</p>
             </div>
           </div>
 
@@ -238,7 +233,6 @@ export function AdminDashboardPage({
           <div className="panel-heading">
             <div>
               <h2>Recent Activity</h2>
-              <p>Latest activity available in the dashboard</p>
             </div>
           </div>
 
@@ -284,7 +278,6 @@ export function AdminDashboardPage({
           <div className="panel-heading">
             <div>
               <h2>Quick Actions</h2>
-              <p>Access common administrator functions</p>
             </div>
           </div>
 

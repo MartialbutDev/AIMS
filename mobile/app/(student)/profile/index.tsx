@@ -116,22 +116,22 @@ export default function ProfileScreen() {
   const loadProfile = async () => {
     try {
       setLoading(true);
-      
+
       const data = await authService.getCurrentUser();
       setProfile(data);
       setEditFirstName(data.first_name);
       setEditLastName(data.last_name);
       setEditPhone(data.phone || "");
-      
+
       const avatar = await authService.getAvatar();
       console.log('📸 Profile - Avatar URL:', avatar);
       if (avatar) {
         setAvatarUri(avatar);
       }
-      
+
       // ✅ Load documents
       await loadDocuments();
-      
+
     } catch (error) {
       console.error("Error loading profile:", error);
       Alert.alert("Error", "Failed to load profile data");
@@ -174,13 +174,13 @@ export default function ProfileScreen() {
         last_name: editLastName.trim(),
         phone: editPhone.trim() || undefined,
       });
-      
+
       setProfile(updated);
       setEditing(false);
       Alert.alert("Success", "Profile updated successfully!");
-      
+
       await loadProfile();
-      
+
     } catch (error) {
       Alert.alert("Error", "Failed to update profile");
     } finally {
@@ -205,18 +205,18 @@ export default function ProfileScreen() {
 
       if (!result.canceled) {
         const uri = result.assets[0].uri;
-        
+
         setUploadingAvatar(true);
         setAvatarUri(uri);
-        
+
         const updatedUser = await authService.uploadAvatar(uri);
         setProfile(updatedUser);
-        
+
         await refreshAvatar();
-        
+
         Alert.alert("Success", "Profile picture updated!");
       }
-      
+
     } catch (error: any) {
       console.error("Avatar upload error:", error);
       Alert.alert("Error", error.message || "Failed to upload avatar");
@@ -598,8 +598,8 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {editing && <View style={{ marginBottom: 20 }}><AccountHero icon="create-outline" title="Your details, up to date." description="Update your name, contact number and profile photo. Your student ID and email are managed by the school." label="PERSONAL INFORMATION" /></View>}
         <View style={[styles.avatarSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <TouchableOpacity 
-            style={styles.avatarContainer} 
+          <TouchableOpacity
+            style={styles.avatarContainer}
             onPress={handlePickImage}
             disabled={uploadingAvatar}
           >
@@ -618,7 +618,7 @@ export default function ProfileScreen() {
               <Ionicons name="camera-outline" size={16} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
-          
+
           {avatarUri && (
             <TouchableOpacity
               style={[styles.deleteAvatarButton, { backgroundColor: `${colors.error}10` }]}
@@ -628,7 +628,7 @@ export default function ProfileScreen() {
               <Text style={[styles.deleteAvatarText, { color: colors.error }]}>Remove</Text>
             </TouchableOpacity>
           )}
-          
+
           <Text style={[styles.studentName, { color: colors.textPrimary }]}>{fullName}</Text>
           <Text style={[styles.studentId, { color: colors.textSecondary }]}>ID: {profile.student_id}</Text>
           <Text style={[styles.userRole, { color: colors.accent, backgroundColor: `${colors.primary}10` }]}>
@@ -732,7 +732,7 @@ export default function ProfileScreen() {
                     Completion &amp; Archive
                   </Text>
                   <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 4 }}>
-                    Checklist, completion requests, released grades and past internships.
+                    Checklist, completion requests and past internships.
                   </Text>
                 </View>
               </View>
@@ -777,8 +777,8 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <TouchableOpacity 
-          style={[styles.logoutButton, { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}30` }]} 
+        <TouchableOpacity
+          style={[styles.logoutButton, { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}30` }]}
           onPress={handleLogout}
         >
           <Ionicons name="log-out-outline" size={22} color={colors.error} />

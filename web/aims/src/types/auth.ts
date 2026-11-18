@@ -14,6 +14,15 @@ export interface UserSession {
   email: string
   role: UserRole
   accessToken: string
+  avatarPath?: string | null
+}
+
+export function formatAccountName(user: {
+  first_name: string
+  middle_name?: string | null
+  last_name: string
+}): string {
+  return [user.first_name, user.middle_name, user.last_name].map(part => part?.trim()).filter(Boolean).join(' ')
 }
 
 export const roleLabels: Record<UserRole, string> = {

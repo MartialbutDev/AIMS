@@ -1,5 +1,5 @@
 
-"""Scheduler for in-app notification campaigns."""
+"""Scheduler for notification campaigns, internship reminders, and delivery."""
 
 import asyncio
 import logging
@@ -8,11 +8,13 @@ from datetime import datetime, timezone
 from app.core.database import SessionLocal
 from app.models.notification_campaign import NotificationCampaign
 from app.services.notification_campaign_service import deliver_campaign
+from app.services.internship_reminders import process_internship_reminders
 from app.services.push_service import process_push_deliveries
 
 
 SCHEDULER_INTERVAL_SECONDS = 5
 SCHEDULER_BATCH_SIZE = 50
+REMINDER_CHECK_INTERVAL_SECONDS = 60
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +25,7 @@ def _utc_naive() -> datetime:
     )
 
 
-def process_due_notification_campaigns() -> int:
+def process_due_notification_campaigns(check_reminders: bool = True) -> int:
     db = SessionLocal()
 
     try:
@@ -58,6 +60,12 @@ def process_due_notification_campaigns() -> int:
                 delivered += 1
 
         db.commit()
+        if check_reminders:
+            try:
+                process_internship_reminders(db)
+            except Exception:
+                db.rollback()
+                logger.exception("Internship reminder check failed")
         # A transport failure must not block the other delivery channel.
         from app.services.notification_email_service import process_email_deliveries
         for worker in (process_push_deliveries, process_email_deliveries):
@@ -77,11 +85,15 @@ def process_due_notification_campaigns() -> int:
 
 
 async def run_notification_scheduler() -> None:
+    loop = asyncio.get_running_loop()
+    next_reminder_check = loop.time()
     while True:
         try:
-            await asyncio.to_thread(
-                process_due_notification_campaigns
-            )
+            tick = loop.time()
+            check_reminders = tick >= next_reminder_check
+            await asyncio.to_thread(process_due_notification_campaigns, check_reminders)
+            if check_reminders:
+                next_reminder_check = tick + REMINDER_CHECK_INTERVAL_SECONDS
 
         except Exception:
             logger.exception(

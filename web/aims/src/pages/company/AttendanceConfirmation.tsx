@@ -25,9 +25,8 @@ export function AttendanceConfirmation({ deploymentId, entries, active, refresh 
   }
   return <section className="hte-record-panel attendance-confirmation" aria-label="Workplace attendance confirmation" aria-busy={busy}>
     <header><div>
-      <span className="ac-eyebrow">COMPANY REVIEW</span>
       <h2>Confirm workplace attendance</h2>
-      <p>Check the selfies and locations against who reported to work. Confirmed entries go to the coordinator for final approval.</p>
+      <p>Check selfies and locations against workplace attendance. Confirmed entries go to the coordinator for final approval.</p>
     </div></header>
     <div className="ac-toolbar">
       <label className="ac-field">Review week (select Monday)
@@ -65,7 +64,7 @@ export function AttendanceConfirmation({ deploymentId, entries, active, refresh 
     })}</div>
     {!visible.length && <p className="ac-empty">No entries for this week on the loaded attendance page. Change the week or attendance page.</p>}
     <footer className="ac-batch">
-      <div><strong>{selected.length} selected for confirmation</strong><p>Select only entries you have checked. Disputed entries must be resolved individually.</p></div>
+      <div><strong>{selected.length} selected for confirmation</strong><p>Select checked entries only. Handle disputes one at a time.</p></div>
       <button type="button" className="ac-primary" disabled={busy || !active || !selected.length} onClick={() => { if (window.confirm(`Confirm workplace attendance for ${selected.length} reviewed entries?`)) void save() }}>Confirm selected entries for this week ({selected.length})</button>
     </footer>
     {preview && <FilePreview {...preview} close={() => setPreview(null)} />}

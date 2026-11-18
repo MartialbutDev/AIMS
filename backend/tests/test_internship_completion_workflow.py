@@ -81,26 +81,26 @@ class CompletionTests(unittest.TestCase):
     def completed(self):
         for response in [self.request(),self.company(),self.action('approve')]:self.assertEqual(response.status_code,200,response.text)
 
-    def test_full_lifecycle_and_grade_release_privacy(self):
+    def test_approval_archives_without_grade_and_retires_grade_actions(self):
         self.assertTrue(self.detail().json()['checklist']['ready_to_request'])
-        self.assertEqual(self.request().status_code,200)
-        response=self.action('grade',grade=1.25,notes='Excellent work');self.assertEqual(response.status_code,200,response.text)
-        self.as_user('s1',UserRole.STUDENT);student=self.detail().json()
-        self.assertNotIn('draft_grade',student);self.assertIsNone(student['released_grade'])
-        self.assertNotIn('grade_draft_saved', [e['action'] for e in student['events']])
-        self.assertEqual(self.action('release-grade').status_code,409)
-        self.assertEqual(self.company().status_code,200)
-        self.assertEqual(self.action('approve').status_code,200)
+        self.completed()
         self.assertEqual(self.db.get(service.Deployment,self.deployment.id).status,DeploymentStatus.COMPLETED)
-        response=self.action('release-grade');self.assertEqual(response.status_code,200,response.text)
-        self.as_user('s1',UserRole.STUDENT);student=self.detail().json()
-        self.assertEqual(student['released_grade']['grade'],1.25)
-        self.assertEqual(len(student['checklist']['records']['dtr']),2)
-        self.as_user('hte',UserRole.HTE_SUPERVISOR);company=self.detail().json()
-        self.assertNotIn('released_grade',company);self.assertNotIn('draft_grade',company)
-        self.assertNotIn('storage_name',company['company_confirmation'])
-        self.assertEqual(self.action('grade',grade=2,notes='Changed').status_code,409)
-        self.assertEqual(self.action('release-grade').status_code,409)
+        case=self.db.query(Case).one()
+        version=case.version
+        self.assertEqual(self.action('grade',grade=1.25,notes='Retired action').status_code,404)
+        self.assertEqual(self.action('release-grade').status_code,404)
+        self.db.refresh(case)
+        self.assertEqual(case.version,version)
+        self.assertIsNone(case.draft_grade)
+        self.assertIsNone(case.released_grade)
+        for id,role in [('s1',UserRole.STUDENT),('c1',UserRole.COORDINATOR),('hte',UserRole.HTE_SUPERVISOR)]:
+            self.as_user(id,role)
+            record=self.detail().json()
+            self.assertEqual(record['status'],'completed')
+            self.assertEqual(len(record['checklist']['records']['dtr']),2)
+            self.assertFalse({'draft_grade','released_grade','grade_released_at'} & record.keys())
+            self.assertEqual(self.client.get('/completion?status=completed').json()['total'],1)
+            self.assertNotIn('storage_name',record['company_confirmation'])
 
     def test_wrong_student_company_and_coordinator_cannot_access(self):
         for id,role in [('s2',UserRole.STUDENT),('hte2',UserRole.HTE_SUPERVISOR),('c2',UserRole.COORDINATOR)]:
@@ -113,7 +113,7 @@ class CompletionTests(unittest.TestCase):
         self.request()
         for id,role in [('admin',UserRole.ADMIN),('dean1',UserRole.DEAN),('career',UserRole.CAREER_CENTER),('hte',UserRole.HTE_SUPERVISOR),('s1',UserRole.STUDENT)]:
             self.as_user(id,role)
-            for action in ['approve','return','release-grade','reopen']:
+            for action in ['approve','return','reopen']:
                 response=self.client.post(self.base+'/'+action,json={'version':1,**({'reason':'Needs a correction'} if action in ('return','reopen') else {})})
                 self.assertEqual(response.status_code,403,(id,action,response.text))
 
@@ -134,11 +134,6 @@ class CompletionTests(unittest.TestCase):
         self.assertEqual(self.request().status_code,409)
         record.date=datetime.combine(service.today()+timedelta(days=1),time());self.db.commit()
         self.assertEqual(self.request().status_code,409)
-
-    def test_grade_validation(self):
-        self.request()
-        for grade in [0,5.01,1.234,'NaN']:
-            self.assertEqual(self.action('grade',grade=grade).status_code,422)
 
     def test_request_and_company_decision_use_versions(self):
         self.request();self.as_user('s1',UserRole.STUDENT)
@@ -189,12 +184,24 @@ class CompletionTests(unittest.TestCase):
         with self.assertRaises(HTTPException):self.db.commit()
         self.db.rollback()
 
-    def test_reopening_withdraws_grade_preserves_audit_and_allows_corrections(self):
-        self.completed();self.action('grade',grade=1.5,notes='Final notes');self.action('release-grade')
-        self.assertEqual(self.action('reopen',reason='Correct attendance before reapproval.').status_code,200)
-        case=self.db.query(Case).one();self.assertIsNone(case.released_grade);self.assertIsNone(case.company_confirmation)
-        event=self.db.query(Event).filter(Event.action=='reopened').one()
-        self.assertEqual(event.details['released_grade']['grade'],1.5)
+    def test_reopening_preserves_historical_grade_without_exposing_it(self):
+        self.completed()
+        case=self.db.query(Case).one()
+        case.released_grade={'grade':1.5,'notes':'Historical feedback'}
+        case.grade_released_at=service.utcnow()
+        case.grade_released_by='c1'
+        self.db.add(Event(id='historical-release',case_id=case.id,actor_id='c1',
+                          action='grade_released',reason='',details={},created_at=service.utcnow()))
+        self.db.commit()
+        response=self.action('reopen',reason='Correct attendance before reapproval.')
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertNotIn('released_grade',response.json())
+        self.assertNotIn('grade_released',[item['action'] for item in response.json()['events']])
+        self.assertEqual(case.released_grade['grade'],1.5)
+        self.assertIsNotNone(case.grade_released_at)
+        self.assertIsNone(case.company_confirmation)
+        self.assertEqual(self.db.query(Event).filter_by(action='grade_released').count(),1)
+        self.assertEqual(self.db.query(Event).filter_by(action='reopened').count(),1)
         self.db.get(DTR,'time0').tasks_completed='Corrected tasks';self.db.commit()
         self.assertEqual(self.action('approve').status_code,409)
 
@@ -237,7 +244,7 @@ class CompletionTests(unittest.TestCase):
         self.request()
         recipients={n.user_id for n in self.db.query(Notification)}
         self.assertEqual(recipients,{'c1','hte'})
-        self.company();self.action('approve');self.action('grade',grade=1.25,notes='Private academic feedback');self.action('release-grade')
+        self.company();self.action('approve')
         for n in self.db.query(Notification):
             data=json.loads(n.data or '{}')
             if data.get('source')=='completion':
@@ -245,7 +252,7 @@ class CompletionTests(unittest.TestCase):
                 self.assertNotIn(n.user_id,{'s2','c2','hte2','dean2'})
                 self.assertTrue(data.get('route','').endswith('/completion') or data.get('web_path','').endswith('/completion'))
         released=[n for n in self.db.query(Notification) if json.loads(n.data or '{}').get('action')=='grade_released']
-        self.assertEqual({n.user_id for n in released},{'s1'})
+        self.assertEqual(released,[])
 
     def test_missing_schema_returns_503_without_creating_tables(self):
         Event.__table__.drop(self.f.engine);Case.__table__.drop(self.f.engine)

@@ -7,7 +7,7 @@ import * as Sharing from 'expo-sharing'
 export interface CompletionRecord {
   deployment_id: string; student_name: string; company_name: string; academic_year: string; semester: string
   status: string; version: number; can_write: boolean; submitted_at: string | null; approved_at: string | null
-  grade_released_at: string | null; released_grade?: { grade: number; notes: string } | null; request_note?: string
+  request_note?: string
   checklist?: { label: string; required_hours: number | null; approved_hours: number; dtr_count: number; journal_count: number; ready_to_request: boolean
     items: { key: string; label: string; met: boolean }[]
     records?: { documents?: { id: string; type: string; status: string; extension: string }[]; dtr: { id: string; date: string; time_in: string; time_out: string; hours: number; tasks: string }[]; journals: { id: string; week: number; title: string; summary: string }[] } }

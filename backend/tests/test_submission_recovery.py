@@ -5,6 +5,8 @@ from uuid import uuid4
 from unittest import TestCase
 from unittest.mock import patch
 
+import pymupdf
+
 from app.api.v1.endpoints import journals
 from app.core import file_storage
 from app.models.document import Document
@@ -14,6 +16,23 @@ from app.models.submission_receipt import SubmissionReceipt
 from app.routers import documents
 from app.services import attendance_review, ocr_service
 import test_company_attendance as attendance_fixtures
+
+
+def journal_pdf(*, scanned=False, password_protected=False):
+    with pymupdf.open() as pdf:
+        page = pdf.new_page()
+        if scanned:
+            image = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 8, 8), False)
+            image.clear_with(180)
+            page.insert_image(page.rect, pixmap=image)
+        else:
+            page.insert_text((40, 60), "Synthetic weekly journal")
+        if password_protected:
+            return pdf.tobytes(
+                encryption=pymupdf.PDF_ENCRYPT_AES_256,
+                owner_pw="fixture-owner", user_pw="fixture-reader",
+            )
+        return pdf.tobytes()
 
 
 class SubmissionRecoveryTests(TestCase):
@@ -29,12 +48,55 @@ class SubmissionRecoveryTests(TestCase):
         self.enterContext(patch.object(ocr_service, "UPLOAD_DIR", self.root / "uploads"))
         self.journal_notification = self.enterContext(patch.object(journals, "_fire_journal_notification"))
 
-    def submit_journal(self, key):
+    def submit_journal(self, key, *, attachment=None, submit=True):
+        if attachment is None:
+            attachment = ("journal.pdf", journal_pdf())
         return self.client.post(
-            "/journals/", data={"week": "1", "title": "Synthetic journal", "submit": "true"},
-            files={"file": ("journal.pdf", b"%PDF-1.4\nSynthetic journal")},
+            "/journals/",
+            data={"week": "1", "title": "Synthetic journal", "submit": str(submit).lower()},
+            files={"file": attachment},
             headers={"Idempotency-Key": key},
         )
+
+    def test_journal_rejects_mislabeled_corrupt_and_locked_files(self):
+        for label, attachment, detail in (
+            ("image extension", ("photo.png", b"image bytes"), "Only PDF"),
+            ("image renamed to PDF", ("journal.pdf", b"\x89PNG\r\n\x1a\n"), "Only valid PDF"),
+            ("empty file", ("journal.pdf", b""), "Only valid PDF"),
+            ("corrupt PDF", ("journal.pdf", b"%PDF-1.4\nBroken PDF"), "could not be opened"),
+            ("locked PDF", ("journal.pdf", journal_pdf(password_protected=True)), "without password"),
+        ):
+            with self.subTest(label=label):
+                result = self.submit_journal(str(uuid4()), attachment=attachment)
+                self.assertEqual(result.status_code, 400, result.text)
+                self.assertIn(detail, result.json()["detail"])
+        self.assertEqual(self.db.query(Journal).count(), 0)
+        self.assertEqual(self.db.query(SubmissionReceipt).count(), 0)
+        self.assertEqual(list((self.root / "journal_uploads").glob("*")), [])
+        self.journal_notification.assert_not_called()
+
+    def test_invalid_draft_replacement_keeps_original_and_valid_scan_replaces_it(self):
+        first_pdf = journal_pdf()
+        draft = self.submit_journal(
+            str(uuid4()), attachment=("journal.pdf", first_pdf), submit=False,
+        )
+        self.assertEqual(draft.status_code, 201, draft.text)
+        path = "/journals/" + draft.json()["id"] + "/file"
+        original_path = self.root / draft.json()["file_path"]
+
+        rejected = self.client.put(path, files={"file": ("journal.pdf", b"%PDF-1.4\nBroken")})
+        self.assertEqual(rejected.status_code, 400, rejected.text)
+        self.assertEqual(self.client.get(path).content, first_pdf)
+        self.assertEqual(list(original_path.parent.iterdir()), [original_path])
+
+        scan = journal_pdf(scanned=True)
+        with pymupdf.open(stream=scan, filetype="pdf") as pdf:
+            self.assertEqual(pdf[0].get_text().strip(), "")
+        replaced = self.client.put(path, files={"file": ("scan.pdf", scan)})
+        self.assertEqual(replaced.status_code, 200, replaced.text)
+        self.assertEqual(self.client.get(path).content, scan)
+        self.assertFalse(original_path.exists())
+        self.assertEqual(len(list(original_path.parent.iterdir())), 1)
 
     def test_interrupted_storage_write_leaves_no_file_or_receipt_then_retries(self):
         key = str(uuid4())

@@ -91,6 +91,23 @@ class AvatarTests(TestCase):
         self.assertFalse(second_path.exists())
         self.assertIsNone(self.db.get(User, "s1").avatar_url)
 
+    def test_coordinator_can_delete_own_profile_photo(self):
+        self.client.app.dependency_overrides[users.get_current_user] = (
+            lambda: self.db.get(User, "c1")
+        )
+        photo = BytesIO()
+        Image.new("RGB", (30, 30)).save(photo, format="PNG")
+
+        uploaded = self.upload(photo.getvalue())
+        self.assertEqual(uploaded.status_code, 200, uploaded.text)
+        avatar_path = self.root / uploaded.json()["avatar_url"]
+        self.assertTrue(avatar_path.is_file())
+
+        removed = self.client.delete("/users/avatar")
+        self.assertEqual(removed.status_code, 200, removed.text)
+        self.assertIsNone(self.db.get(User, "c1").avatar_url)
+        self.assertFalse(avatar_path.exists())
+
     def test_public_mount_blocks_legacy_non_image_extensions(self):
         (self.avatars / "legacy.html").write_text("Plain text fixture", encoding="utf-8")
         self.assertEqual(self.client.get("/static/avatars/legacy.html").status_code, 404)

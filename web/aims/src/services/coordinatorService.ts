@@ -22,7 +22,6 @@ export interface CoordinatorStudent {
   application_count: number
   application_statuses: Record<string, number>
   journey: CoordinatorJourney
-  grade: number | null
 }
 
 export interface CoordinatorJourney {
@@ -100,12 +99,6 @@ export interface CoordinatorStudentDetail {
     status: string
     summary: string | null
   }>
-
-  evaluation: {
-    grade: number
-    notes: string | null
-    updated_at: string
-  } | null
 }
 
 export interface StudentPage {
@@ -178,30 +171,6 @@ export function getCoordinatorStudentDetail(
 ): Promise<CoordinatorStudentDetail> {
   return apiRequest<CoordinatorStudentDetail>(
     `/api/v1/coordinator/students/${encodeURIComponent(studentId)}`,
-  )
-}
-
-export function saveCoordinatorEvaluation(
-  studentId: string,
-  academicYear: string,
-  semester: '1' | '2',
-  grade: number,
-  notes: string,
-): Promise<{
-  grade: number
-  notes: string | null
-  updated_at: string
-}> {
-  return apiRequest(
-    `/api/v1/coordinator/students/${encodeURIComponent(studentId)}/evaluation`,
-    {
-      method: 'PUT',
-      body: JSON.stringify({
-        academic_year: academicYear, semester,
-        grade,
-        notes: notes || null,
-      }),
-    },
   )
 }
 

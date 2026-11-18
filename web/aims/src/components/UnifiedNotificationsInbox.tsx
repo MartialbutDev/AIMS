@@ -49,7 +49,7 @@ export function NotificationsInbox() {
   }
   const switchTab = (next: typeof tab) => { setPage(0); setTab(next); setError('') }
   return <section className="aims-inbox" aria-label="Notifications">
-    <header className="aims-inbox-head"><div><span className="aims-inbox-eyebrow">CITC · INTERNSHIP COMMUNICATIONS</span><h1>Keep the journey moving.</h1><p>Student updates, school decisions, and internship reminders in one place.</p></div><div className="aims-inbox-count"><strong>{unread}</strong><span>unread updates</span></div></header>
+    <header className="aims-inbox-head"><div><span className="aims-inbox-eyebrow">CITC · INTERNSHIP COMMUNICATIONS</span><h1>Keep the journey moving.</h1></div><div className="aims-inbox-count"><strong>{unread}</strong><span>unread updates</span></div></header>
     <nav className="aims-inbox-tabs" aria-label="Inbox sections">{(['activity', 'preferences'] as const).map(t => <button key={t} aria-pressed={tab === t} onClick={() => switchTab(t)}>{t === 'activity' ? 'Activity inbox' : 'Delivery preferences'}</button>)}<button onClick={() => void load()} disabled={busy}>Refresh</button></nav>
     {error && <p className="aims-inbox-error" role="alert">{error}</p>}
     {tab === 'activity' && <><div className="aims-inbox-tools"><label><input type="checkbox" checked={unreadOnly} onChange={e => { setUnreadOnly(e.target.checked); setPage(0) }} /> Unread only</label><button disabled={busy || !unread} onClick={() => void action(markAllNotificationsRead)}>Mark all as read</button></div>

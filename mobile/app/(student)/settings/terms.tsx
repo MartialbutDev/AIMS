@@ -33,7 +33,7 @@ const TERMS_SECTIONS = [
   },
   {
     "title": "7. Reviews, corrections and completion",
-    "body": "Only approved attendance contributes to completion hours. Use the time-correction process for incorrect recorded times; company review and coordinator approval are required. Submit journals and address review feedback. Internship completion requires the applicable eligibility checklist, student request, company confirmation and coordinator final approval. Final grade release is a separate authorized action. Archived completion records may be protected from ordinary edits."
+    "body": "Only approved attendance contributes to completion hours. Use the time-correction process for incorrect recorded times; company review and coordinator approval are required. Submit journals and address review feedback. Internship completion requires the applicable eligibility checklist, student request, company confirmation and coordinator final approval. Official grades are posted in USTP PRISM. Archived completion records may be protected from ordinary edits."
   },
   {
     "title": "8. Privacy and authorized access",

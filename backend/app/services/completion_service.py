@@ -148,7 +148,7 @@ def event(db, obj, case, actor, action, reason='', details=None):
     if action in {'requested','company_confirmed','returned','completed','reopened'}: recipients |= supervisors
     if action in {'completed','reopened'}: recipients |= scope.deans[obj.student_id] | scope.roles['career_center'] | scope.roles['admin']
     recipients.discard(actor.id)
-    # Grades and private remarks never appear in notification bodies or company payloads.
+    # Private remarks stay out of notifications.
     enqueue(db, recipients, 'system', 'Internship '+action.replace('_',' '),
         'An internship completion record has been updated. Open Completion to review the next step.',
         data={'source':'completion','deployment_id':obj.id,'action':action}, scope=scope)
@@ -225,34 +225,12 @@ def approve(db,obj,case,actor,version):
     db.commit()
 
 
-def save_grade(db,obj,case,actor,version,grade,notes):
-    expect(case,version,{'requested','company_confirmed','returned','completed'})
-    if case.grade_released_at: raise HTTPException(409,'Released grades are locked; reopen the completion to correct records')
-    case.draft_grade=grade;case.draft_notes=notes;case.version+=1
-    db.add(Event(id=str(uuid.uuid4()),case_id=case.id,actor_id=actor.id,action='grade_draft_saved',reason='',
-                 details={'grade':str(grade),'notes':notes},created_at=utcnow()))
-    db.commit()
-
-
-def release_grade(db,obj,case,actor,version):
-    expect(case,version,{'completed'})
-    if obj.status != DeploymentStatus.COMPLETED: raise HTTPException(409,'Internship must be completed before releasing the grade')
-    if case.grade_released_at: raise HTTPException(409,'The final grade has already been released')
-    if case.draft_grade is None: raise HTTPException(409,'Save a draft final grade first')
-    case.released_grade={'grade':float(case.draft_grade),'notes':case.draft_notes or ''}
-    case.grade_released_at=utcnow();case.grade_released_by=actor.id;case.version+=1
-    event(db,obj,case,actor,'grade_released')
-    db.commit()
-
-
 def reopen(db,obj,case,actor,version,reason):
     expect(case,version,{'completed'})
-    previous={'checklist':case.checklist_snapshot,'released_grade':case.released_grade,
+    previous={'checklist':case.checklist_snapshot,
               'approved_at':case.approved_at.isoformat() if case.approved_at else None,'company_confirmation':case.company_confirmation}
     case.status='returned';case.version+=1;case.company_confirmation=None
     case.approved_at=None;case.approved_by=None;case.checklist_snapshot=None
-    case.released_grade=None;case.grade_released_at=None;case.grade_released_by=None
-    case.draft_grade=None;case.draft_notes=None
     obj.status=DeploymentStatus.DEPLOYED
     obj._completion_workflow=True
     event(db,obj,case,actor,'reopened',reason,previous)
@@ -268,14 +246,12 @@ def serialize(db,obj,actor,detail=False):
         'academic_year':obj.academic_year,'semester':obj.semester,'deployment_date':obj.deployment_date,
         'status':case.status if case else ('completed_legacy' if obj.status==DeploymentStatus.COMPLETED else 'not_requested'),
         'version':case.version if case else 0,'submitted_at':case.submitted_at if case else None,
-        'approved_at':case.approved_at if case else None,'grade_released_at':case.grade_released_at if case else None,
+        'approved_at':case.approved_at if case else None,
         'can_write':(obj.academic_year,obj.semester)==get_current_academic_term() and actor.role in
                     (UserRole.STUDENT,UserRole.COORDINATOR,UserRole.HTE_SUPERVISOR)}
     if coordinator and result['can_write']:
         try: get_coordinator_student_assignment(db,actor,obj.student_id,academic_year=obj.academic_year,semester=obj.semester,mode='write')
         except HTTPException: result['can_write']=False
-    if actor.role in (UserRole.STUDENT,UserRole.COORDINATOR) and case:
-        result['released_grade']=case.released_grade
     if detail:
         result['checklist']=case.checklist_snapshot if case and case.status=='completed' else checklist(db,obj,case)
         if result['checklist'] and actor.role not in (UserRole.STUDENT,UserRole.COORDINATOR,UserRole.ADMIN):
@@ -285,11 +261,11 @@ def serialize(db,obj,actor,detail=False):
         confirmation.pop('storage_name',None);confirmation.pop('sha256',None)
         result['company_confirmation']=confirmation or None
         result['request_note']=case.request_note if case else ''
-        if coordinator and case: result.update(draft_grade=float(case.draft_grade) if case.draft_grade is not None else None,draft_notes=case.draft_notes or '')
-        events=db.query(Event).filter(Event.case_id==case.id).order_by(Event.created_at,Event.id).all() if case else []
-        # Audit details contain past grades and private storage references; expose
-        # only action/reason/timestamps, with grade drafts visible only to coordinators.
+        events = db.query(Event).filter(
+            Event.case_id == case.id,
+            Event.action.notin_(("grade_draft_saved", "grade_released")),
+        ).order_by(Event.created_at, Event.id).all() if case else []
         names={u.id:f'{u.first_name} {u.last_name}' for u in db.query(User).filter(User.id.in_({e.actor_id for e in events}))} if events else {}
         result['events']=[{'id':e.id,'action':e.action,'reason':e.reason,'created_at':e.created_at,'actor_name':names.get(e.actor_id,'Authorized user')}
-                          for e in events if coordinator or e.action!='grade_draft_saved']
+                          for e in events]
     return result

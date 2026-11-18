@@ -15,7 +15,7 @@ export interface DashboardActivity {
 }
 
 export interface CompletionCounts {
-  pre_deployment: number; deployed: number; requested: number; company_confirmed: number; returned: number; completed: number; completed_legacy: number; grade_released: number
+  pre_deployment: number; deployed: number; requested: number; company_confirmed: number; returned: number; completed: number; completed_legacy: number
 }
 
 export interface DashboardData {

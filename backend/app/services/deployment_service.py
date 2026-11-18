@@ -322,13 +322,13 @@ class DeploymentService:
         return deployment
 
     @staticmethod
-    def require_active_deployment(
+    def find_active_deployment(
         db: Session,
         student_id: str,
-    ) -> InternshipDeployment:
+    ) -> InternshipDeployment | None:
         year, semester = get_current_academic_term()
 
-        deployment = (
+        return (
             db.query(InternshipDeployment)
             .filter(
                 InternshipDeployment.student_id == student_id,
@@ -342,6 +342,9 @@ class DeploymentService:
             .first()
         )
 
+    @staticmethod
+    def require_active_deployment(db: Session, student_id: str) -> InternshipDeployment:
+        deployment = DeploymentService.find_active_deployment(db, student_id)
         if deployment is None:
             raise HTTPException(
                 status_code=403,

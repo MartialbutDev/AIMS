@@ -106,4 +106,3 @@ export default function DTRCorrectionForm({dtrId}:{dtrId:string}) {
     <Button title={busy?'Sending…':'Send correction request'} disabled={busy || picker !== null} onPress={submit}/>
   </View>
 }
-

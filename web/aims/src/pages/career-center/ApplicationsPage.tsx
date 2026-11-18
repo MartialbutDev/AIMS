@@ -44,15 +44,9 @@ export function ApplicationsPage({ data }: ApplicationsPageProps) {
     <main className="cc-page">
       <header className="cc-page-header">
         <div>
-          <div className="cc-eyebrow">
-            <span className="cc-eyebrow-dot" />
-            CAREER CENTER · APPLICATION MONITORING
-          </div>
-
           <h1>Applications & Placements</h1>
           <p>
-            Monitor internship application statistics and recent
-            placement-related activity.
+            Track applications and placement updates.
           </p>
         </div>
       </header>
@@ -67,9 +61,6 @@ export function ApplicationsPage({ data }: ApplicationsPageProps) {
         <div className="cc-section-header">
           <div>
             <h2>Recent Application Activity</h2>
-            <p>
-              Search recent application and placement updates from the dashboard.
-            </p>
           </div>
 
           <span className="cc-counter">
@@ -126,4 +117,3 @@ export function ApplicationsPage({ data }: ApplicationsPageProps) {
     </main>
   )
 }
-

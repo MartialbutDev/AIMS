@@ -14,7 +14,7 @@ import './workspace-layout.css'
 import { Brand } from './Brand'
 import { Icon } from './Icons'
 
-import { roleLabels } from '../types/auth'
+import { SidebarAccount } from './SidebarAccount'
 
 import type { UserRole, UserSession } from '../types/auth'
 import type { DashboardData } from '../types/dashboard'
@@ -34,7 +34,7 @@ interface DashboardLayoutProps {
 const NAV_BY_ROLE = {
   student: [],
   admin: [
-    { label: 'Overview', slug: 'dashboard', icon: 'grid' },
+    { label: 'Dashboard', slug: 'dashboard', icon: 'grid' },
     { label: 'Users', slug: 'users', icon: 'users' },
     { label: 'Company access', slug: 'company-access', icon: 'building' },
     { label: 'Activity history', slug: 'activity-history', icon: 'clock' },
@@ -46,7 +46,7 @@ const NAV_BY_ROLE = {
   ],
 
   coordinator: [
-    { label: 'Overview', slug: 'dashboard', icon: 'grid' },
+    { label: 'Dashboard', slug: 'dashboard', icon: 'grid' },
     { label: 'Students', slug: 'students', icon: 'users' },
     { label: 'Document review', slug: 'document-verification', icon: 'clipboard' },
     { label: 'Approved forms', slug: 'document-templates', icon: 'file' },
@@ -62,14 +62,14 @@ const NAV_BY_ROLE = {
   ],
 
   dean: [
-    { label: 'Program overview', slug: 'dashboard', icon: 'grid' },
+    { label: 'Dashboard', slug: 'dashboard', icon: 'grid' },
     { label: 'MOA partners', slug: 'moa-partners', icon: 'building' },
     { label: 'Completion & archive', slug: 'completion', icon: 'archive' },
     { label: 'Direct placements', slug: 'direct-placements', icon: 'route' },
   ],
 
   career_center: [
-    { label: 'Overview', slug: 'dashboard', icon: 'grid' },
+    { label: 'Dashboard', slug: 'dashboard', icon: 'grid' },
     { label: 'Companies', slug: 'companies', icon: 'building' },
     { label: 'Applications', slug: 'applications', icon: 'briefcase' },
     { label: 'Completion & archive', slug: 'completion', icon: 'archive' },
@@ -77,7 +77,7 @@ const NAV_BY_ROLE = {
   ],
 
   company: [
-    { label: 'Overview', slug: 'dashboard', icon: 'grid' },
+    { label: 'Dashboard', slug: 'dashboard', icon: 'grid' },
     { label: 'Intern monitoring', slug: 'interns', icon: 'users' },
     { label: 'Applications', slug: 'applications', icon: 'briefcase' },
     { label: 'Completion & archive', slug: 'completion', icon: 'archive' },
@@ -140,7 +140,7 @@ function DashboardWorkspace({
   const navItems = NAV_BY_ROLE[session.role]
 
   const sectionLabels: Record<string, string> = {
-    dashboard: 'Overview',
+    dashboard: 'Dashboard',
     users: 'Users',
     'company-access': 'Company access',
     'activity-history': 'Activity history',
@@ -163,8 +163,7 @@ function DashboardWorkspace({
     'help-center': 'Help center',
   }
 
-  const activeNav = navItems.find(item => item.slug === section)?.label ?? sectionLabels[section] ?? 'Overview'
-  const firstName = session.name || 'User'
+  const activeNav = navItems.find(item => item.slug === section)?.label ?? sectionLabels[section] ?? 'Dashboard'
 
   function goTo(nextSection: string) {
     if (nextSection === 'notifications') { setNotificationsOpen(true); setMobileNavOpen(false); return }
@@ -262,7 +261,7 @@ function DashboardWorkspace({
         }`}
       >
         <div className="sidebar-brand">
-          <Brand compact />
+          <Brand />
 
           <button
             type="button"
@@ -274,26 +273,7 @@ function DashboardWorkspace({
           </button>
         </div>
 
-        <div className="citc-sidebar-subtitle"><strong>CITC · USTP-CDO</strong><p>Academic Internship<br />Management System</p></div>
-
-        <div className="workspace-label">
-          YOUR WORKSPACE
-        </div>
-
-        <div className="workspace-switcher">
-          <span
-            className={`workspace-avatar workspace-avatar--${session.role}`}
-          >
-            {roleLabels[session.role].slice(0, 1)}
-          </span>
-
-          <span>
-            <strong>{roleLabels[session.role]}</strong>
-            <small>{session.role === 'company' ? 'Host Training Establishment' : 'CITC Internship Office'}</small>
-          </span>
-
-          <Icon name="chevron" size={16} />
-        </div>
+        <SidebarAccount session={session} />
 
         <div className="nav-label">MENU</div>
 
@@ -362,26 +342,6 @@ function DashboardWorkspace({
             <span className="workspace-nav-icon"><Icon name="help" size={18} /></span>
             <span className="workspace-nav-text">Help center</span>
           </button>
-
-          <div className="sidebar-user">
-            <span className="user-avatar">
-              {firstName.slice(0, 1).toUpperCase()}
-            </span>
-
-            <span className="sidebar-user-copy">
-              <strong>{firstName}</strong>
-              <small>{roleLabels[session.role]}</small>
-            </span>
-
-            <button
-              type="button"
-              className="logout-button"
-              onClick={onLogout}
-              aria-label="Sign out"
-            >
-              <Icon name="logout" size={17} />
-            </button>
-          </div>
         </div>
       </aside>
 
@@ -407,14 +367,16 @@ function DashboardWorkspace({
             <Icon name="menu" size={20} />
           </button>
 
-          <div className="breadcrumbs">
-            <span>Workspace</span>
-            <Icon name="chevron" size={14} />
-            <strong>{activeNav}</strong>
-          </div>
+          <strong className="topbar-page-title">{activeNav}</strong>
 
           <div className="topbar-actions">
-            <span className="citc-topbar-campus">CITC / USTP Cagayan de Oro</span>
+            {data.academic_year && data.semester && (
+              <span className="workspace-term">
+                <span>{session.role === 'dean' ? 'Current ' : ''}AY {data.academic_year}</span>
+                <span className="workspace-term-divider" aria-hidden="true"> · </span>
+                <span>Semester {data.semester}</span>
+              </span>
+            )}
             <NotificationCenter key={session.accessToken} session={session} open={notificationsOpen} onOpenChange={changeNotificationsOpen} onSettings={() => navigate(`/${WORKSPACE_SLUGS[session.role]}/settings`, { state: { settingsTab: 'notifications' } })} />
             <AccountMenu session={session} onLogout={onLogout} notificationsOpen={notificationsOpen} onOpen={() => { setNotificationsOpen(false); setMobileNavOpen(false) }} />
           </div>
@@ -422,7 +384,6 @@ function DashboardWorkspace({
 
         <div className="dashboard-content">
           <PageActivity section={section} />
-          {section === 'dashboard' && session.role !== 'dean' && data.academic_year && <section className="panel aims-reporting-term" aria-label="Reporting term" style={{ marginBottom: 18 }}><strong>AY {data.academic_year} · Semester {data.semester}</strong>{data.completion && <p>Active internships: {data.completion.deployed} · Coordinator approved: {data.completion.completed} · Grades released: {data.completion.grade_released}{data.completion.completed_legacy > 0 ? ` · Historical completed records: ${data.completion.completed_legacy}` : ''}</p>}<small>Internship activity uses this term and your access scope. Registered-account and partner inventories are labelled separately.</small></section>}
           {section === 'dtr-corrections' ? <DTRCorrectionsPage role={session.role} /> : section === 'settings' ? <WorkspaceSettings key={session.accessToken} session={session} onLogout={onLogout} adminOptions={session.role === 'admin' ? content : undefined} /> : content}
         </div>
       </main>

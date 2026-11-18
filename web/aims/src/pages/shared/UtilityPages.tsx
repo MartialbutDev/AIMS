@@ -22,11 +22,7 @@ export function HelpCenterPage({
     <section className="workspace-page">
       <div className="workspace-page-heading">
         <div>
-          <span className="welcome-eyebrow">
-            <span className="eyebrow-dot" /> SUPPORT
-          </span>
           <h1>Help center</h1>
-          <p>Guidance for navigating your AIMS workspace.</p>
         </div>
       </div>
 

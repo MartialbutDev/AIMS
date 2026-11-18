@@ -205,11 +205,7 @@ export function DocumentVerificationPage() {
     <main className="co-page dv-page"><ActivityViewed categories={['onboarding']} studentIds={queue.map(item => item.student.id)} ready={!loading && !error} recordIds={queue.filter(item => !search || JSON.stringify(item).toLowerCase().includes(search.toLowerCase())).map(item => item.submission.id)} />
       <header className="dv-header">
         <div>
-          <span className="co-overline">
-            COORDINATOR WORKSPACE · ONBOARDING
-          </span>
-
-          <h1>Document verification</h1>
+          <h1>Onboarding document verification</h1>
 
           <p>
             Review Orientation Certificates and CORs that

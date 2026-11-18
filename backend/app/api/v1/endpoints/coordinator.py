@@ -8,12 +8,11 @@ import math
 import mimetypes
 import os
 from datetime import date, datetime
-from decimal import Decimal
 from typing import Optional, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -49,14 +48,10 @@ REQUIRED_DOCUMENT_TYPES = (
 
 
 class EvaluationInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
     academic_year: str = Field(pattern=r"^\d{4}-\d{4}$")
     semester: Literal["1", "2"]
-    grade: Decimal = Field(
-        ge=Decimal("1.00"),
-        le=Decimal("5.00"),
-        max_digits=3,
-        decimal_places=2,
-    )
     notes: Optional[str] = Field(
         default=None,
         max_length=5000,
@@ -315,20 +310,9 @@ async def list_students(
         Application.student_id.in_(student_ids), Application.academic_year == year, Application.semester == semester
     ).all()
 
-    evaluations = db.query(CoordinatorEvaluation).filter(
-        CoordinatorEvaluation.coordinator_id == current_user.id,
-        CoordinatorEvaluation.student_id.in_(student_ids),
-        CoordinatorEvaluation.academic_year == year, CoordinatorEvaluation.semester == semester,
-    ).all()
-
     docs_by_student: dict[str, list[Document]] = {}
     dtrs_by_student: dict[str, list[DTR]] = {}
     apps_by_student: dict[str, list[Application]] = {}
-
-    evaluations_by_student = {
-        evaluation.student_id: evaluation
-        for evaluation in evaluations
-    }
 
     for document in documents:
         docs_by_student.setdefault(
@@ -405,11 +389,6 @@ async def list_students(
             },
             "journey": _hours_summary(
                 dtrs_by_student.get(student.id, []), db, student.id, year, semester
-            ),
-            "grade": (
-                float(evaluations_by_student[student.id].grade)
-                if student.id in evaluations_by_student
-                else None
             ),
         })
 
@@ -595,7 +574,6 @@ async def get_student_detail(
         ],
         "evaluation": (
             {
-                "grade": float(evaluation.grade),
                 "notes": evaluation.notes,
                 "updated_at": evaluation.updated_at,
             }
@@ -627,23 +605,22 @@ async def save_student_evaluation(
     ).first()
 
     if evaluation is None:
+        if not evaluation_data.notes:
+            raise HTTPException(422, "Enter review notes before saving.")
         evaluation = CoordinatorEvaluation(
             coordinator_id=current_user.id,
             student_id=student.id,
             academic_year=year, semester=semester,
-            grade=evaluation_data.grade,
             notes=evaluation_data.notes,
         )
         db.add(evaluation)
     else:
-        evaluation.grade = evaluation_data.grade
         evaluation.notes = evaluation_data.notes
 
     db.commit()
     db.refresh(evaluation)
 
     return {
-        "grade": float(evaluation.grade),
         "notes": evaluation.notes,
         "updated_at": evaluation.updated_at,
     }

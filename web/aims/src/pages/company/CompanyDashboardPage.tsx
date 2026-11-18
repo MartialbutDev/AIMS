@@ -1,3 +1,4 @@
+import { internshipMetrics } from '../../services/analyticsService'
 import { useState } from 'react'
 import { Icon } from '../../components/Icons'
 import type { DashboardData } from '../../types/dashboard'
@@ -11,13 +12,21 @@ interface CompanyDashboardPageProps {
 export function CompanyDashboardPage({ data, name, onNavigate }: CompanyDashboardPageProps) {
   const [checked, setChecked] = useState<string[]>([])
   const max = Math.max(1, ...data.chartValues.filter(Number.isFinite))
+  const metrics = [...data.metrics, ...internshipMetrics(data)]
   return (
     <section className="workspace-page stake-company-page">
-      <header className="stake-page-heading"><div><span className="stake-kicker">CITC / HOST TRAINING ESTABLISHMENT</span><h1>Your next intern.<br /><em>Their next chapter.</em></h1><p>{name ? `${name}, welcome to your` : 'Welcome to your'} USTP industry partner workspace.</p></div><button type="button" className="stake-navy-button" onClick={() => onNavigate('applications')}>Open applicant desk <Icon name="arrow" size={18} /></button></header>
+      <header className="stake-page-heading"><div><h1>Company overview</h1><p>{name ? `${name}, welcome to your` : 'Welcome to your'} USTP industry partner workspace.</p></div><button type="button" className="stake-navy-button" onClick={() => onNavigate('applications')}>View applications <Icon name="arrow" size={18} /></button></header>
 
       <section className="stake-employer-desk" aria-label="Company application workspace">
-        <div className="stake-employer-mission"><span className="stake-kicker">LEARNING BEYOND THE CLASSROOM</span><h2>Make room for<br />tomorrow's professionals.</h2><p>Review student applications and help turn academic preparation into practical experience.</p><button type="button" className="stake-yellow-button" onClick={() => onNavigate('applications')}>Review student applications <Icon name="arrow" size={17} /></button></div>
-        <div className="stake-employer-register"><span className="stake-kicker">AT YOUR ESTABLISHMENT</span>{data.metrics.length ? data.metrics.map(metric => <div className="stake-employer-metric" key={metric.label}><span><Icon name={metric.icon} size={19} /><span>{metric.label}<small>{metric.change}</small></span></span><strong>{metric.value}</strong></div>) : <p className="stake-note">Company metrics will appear when available.</p>}</div>
+        <div className="stake-employer-mission">
+          <span className="stake-kicker">LEARNING BEYOND THE CLASSROOM</span>
+          <h2>Make room for<br />tomorrow's professionals.</h2>
+          <p>Invite endorsed applicants for an interview or record an acceptance or rejection. The coordinator approves deployment after your company accepts.</p>
+          <button type="button" className="stake-yellow-button" onClick={() => onNavigate('applications')}>
+            Review student applications <Icon name="arrow" size={17} />
+          </button>
+        </div>
+        <div className="stake-employer-register"><span className="stake-kicker">AT YOUR ESTABLISHMENT</span>{metrics.length ? metrics.map(metric => <div className="stake-employer-metric" key={metric.label}><span><Icon name={metric.icon} size={19} /><span>{metric.label}<small>{metric.change}</small></span></span><strong>{metric.value}</strong></div>) : <p className="stake-note">Company metrics will appear when available.</p>}</div>
       </section>
 
       <nav className="stake-employer-links" aria-label="Partner workspace shortcuts"><button type="button" onClick={() => onNavigate('interns')}><Icon name="briefcase" size={22} /><span><strong>Intern monitoring</strong><small>Attendance, approved hours, and submitted journals</small></span><Icon name="arrow" size={17} /></button><button type="button" onClick={() => onNavigate('applications')}><Icon name="users" size={22} /><span><strong>Applicant desk</strong><small>Review student interest in your establishment</small></span><Icon name="arrow" size={17} /></button><button type="button" onClick={() => onNavigate('notifications')}><Icon name="bell" size={22} /><span><strong>University updates</strong><small>Stay connected with internship announcements</small></span><Icon name="arrow" size={17} /></button></nav>

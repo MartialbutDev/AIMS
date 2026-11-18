@@ -13,7 +13,6 @@ import { InternMonitoringPage } from './InternMonitoringPage'
 import { CompanyDashboardPage } from './CompanyDashboardPage'
 import { ApplicationsPage } from './ApplicationsPage'
 import { NotificationsPage } from './NotificationsPage'
-import { DeveloperInfoPage } from './DeveloperInfoPage'
 
 interface CompanyPagesProps {
   section: string
@@ -61,11 +60,6 @@ export function CompanyPages({
 
     case 'notifications':
       return <NotificationsPage />
-
-    // DEVELOPER INFORMATION
-
-    case 'developer-info':
-      return <DeveloperInfoPage />
 
     // ACCOUNT SETTINGS
 

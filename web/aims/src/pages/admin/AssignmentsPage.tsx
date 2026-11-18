@@ -217,11 +217,6 @@ export function AssignmentsPage() {
 
       <div className="workspace-page-heading">
         <div>
-          <span className="welcome-eyebrow">
-            <span className="eyebrow-dot" />
-            COORDINATOR ROSTERS
-          </span>
-
           <h1>Student Assignments</h1>
 
           <p>

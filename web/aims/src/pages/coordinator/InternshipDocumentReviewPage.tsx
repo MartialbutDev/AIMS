@@ -222,11 +222,7 @@ export function InternshipDocumentReviewPage() {
     <main className="co-page dv-page"><ActivityViewed categories={['documents']} ready={!loading && !error} recordIds={documents.filter(item => !search || JSON.stringify(item).toLowerCase().includes(search.toLowerCase())).map(item => item.id)} />
       <header className="dv-header">
         <div>
-          <span className="co-overline">
-            COORDINATOR WORKSPACE · INTERNSHIP DOCUMENTS
-          </span>
-
-          <h1>Internship document verification</h1>
+          <h1>Internship documents</h1>
 
           <p>
             Review internship documents submitted by your

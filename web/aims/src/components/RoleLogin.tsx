@@ -35,9 +35,9 @@ export function RoleLogin({ role, isSigningIn, onBack, onLogin }: RoleLoginProps
       <section className="citc-workspace" aria-labelledby="login-heading">
         <header className="citc-workspace-top"><span>CITC INTERNSHIP PORTAL</span><span className="citc-access-label"><span />Authorized access</span></header>
         <div className="citc-workspace-content citc-login-content">
-          <button className="citc-back" type="button" onClick={onBack} disabled={isSigningIn}><Icon name="arrow" size={17} />All workspaces</button>
+          <button className="citc-back" type="button" onClick={onBack} disabled={isSigningIn}><Icon name="arrow" size={17} />Change role</button>
           <div className="citc-login-role"><Icon name={role === 'admin' ? 'settings' : role === 'dean' ? 'chart' : role === 'company' || role === 'career_center' ? 'briefcase' : 'users'} size={25} /></div>
-          <p className="citc-overline">{roleLabels[role]} WORKSPACE</p>
+          <p className="citc-overline">{roleLabels[role]} sign-in</p>
           <h1 id="login-heading">Welcome back<span>.</span></h1>
           <p className="citc-intro">{roleDescriptions[role]}</p>
           <form className="citc-login-form" onSubmit={handleSubmit} aria-busy={isSigningIn}>

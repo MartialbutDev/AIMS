@@ -38,9 +38,9 @@ const slides = [
     steps: [
       { icon: 'business-outline', label: 'Company confirmation' },
       { icon: 'people-outline', label: 'Coordinator final approval' },
-      { icon: 'school-outline', label: 'Released grades & archive' },
+      { icon: 'school-outline', label: 'Completed internship archive' },
     ],
-    note: 'Completion approval and final grade release are separate steps.',
+    note: 'Check USTP PRISM for your official internship grade.',
   },
 ] as const;
 

@@ -37,7 +37,6 @@ import { CompletionPage } from '../shared/CompletionPage'
 import { AssignmentsPage } from './AssignmentsPage'
 import { CoordinatorManagement } from './CoordinatorManagement'
 import { NotificationsPage } from './NotificationsPage'
-import { DeveloperInfoPage } from './DeveloperInfoPage'
 import { SettingsPage } from './SettingsPage'
 import { AdminUserDialog } from './UserDialog'
 
@@ -327,14 +326,6 @@ export function AdminPages({
           usersError={usersError}
         />
       )
-      break
-
-    // ========================================
-    // DEVELOPER INFORMATION
-    // ========================================
-
-    case 'developer-info':
-      content = <DeveloperInfoPage />
       break
 
     // ========================================

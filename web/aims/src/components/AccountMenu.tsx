@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { roleLabels, type UserSession } from '../types/auth'
 import { Icon } from './Icons'
+import { AccountAvatar } from './AccountAvatar'
 import './account-menu.css'
 
 export function AccountMenu({ session, onLogout, notificationsOpen, onOpen }: { session: UserSession; onLogout: () => void; notificationsOpen: boolean; onOpen: () => void }) {
@@ -32,17 +33,20 @@ export function AccountMenu({ session, onLogout, notificationsOpen, onOpen }: { 
     items[next]?.focus()
   }}>
     <button type="button" ref={trigger} className="aims-account-trigger" aria-label="Account menu" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (open) close(); else { onOpen(); setOpenedAt(identity) } }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); onOpen(); setOpenedAt(identity) } }}>
-      <span className="aims-account-initial" aria-hidden="true">{(session.name.trim() || session.email).slice(0, 1).toUpperCase()}</span><span className="aims-account-chevron" aria-hidden="true"><Icon name="chevron" size={13} /></span>
+      <AccountAvatar className="aims-account-initial" session={session.role === 'student' ? { ...session, avatarPath: null } : session} /><span className="aims-account-chevron" aria-hidden="true"><Icon name="chevron" size={13} /></span>
     </button>
     {open && <div className="aims-account-panel" id={id} role="menu" aria-label="Your account">
       <div className="aims-account-identity" role="presentation"><strong>{session.name}</strong><span>{session.email}</span><small>{roleLabels[session.role]}</small></div>
       <Link role="menuitem" to={session.role === 'student' ? `${base}/profile` : `${base}/settings`} state={{ settingsTab: 'account' }} onClick={close}><Icon name="users" size={18} /><span>Profile</span></Link>
       <Link role="menuitem" to={`${base}/settings`} onClick={close}><Icon name="settings" size={18} /><span>Settings</span></Link>
-      <button type="button" role="menuitem" onClick={() => { close(); navigate(`${base}/settings`, { state: { settingsTab: 'notifications' } }) }}><Icon name="bell" size={18} /><span>Notification preferences</span></button>
+      <button type="button" role="menuitem" onClick={() => {
+        close()
+        if (session.role === 'student') navigate('/student/settings?tab=notifications')
+        else navigate(`${base}/settings`, { state: { settingsTab: 'notifications' } })
+      }}><Icon name="bell" size={18} /><span>Notification preferences</span></button>
       <Link role="menuitem" to={`${base}/help-center`} onClick={close}><Icon name="help" size={18} /><span>Help & support</span></Link>
       <div className="aims-account-divider" role="separator" />
-      <button type="button" role="menuitem" className="aims-account-logout" onClick={() => { close(); onLogout() }}><Icon name="logout" size={18} /><span>Log out</span></button>
+      <button type="button" role="menuitem" className="aims-account-logout" onClick={() => { close(); onLogout() }}><Icon name="logout" size={18} /><span>Sign out</span></button>
     </div>}
   </div>
 }
-

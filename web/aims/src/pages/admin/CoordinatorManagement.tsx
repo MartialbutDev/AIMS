@@ -287,11 +287,6 @@ export function CoordinatorManagement() {
 
       <div className="dean-designations-heading">
         <div>
-          <span className="welcome-eyebrow">
-            <span className="eyebrow-dot" />
-            FACULTY ASSIGNMENTS
-          </span>
-
           <h2>Coordinator Management</h2>
 
           <p>
@@ -489,10 +484,6 @@ export function CoordinatorManagement() {
               <div>
                 <h3>Faculty designations</h3>
 
-                <p>
-                  View active and inactive coordinator
-                  designations across academic terms.
-                </p>
               </div>
             </div>
 

@@ -41,8 +41,8 @@ class TermManagementTests(unittest.TestCase):
     def assign(self,payload=None):return self.client.post('/users/coordinator-assignments',json=payload or self.payload())
     def history(self,student='s3'):
         self.db.add(Assignment(id='past-'+student,coordinator_id='c1',student_id=student,academic_year='2025-2026',semester='2'));self.db.commit()
-    def assess(self,semester='1',grade=1.5):
-        self.actor='c1';return self.client.put('/coordinator/students/s1/evaluation',json={'academic_year':'2026-2027','semester':semester,'grade':grade,'notes':'Internal assessment fixture'})
+    def assess(self,semester='1',notes='First-term review',**extra):
+        self.actor='c1';return self.client.put('/coordinator/students/s1/evaluation',json={'academic_year':'2026-2027','semester':semester,'notes':notes,**extra})
     def test_assign_saves_current_term_and_duplicate_error_is_accurate(self):
         r=self.assign();self.assertEqual(r.status_code,201,r.text)
         row=self.db.query(Assignment).filter_by(student_id='s3').one();self.assertEqual((row.academic_year,row.semester),('2026-2027','1'))
@@ -74,18 +74,27 @@ class TermManagementTests(unittest.TestCase):
         self.assertEqual(r.status_code,500);self.assertNotIn('already assigned',r.text)
     def test_assessment_saves_term_and_preserves_legacy_grade(self):
         self.db.add(Evaluation(id='legacy',coordinator_id='c1',student_id='s1',grade=1.25));self.db.commit()
-        self.history('s1');r=self.assess();self.assertEqual(r.status_code,200,r.text)
+        self.history('s1')
+        self.assertEqual(self.assess(notes='  ').status_code,422)
+        r=self.assess();self.assertEqual(r.status_code,200,r.text)
         self.assertEqual(self.db.get(Evaluation,'legacy').academic_year,None)
         self.assertEqual(float(self.db.get(Evaluation,'legacy').grade),1.25)
-        current=self.db.query(Evaluation).filter_by(academic_year='2026-2027',semester='1').one();self.assertEqual(float(current.grade),1.5)
+        current=self.db.query(Evaluation).filter_by(academic_year='2026-2027',semester='1').one()
+        self.assertIsNone(current.grade);self.assertEqual(current.notes,'First-term review')
+        self.assertNotIn('grade',r.json())
+        self.assertEqual(self.assess(grade=2.5).status_code,422)
+        current.grade=1.75;self.db.commit()
+        self.assertEqual(self.assess(notes='Revised notes').status_code,200)
+        self.assertEqual(float(current.grade),1.75)
+        self.assertEqual(current.notes,'Revised notes')
     def test_assessments_in_two_semesters_are_independent(self):
         self.assertEqual(self.assess().status_code,200)
         self.db.add(Assignment(id='next',coordinator_id='c1',student_id='s1',academic_year='2026-2027',semester='2'))
         self.db.add(Designation(id='next-des',coordinator_id='c1',assigned_by_dean_id='admin',academic_year='2026-2027',semester='2',is_active=True));self.db.commit()
         with patch.object(settings,'CURRENT_SEMESTER','2'):
-            self.assertEqual(self.assess('2',2.0).status_code,200)
-            detail=self.client.get('/coordinator/students/s1').json();self.assertEqual(detail['evaluation']['grade'],2.0)
-        self.assertEqual({r.semester:float(r.grade) for r in self.db.query(Evaluation).all()},{'1':1.5,'2':2.0})
+            self.assertEqual(self.assess('2','Second-term review').status_code,200)
+            detail=self.client.get('/coordinator/students/s1').json();self.assertEqual(detail['evaluation']['notes'],'Second-term review');self.assertNotIn('grade',detail['evaluation'])
+        self.assertEqual({r.semester:r.notes for r in self.db.query(Evaluation).all()},{'1':'First-term review','2':'Second-term review'})
     def test_stale_assessment_cannot_overwrite_current_or_legacy_grade(self):
         self.assertEqual(self.assess('2').status_code,409);self.assertEqual(self.db.query(Evaluation).count(),0)
     def test_current_dtr_review_works_with_history_but_past_record_stays_locked(self):
@@ -103,4 +112,3 @@ class TermManagementTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
-

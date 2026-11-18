@@ -7,7 +7,7 @@ export function Notice({ error, message, retry, retrying }: { error?: string; me
   return <>{error && <p className="sw-notice error" role="alert">{error}</p>}{retry && <button disabled={retrying} onClick={retry}>Retry previous submission</button>}{message && <p className="sw-notice success" role="status">{message}</p>}</>
 }
 export function Badge({ value }: { value?: string | null }) { return <span className={`sw-badge ${['verified', 'approved', 'accepted', 'deployed', 'completed', 'current_approved'].includes(value || '') ? 'good' : ['rejected', 'declined', 'withdrawn', 'approval_revoked'].includes(value || '') ? 'bad' : 'neutral'}`}>{human(value)}</span> }
-export function Heading({ eyebrow = 'YOUR INTERNSHIP', title, description, children }: { eyebrow?: string; title: string; description: string; children?: ReactNode }) { return <header className="sw-heading"><div><p className="sw-eyebrow">{eyebrow}</p><h1>{title}</h1><p>{description}</p></div>{children}</header> }
+export function Heading({ title, description, children }: { title: string; description?: string; children?: ReactNode }) { return <header className="sw-heading"><div><h1>{title}</h1>{description && <p>{description}</p>}</div>{children}</header> }
 export function Empty({ children }: { children: ReactNode }) { return <p className="sw-empty">{children}</p> }
 export function Loading() { return <p className="sw-empty" role="status">Loading your records…</p> }
 export function Term({ year, semester }: { year?: string; semester?: string }) { return <span className="sw-term">AY {year || '—'} · Semester {semester || '—'}</span> }

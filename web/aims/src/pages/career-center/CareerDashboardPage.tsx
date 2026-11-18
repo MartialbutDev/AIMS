@@ -1,3 +1,4 @@
+import { internshipMetrics } from '../../services/analyticsService'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Icon } from '../../components/Icons'
@@ -10,7 +11,6 @@ import './career-center-ui.css'
 
 interface CareerDashboardPageProps {
   data: DashboardData
-  name: string
   onNavigate: (section: string) => void
 }
 
@@ -33,7 +33,6 @@ function daysRemaining(date: string) {
 
 export function CareerDashboardPage({
   data,
-  name,
   onNavigate,
 }: CareerDashboardPageProps) {
   const [companies, setCompanies] = useState<CareerCompany[]>([])
@@ -104,19 +103,10 @@ export function CareerDashboardPage({
     <main className="cc-page">
       <header className="cc-page-header">
         <div>
-          <div className="cc-eyebrow">
-            <span className="cc-eyebrow-dot" />
-            CITC / INDUSTRY LINKAGES
-          </div>
-
           <h1>
-            Partnerships with a purpose.
+            Career Center overview
           </h1>
 
-          <p>
-            Monitor internship partnerships, agreement status,
-            and the latest Career Center activities.
-          </p>
         </div>
 
         <div className="cc-header-actions">
@@ -141,7 +131,13 @@ export function CareerDashboardPage({
       </header>
 
       <section className="stake-career-brief" aria-label="Partnership agreement priorities">
-        <div><span className="stake-kicker">THE INDUSTRY PARTNERSHIP DESK</span><h2>Build the bridge from<br />campus to the workplace.</h2><p>{name ? (name + ', keep') : 'Keep'} host establishments and agreements ready for the next student placement.</p><button type="button" className="stake-yellow-button" onClick={() => onNavigate('companies')}>Open partnership directory <Icon name="arrow" size={17} /></button></div>
+        <div>
+          <h2>Partner companies</h2>
+          <p>Manage company profiles and signed MOAs for student placements.</p>
+          <button type="button" className="stake-yellow-button" onClick={() => onNavigate('companies')}>
+            View partner companies <Icon name="arrow" size={17} />
+          </button>
+        </div>
         <div className="stake-renewal-brief"><span>Agreement watch</span><strong>{loading || error ? '—' : stats.expiring.length}<small>expiring within 30 days</small></strong><p>{loading ? 'Checking partnership records…' : error ? 'Agreement status is unavailable.' : (stats.expired + ' expired · ' + stats.pending + ' unsigned')}</p><button type="button" onClick={() => onNavigate('companies')}>Review agreements <Icon name="arrow" size={16} /></button></div>
       </section>
 
@@ -167,15 +163,21 @@ export function CareerDashboardPage({
             <span className="cc-stat-detail">{detail}</span>
           </article>
         ))}
+        {internshipMetrics(data).map(metric => (
+          <article className="cc-stat-card" key={metric.label}>
+            <span className="cc-stat-label">{metric.label}</span>
+            <strong className="cc-stat-value">{metric.value}</strong>
+            <span className="cc-stat-detail">{metric.change}</span>
+          </article>
+        ))}
       </section>
 
       <section className="cc-bottom-grid stake-partnership-grid">
-        <article className="cc-card cc-info-card">
+        <article className="cc-card cc-info-card cc-application-records">
           <div className="cc-section-header">
             <div>
               <span className="cc-section-kicker">RECENT UPDATES</span>
               <h2>Application Activity</h2>
-              <p>Latest internship-related records.</p>
             </div>
             <button
               type="button"
@@ -295,4 +297,3 @@ export function CareerDashboardPage({
     </main>
   )
 }
-

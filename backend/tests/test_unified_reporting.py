@@ -77,12 +77,11 @@ class UnifiedReportingTests(unittest.TestCase):
         self.assertEqual(result['average_ojt_completion_percent'],100)
         self.assertEqual(result['average_document_completion_percent'],100)
         self.f.completed();self.assertEqual(self.dean()['fully_complete_students'],1)
-        self.f.action('grade',grade=1.5,notes='Private feedback');self.f.action('release-grade')
-        company=self.dashboard('hte');self.assertEqual(company['completion']['grade_released'],1)
-        self.assertNotIn('Private feedback',str(company));self.assertNotIn('released_grade',str(company))
+        company=self.dashboard('hte');self.assertEqual(company['completion']['completed'],1)
+        self.assertNotIn('grade_released',company['completion'])
         self.f.action('reopen',reason='Correct the internship record.')
         self.assertEqual(self.dean()['fully_complete_students'],0)
-        self.assertEqual(self.dashboard('c1')['completion']['grade_released'],0)
+        self.assertEqual(self.dashboard('c1')['completion']['completed'],0)
 
     def test_legacy_completed_is_separate(self):
         self.f.deployment.status=DeploymentStatus.COMPLETED;self.db.commit()

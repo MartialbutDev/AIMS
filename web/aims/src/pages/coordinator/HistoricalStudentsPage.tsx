@@ -90,10 +90,6 @@ export function HistoricalStudentsPage({
     <section className="workspace-page coordinator-workspace">
       <div className="workspace-page-heading">
         <div>
-          <span className="welcome-eyebrow">
-            <span className="eyebrow-dot" />
-            COORDINATOR WORKSPACE
-          </span>
           <h1>Historical students</h1>
           <p>
             Review your previous-semester student assignments.

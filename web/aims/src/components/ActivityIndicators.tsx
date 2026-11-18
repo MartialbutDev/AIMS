@@ -5,7 +5,7 @@ import { apiRequest } from '../services/apiClient'
 import { notificationChanged } from '../hooks/useNotificationCount'
 import './activity-indicators.css'
 
-export type ActivityCategory = 'documents' | 'onboarding' | 'attendance' | 'journals' | 'applications' | 'deployment' | 'completion' | 'grades' | 'placements' | 'corrections' | 'forms' | 'assignments' | 'coordinators' | 'company_access'
+export type ActivityCategory = 'documents' | 'onboarding' | 'attendance' | 'journals' | 'applications' | 'deployment' | 'completion' | 'placements' | 'corrections' | 'forms' | 'assignments' | 'coordinators' | 'company_access'
 interface Bucket { unread: { id: string; record_id: string | null; student_id?: string | null }[]; pending_records: string[]; pending_label: string }
 interface Summary { academic_year: string; semester: string; sections: Partial<Record<ActivityCategory, Bucket>>; students: Record<string, Partial<Record<ActivityCategory, Bucket>>> }
 interface ContextValue { role: UserSession['role']; data: Summary | null; error: string; refresh: () => void; acknowledge: (ids: string[]) => Promise<void> }

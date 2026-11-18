@@ -58,10 +58,10 @@ export function NotificationPreferences({ session }: { session: UserSession }) {
   return <div className="aims-settings-stack" aria-label="Notification preferences">
     {error && <p className="account-error" role="alert">{error} <button onClick={() => setRetry(value => value + 1)}>Retry</button></p>}
     {message && <p className="account-success" role="status">{message}</p>}
-    <section className="panel aims-settings-panel"><h2>Pop-up alerts in this browser</h2><p>Small alerts appear in the corner when new updates arrive while AIMS is open. Updates refresh about every 15 seconds and when you return to the tab.</p>
+    <section className="panel aims-settings-panel"><h2>Pop-up alerts in this browser</h2>
       <label className="aims-settings-toggle"><input type="checkbox" checked={web.enabled} onChange={event => saveBrowser('enabled', event.target.checked)} /><span><strong>Show in-app toast notifications</strong><small>Saved for your account in this browser. Existing notifications remain in the bell.</small></span></label>
       <label className="aims-settings-toggle"><input type="checkbox" checked={web.previews} disabled={!web.enabled} onChange={event => saveBrowser('previews', event.target.checked)} /><span><strong>Show message previews in alerts</strong><small>Turn off to hide notification titles and messages in pop-up alerts.</small></span></label>
-      <p className="aims-settings-note">These alerts appear inside AIMS. They do not appear on the Windows desktop after the website is closed.</p>
+      <p className="aims-settings-note">Pop-up alerts appear while AIMS is open.</p>
     </section>
     <div className="aims-settings-columns">
       <section className="panel aims-settings-panel"><h2>Phone notifications</h2>{settings && delivery ? <><p>{delivery.registered_devices} registered {delivery.registered_devices === 1 ? 'device' : 'devices'}. {delivery.push_delivery_enabled ? 'Phone delivery is enabled on the server.' : 'Phone delivery is awaiting server activation.'}</p><label className="aims-settings-toggle"><input type="checkbox" checked={settings.push_enabled === true} disabled={busy} onChange={event => void save('push_enabled', event.target.checked)} /><span><strong>Allow phone push notifications</strong><small>Applies to your registered mobile devices.</small></span></label><p>Register or reconnect your phone in the mobile app’s notification preferences.</p></> : <p>Loading phone preferences…</p>}</section>

@@ -8,7 +8,7 @@ export interface Workload {
 }
 export interface DeanAnalytics extends AcademicTerm {
   generated_at: string
-  overview: Record<'students_in_oversight' | 'awaiting_deployment' | 'active_interns' | 'pending_completion' | 'approved_completion' | 'grades_released', number>
+  overview: Record<'students_in_oversight' | 'awaiting_deployment' | 'active_interns' | 'pending_completion' | 'approved_completion', number>
   stages: { key: string; label: string; count: number }[]
   workloads: Workload[]
   attention: { key: AttentionCategory; label: string; student_count: number }[]

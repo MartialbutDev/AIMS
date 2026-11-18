@@ -311,5 +311,6 @@ router.include_router(password_reset.router, prefix='/auth/password-reset/otp', 
 
 router.include_router(dean_coordinators.legacy_router)
 
-from app.api.v1.endpoints import dtr_corrections
+from app.api.v1.endpoints import attendance_absences, dtr_corrections
 router.include_router(dtr_corrections.router)
+router.include_router(attendance_absences.router)

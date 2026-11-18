@@ -10,6 +10,7 @@ from fastapi import (
     Form,
 )
 
+import pymupdf
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
@@ -48,6 +49,26 @@ MAX_JOURNAL_SIZE_BYTES = 15 * 1024 * 1024
 # HELPERS
 # ============================================================
 
+def _validate_journal_pdf(data: bytes) -> None:
+    if not data.startswith(b"%PDF-"):
+        raise HTTPException(400, "Only valid PDF files are allowed for journals.")
+
+    try:
+        with pymupdf.open(stream=data, filetype="pdf") as pdf:
+            if not pdf.is_pdf:
+                raise ValueError("Not a PDF")
+            if pdf.needs_pass:
+                raise HTTPException(400, "Upload a PDF without password protection.")
+            if pdf.page_count < 1:
+                raise HTTPException(400, "The journal PDF must contain at least one readable page.")
+            if pdf.load_page(0).rect.is_empty or pdf.is_repaired:
+                raise ValueError("Invalid PDF page or repaired structure")
+    except (RuntimeError, ValueError, pymupdf.mupdf.FzErrorBase) as exc:
+        raise HTTPException(
+            400, "The journal PDF could not be opened. Export a fresh PDF and try again."
+        ) from exc
+
+
 def _save_journal_pdf(
     upload: UploadFile,
 ) -> str:
@@ -67,15 +88,15 @@ def _save_journal_pdf(
     if upload.size is not None and upload.size > MAX_JOURNAL_SIZE_BYTES:
         raise HTTPException(413, "File too large. Max 15 MB")
 
-    relative = Path("journal_uploads") / f"{uuid.uuid4()}{ext}"
-    size = 0
     upload.file.seek(0)
+    data = upload.file.read(MAX_JOURNAL_SIZE_BYTES + 1)
+    if len(data) > MAX_JOURNAL_SIZE_BYTES:
+        raise HTTPException(413, "File too large. Max 15 MB")
+    _validate_journal_pdf(data)
+
+    relative = Path("journal_uploads") / f"{uuid.uuid4()}{ext}"
     with staged_file(Path(settings.ASSET_DIR) / relative) as output:
-        while chunk := upload.file.read(1024 * 1024):
-            size += len(chunk)
-            if size > MAX_JOURNAL_SIZE_BYTES:
-                raise HTTPException(413, "File too large. Max 15 MB")
-            output.write(chunk)
+        output.write(data)
     return relative.as_posix()
 
 
@@ -798,7 +819,7 @@ async def update_journal(
     "/{journal_id}/file",
     response_model=JournalResponse,
 )
-async def replace_journal_file(
+def replace_journal_file(
     journal_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),

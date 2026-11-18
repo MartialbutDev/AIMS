@@ -77,6 +77,15 @@ export interface Eligibility { allowed: boolean; reason: string | null; academic
 export interface ChecklistItem { document_type: string; label: string; required: boolean; document_id?: string; status: string }
 export interface Deployment { id: string; application_id: string; company_id: string; company_name?: string; academic_year: string; semester: string; status: string; confirmed_at?: string; deployment_date?: string; checklist?: { items: ChecklistItem[]; ready_for_deployment: boolean } }
 export interface Dtr extends AttendanceReviewFields { id: string; date: string; time_in: string; time_out: string | null; status: string; total_hours?: number; hours?: number; hours_rendered?: number; tasks_completed?: string; notes?: string; feedback?: string; latitude?: number | null; longitude?: number | null; location_address?: string | null }
+export interface TodayAttendanceSchedule {
+  date: string
+  status: 'regular_shift' | 'shift_change' | 'holiday' | 'approved_absence' | 'company_holiday'
+    | 'day_off' | 'no_schedule' | 'not_started' | 'not_deployed'
+  clock_in_at: string | null
+  clock_out_at: string | null
+  clock_in_block_reason?: string | null
+}
+
 export interface DtrSummary { total_entries: number; pending: number; submitted: number; approved: number; rejected: number; total_hours: number; required_hours: number | null; remaining_hours: number | null; progress_percent: number | null; current_company?: string; program_notice?: string | null }
 export interface Journal { id: string; week: number; title: string; summary?: string; status: string; feedback?: string; submitted_date?: string }
 export interface ReportSummary { academic_year: string; semester: string; applications: number; documents: number; dtr_count: number; journals: number; total_hours: number; status_distribution: Record<string, number> }

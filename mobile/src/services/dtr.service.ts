@@ -30,6 +30,15 @@ export interface DTR {
   approved_date?: string;
 }
 
+export interface TodayAttendanceSchedule {
+  date: string
+  status: 'regular_shift' | 'shift_change' | 'holiday' | 'approved_absence' | 'company_holiday'
+    | 'day_off' | 'no_schedule' | 'not_started' | 'not_deployed'
+  clock_in_at: string | null
+  clock_out_at: string | null
+  clock_in_block_reason?: string | null
+}
+
 export interface DTRSummary {
   total_entries: number;
   pending: number;
@@ -82,6 +91,11 @@ export const dtrService = {
       console.error('❌ Get DTR error:', error.response?.data || error.message);
       return { items: [], total: 0, page, limit, total_pages: 0 };
     }
+  },
+
+  async getTodaySchedule(signal: AbortSignal): Promise<TodayAttendanceSchedule> {
+    const { data } = await api.get<TodayAttendanceSchedule>('/dtr/today-schedule', { signal });
+    return data;
   },
 
   async getDTRSummary(): Promise<DTRSummary> {

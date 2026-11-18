@@ -53,24 +53,11 @@
 .sw-sidebar .brand {
   color:white;
 }
-.sw-sidebar .brand small {
-  color:#bac1d6;
-  font-size:9px;
-  letter-spacing:.05em;
-}
 .sw-sidebar .brand strong {
   color:white;
 }
 .sw-sidebar .brand-image {
   border-radius:10px;
-}
-.sw-workspace-label {
-  color:#ffcf4b;
-  border-bottom:1px solid #ffffff24;
-  letter-spacing:.15em;
-  text-transform:uppercase;
-  font-size:10px;
-  padding:16px 9px;
 }
 .sw-sidebar nav {
   flex:1;
@@ -143,19 +130,6 @@
   outline-color:var(--sw-gold);
   outline-offset:-2px;
 }
-.sw-signout {
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:9px;
-  color:#dce1f0;
-  background:transparent;
-  border:1px solid #ffffff30;
-  padding:9px;
-  border-radius:8px;
-  margin-top:16px;
-}
-.sw-signout:hover { background:#ffffff10; }
 .sw-main {
   margin-left:265px;
   min-width:0;
@@ -1117,3 +1091,7 @@
   .sw-related a { padding:8px; flex-wrap:wrap; }
   .sw-related a>.activity-badges { flex-basis:100%; max-width:none; justify-content:flex-end; }
 }
+
+.sw-today-shift { display:flex; flex-wrap:wrap; gap:12px 28px; margin:12px 0 0; }
+.sw-today-shift dt { font-size:13px; }
+.sw-today-shift dd { margin:4px 0 0; font-weight:700; }

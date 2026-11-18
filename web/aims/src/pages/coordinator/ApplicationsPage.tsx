@@ -167,7 +167,6 @@ export function ApplicationsPage() {
     <main className="co-page co-review-page">
       <header className="co-review-header">
         <div>
-          <span className="co-overline">COORDINATOR WORKSPACE · REVIEW CENTER</span>
           <h1>Internship review center</h1><ActivityViewed categories={[activityCategory]} ready={!loading && !error} recordIds={records.map(item => item.id)} revision={lastUpdated?.getTime()} />
           <p>Review applications, verify daily time records, and assess weekly journals for your assigned students.</p>
           {lastUpdated && <span className="co-review-updated">Last refreshed {lastUpdated.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>}

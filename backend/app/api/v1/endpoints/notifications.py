@@ -9,7 +9,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models.notification import Notification, NotificationType
 from app.models.notification_campaign import NotificationCampaign
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.notification import (
     AdminNotificationCampaignCreate,
     AdminNotificationCampaignResponse,
@@ -18,6 +18,7 @@ from app.schemas.notification import (
 )
 from app.services.notification_campaign_service import deliver_campaign
 from app.services.notification_service import NotificationService
+from app.services.push_service import notification_route
 
 router = APIRouter()
 
@@ -144,7 +145,7 @@ async def get_notifications(
     current_user: User = Depends(get_current_user)
 ):
     """Get user's notifications"""
-    
+
     notifications = NotificationService.get_user_notifications(
         db=db,
         user_id=current_user.id,
@@ -152,7 +153,7 @@ async def get_notifications(
         limit=limit,
         unread_only=unread_only
     )
-    
+
     return notifications
 
 
@@ -162,10 +163,10 @@ async def get_notification_count(
     current_user: User = Depends(get_current_user)
 ):
     """Get notification counts"""
-    
+
     total = db.query(Notification).filter(Notification.user_id == current_user.id).count()
     unread = NotificationService.get_unread_count(db=db, user_id=current_user.id)
-    
+
     return NotificationCountResponse(total=total, unread=unread)
 
 
@@ -197,19 +198,19 @@ async def mark_as_read(
     current_user: User = Depends(get_current_user)
 ):
     """Mark a notification as read"""
-    
+
     notification = NotificationService.mark_as_read(
         db=db,
         notification_id=notification_id,
         user_id=current_user.id
     )
-    
+
     if not notification:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Notification not found"
         )
-    
+
     return notification
 
 
@@ -219,12 +220,12 @@ async def mark_all_as_read(
     current_user: User = Depends(get_current_user)
 ):
     """Mark all notifications as read"""
-    
+
     count = NotificationService.mark_all_as_read(
         db=db,
         user_id=current_user.id
     )
-    
+
     return {"message": f"{count} notifications marked as read"}
 
 
@@ -235,19 +236,19 @@ async def delete_notification(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a notification"""
-    
+
     deleted = NotificationService.delete_notification(
         db=db,
         notification_id=notification_id,
         user_id=current_user.id
     )
-    
+
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Notification not found"
         )
-    
+
     return {"message": "Notification deleted successfully"}
 
 @router.get('/detail/{notification_id}', response_model=NotificationResponse)
@@ -255,4 +256,7 @@ async def notification_detail(notification_id: str, db: Session = Depends(get_db
     notice = db.query(Notification).filter_by(id=notification_id, user_id=current_user.id).first()
     if notice is None:
         raise HTTPException(404, 'Notification not found')
-    return notice
+    response = NotificationResponse.model_validate(notice)
+    if current_user.role == UserRole.STUDENT:
+        response.data = {**(response.data or {}), 'route': notification_route(notice)}
+    return response

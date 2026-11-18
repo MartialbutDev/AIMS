@@ -99,7 +99,7 @@ def confirm_orientation_context(identification: dict, header: str, content: str)
         return identification
     return {**identification, 'status': 'matched', 'detected_type': 'orientation',
             'candidates': ['orientation'], 'method': 'header_first_with_content_confirmation',
-            'message': 'Certificate header identified; OJT/Internship Orientation event confirmed in the body. Institution and registered student name must also match.',
+            'message': 'Certificate header identified; Internship orientation confirmed in the body. Institution and registered student name must also match.',
             'content_confirmation': 'orientation_event'}
 
 

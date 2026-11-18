@@ -421,6 +421,24 @@ async def update_user(
         raise
 
 
+@router.delete("/avatar")
+@router.post("/avatar/delete")
+def delete_avatar(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    db.refresh(current_user, with_for_update=True)
+    old_url = current_user.avatar_url
+    if not old_url:
+        raise HTTPException(status_code=404, detail="No avatar found")
+
+    current_user.avatar_url = None
+    db.commit()
+    _remove_previous_avatar(db, current_user.id, old_url)
+    return {"message": "Avatar deleted successfully"}
+
+
+# Keep the specific avatar DELETE route above this parameterized route.
 @router.delete("/{user_id}")
 async def delete_user(
     user_id: str,
@@ -523,20 +541,3 @@ def _remove_previous_avatar(db: Session, user_id: str, old_url: str | None) -> N
             old_path.unlink(missing_ok=True)
     except Exception:
         logging.getLogger(__name__).exception("Unable to clean up the previous avatar")
-
-
-@router.delete("/avatar")
-@router.post("/avatar/delete")
-def delete_avatar(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    db.refresh(current_user, with_for_update=True)
-    old_url = current_user.avatar_url
-    if not old_url:
-        raise HTTPException(status_code=404, detail="No avatar found")
-
-    current_user.avatar_url = None
-    db.commit()
-    _remove_previous_avatar(db, current_user.id, old_url)
-    return {"message": "Avatar deleted successfully"}

@@ -1,3 +1,4 @@
+import { internshipMetrics } from '../../services/analyticsService'
 import { useState } from 'react'
 import { Icon } from '../../components/Icons'
 import type { DashboardData, DashboardMetric } from '../../types/dashboard'
@@ -10,7 +11,7 @@ interface CoordinatorDashboardPageProps {
 }
 
 const shortcuts = [
-  { number: '01', icon: 'users', title: 'Student records', detail: 'Monitor hours, documents, and evaluations', route: 'students' },
+  { number: '01', icon: 'users', title: 'Student records', detail: 'Review hours, documents, and journals', route: 'students' },
   { number: '02', icon: 'file', title: 'Document review', detail: 'Verify internship requirements', route: 'document-verification' },
   { number: '03', icon: 'briefcase', title: 'Applications', detail: 'Follow student placement progress', route: 'applications' },
 ] as const
@@ -34,7 +35,7 @@ export function CoordinatorDashboardPage({ data, name, onNavigate }: Coordinator
   return (
     <div className="co-page co-dashboard">
       <div className="citc-page-intro">
-        <div><span className="citc-eyebrow">CITC · USTP CAGAYAN DE ORO</span><h1>Coordinator overview</h1><p>A clearer view of every student's internship journey.</p></div>
+        <div><span className="citc-eyebrow">CITC · USTP CAGAYAN DE ORO</span><h1>Coordinator overview</h1></div>
         <span className="citc-date"><Icon name="clock" size={16} />{date}</span>
       </div>
 
@@ -42,18 +43,16 @@ export function CoordinatorDashboardPage({ data, name, onNavigate }: Coordinator
         <div className="citc-welcome-copy">
           <span className="citc-hero-kicker">CONNECTING LEARNING WITH EXPERIENCE</span>
           <h2>{data.greeting}, {name || 'Coordinator'}.</h2>
-          <p>{data.subtitle || 'Guide your students from their first application to a successful internship.'}</p>
-          <button className="citc-gold-button" type="button" onClick={() => onNavigate('students')}>Open student workspace <Icon name="arrow" size={17} /></button>
+          <button className="citc-gold-button" type="button" onClick={() => onNavigate('students')}>View students <Icon name="arrow" size={17} /></button>
         </div>
         <div className="citc-pathway" aria-label="Internship process">
           <span className="citc-pathway-label">THE INTERNSHIP JOURNEY</span>
           <ol><li><span>1</span>Application</li><li><span>2</span>Requirements</li><li><span>3</span>Deployment</li><li><span>4</span>Completion</li></ol>
-          <small>Support your students. Keep their progress in view.</small>
         </div>
       </section>
 
       <section className="citc-metrics" aria-label="Internship overview metrics">
-        {data.metrics.map(metric => {
+        {[...data.metrics, ...internshipMetrics(data)].map(metric => {
           const route = destination(metric)
           const content = <><div className="citc-metric-top"><span className={`citc-icon-tile co-tone-${metric.tone}`}><Icon name={metric.icon} size={20} /></span><span>{metric.label}</span>{route && <Icon name="arrow" size={16} />}</div><strong>{metric.value}</strong><small>{metric.change}</small></>
           return route
@@ -62,9 +61,9 @@ export function CoordinatorDashboardPage({ data, name, onNavigate }: Coordinator
         })}
       </section>
 
-      <div className="citc-section-heading"><div><span className="citc-eyebrow">YOUR WORKSPACE</span><h2>Where would you like to start?</h2></div><span>Current student assignments</span></div>
+      <div className="citc-section-heading"><div><h2>Quick actions</h2></div><span>Current student assignments</span></div>
       <section className="citc-shortcuts" aria-label="Coordinator quick actions">
-        {shortcuts.map(item => <button type="button" key={item.route} onClick={() => onNavigate(item.route)}><div className="citc-shortcut-top"><Icon name={item.icon} size={23} /><span>{item.number}</span></div><h3>{item.title}</h3><p>{item.detail}</p><span className="citc-shortcut-link">Open workspace <Icon name="arrow" size={16} /></span></button>)}
+        {shortcuts.map(item => <button type="button" key={item.route} onClick={() => onNavigate(item.route)}><div className="citc-shortcut-top"><Icon name={item.icon} size={23} /><span aria-hidden="true">{item.number}</span></div><h3>{item.title}</h3><p>{item.detail}</p><span className="citc-shortcut-footer" aria-hidden="true">Open section <Icon name="arrow" size={16} /></span></button>)}
       </section>
 
       <section className="citc-work-grid">

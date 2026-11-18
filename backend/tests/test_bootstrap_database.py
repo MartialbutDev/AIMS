@@ -65,7 +65,8 @@ class BootstrapTests(unittest.TestCase):
         with e.begin() as c:
             bootstrap(c);self.assertTrue({'internship_deployments','internship_completion_cases','auth_sessions','login_attempt_limits','submission_receipts'}<=set(inspect(c).get_table_names()))
             self.assertTrue({'academic_requirements','academic_requirement_events'}<=set(inspect(c).get_table_names()))
-            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'r48b02df94bd')
+            self.assertTrue({'internship_attendance_schedules','internship_attendance_exceptions','internship_reminder_receipts','company_attendance_holidays','attendance_absence_requests'}<=set(inspect(c).get_table_names()))
+            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'w93a57ce49ac')
         e.dispose()
     def test_login_throttle_migration_creates_expiry_index_on_existing_installation(self):
         engine = create_engine("sqlite://")
@@ -74,12 +75,59 @@ class BootstrapTests(unittest.TestCase):
         with engine.begin() as connection:
             config.attributes["connection"] = connection
             command.stamp(config, "p26f80bd72fb")
-            command.upgrade(config, "head")
+            command.upgrade(config, "r48b02df94bd")
             indexes = inspect(connection).get_indexes("login_attempt_limits")
             self.assertIn(["expires_at"], [index["column_names"] for index in indexes])
             self.assertEqual(
                 connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one(),
                 "r48b02df94bd",
+            )
+
+    def test_notes_migration_preserves_previous_grades(self):
+        engine = create_engine("sqlite://")
+        self.addCleanup(engine.dispose)
+        config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            connection.exec_driver_sql(
+                "CREATE TABLE coordinator_evaluations (id TEXT PRIMARY KEY, grade NUMERIC(3, 2) NOT NULL, notes TEXT)"
+            )
+            connection.exec_driver_sql("INSERT INTO coordinator_evaluations VALUES ('legacy', 1.25, 'Existing feedback')")
+            command.stamp(config, "r48b02df94bd")
+            command.upgrade(config, "s59c13ea05ce")
+            connection.exec_driver_sql("INSERT INTO coordinator_evaluations (id, notes) VALUES ('current', 'Review notes')")
+            grades = dict(connection.exec_driver_sql("SELECT id, grade FROM coordinator_evaluations").all())
+            self.assertEqual(grades, {"legacy": 1.25, "current": None})
+            with self.assertRaisesRegex(RuntimeError, "reviews without grades"):
+                command.downgrade(config, "r48b02df94bd")
+
+    def test_reminder_migration_preserves_an_existing_deployment(self):
+        engine = create_engine("sqlite://")
+        self.addCleanup(engine.dispose)
+        config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            connection.exec_driver_sql("CREATE TABLE users (id VARCHAR(36) PRIMARY KEY)")
+            connection.exec_driver_sql("CREATE TABLE internship_deployments (id VARCHAR(36) PRIMARY KEY)")
+            connection.exec_driver_sql("CREATE TABLE companies (id VARCHAR(36) PRIMARY KEY)")
+            connection.exec_driver_sql("INSERT INTO internship_deployments VALUES ('active-internship')")
+            command.stamp(config, "s59c13ea05ce")
+            command.upgrade(config, "head")
+            self.assertEqual(
+                inspect(connection).get_pk_constraint("internship_reminder_receipts")["constrained_columns"],
+                ["deployment_id", "kind", "period"],
+            )
+            self.assertTrue(inspect(connection).has_table("internship_attendance_schedules"))
+            self.assertEqual(
+                inspect(connection).get_pk_constraint("company_attendance_holidays")["constrained_columns"],
+                ["company_id", "workday"],
+            )
+            self.assertEqual(
+                inspect(connection).get_pk_constraint("internship_attendance_exceptions")["constrained_columns"],
+                ["deployment_id", "workday"],
+            )
+            self.assertEqual(
+                connection.exec_driver_sql("SELECT id FROM internship_deployments").scalar_one(), "active-internship",
             )
 
     def test_existing_database_is_refused_without_stamping_or_changing_records(self):
@@ -133,6 +181,3 @@ class BootstrapTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
-
-
-

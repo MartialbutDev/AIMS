@@ -134,8 +134,6 @@ def snapshot(db, actor, year, semester):
         elif dep and dep.status == DeploymentStatus.COMPLETED:
             approved = bool(case and case.status == 'completed' and case.approved_by and case.approved_at)
             stage = 'approved' if approved else 'legacy_completed'
-            if approved and case.grade_released_at and case.released_grade:
-                totals['grades_released'] += 1
         elif dep and dep.status == DeploymentStatus.DEPLOYED:
             active = True
             pending = bool(case and case.status in ('requested', 'company_confirmed', 'returned'))
@@ -175,7 +173,7 @@ def snapshot(db, actor, year, semester):
             'company_name': companies.get(company_id), 'stage': STAGES[stage], 'issues': issues,
             'review_items': sum(counts.values()) + completion_review})
     return {**reporting.term_metadata(year, semester), 'generated_at': datetime.now(timezone.utc).isoformat(),
-        'overview': {key: totals[key] for key in ('students_in_oversight', 'awaiting_deployment', 'active_interns', 'pending_completion', 'approved_completion', 'grades_released')},
+        'overview': {key: totals[key] for key in ('students_in_oversight', 'awaiting_deployment', 'active_interns', 'pending_completion', 'approved_completion')},
         'stages': [{'key': key, 'label': label, 'count': stage_counts[key]} for key, label in STAGES.items()],
         'workloads': list(workloads.values()),
         'attention': [{'key': key, 'label': label, 'student_count': sum(key in row['issues'] for row in rows)} for key, label in CATEGORIES.items()],

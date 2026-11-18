@@ -117,7 +117,7 @@ const guideContents: Record<string, GuideContent> = {
       {
         "title": "Journals and completion",
         "icon": "ribbon-outline",
-        "content": "Approved journals satisfy the relevant part of your completion checklist. Journals alone do not complete your internship, release your grade or replace company confirmation and coordinator final approval."
+        "content": "Approved journals satisfy the relevant part of your completion checklist. Journals alone do not complete your internship or replace company confirmation and coordinator final approval."
       }
     ]
   },
@@ -164,9 +164,9 @@ const guideContents: Record<string, GuideContent> = {
         "content": "Submit your completion request when eligible. Your company supervisor reviews and confirms the internship, including the required completion evidence. If returned, read the reason, address it and use the available resubmission action. Enough hours alone do not approve completion."
       },
       {
-        "title": "Final approval, grade and archive",
+        "title": "Final approval and archive",
         "icon": "school-outline",
-        "content": "After company confirmation, your coordinator makes the final completion decision. Final grade release is a separate action; see the grade only when released. The completed internship is retained in the archive. Ordinary edits may be locked to protect that history; ask your coordinator about corrections rather than starting another record."
+        "content": "After company confirmation, your coordinator makes the final completion decision. Check USTP PRISM for your official internship grade. The completed internship is retained in the archive. Ordinary edits may be locked to protect that history; ask your coordinator about corrections rather than starting another record."
       }
     ]
   }

@@ -639,17 +639,10 @@ export function NotificationsPage({
 
         <div className="workspace-page-heading">
           <div>
-            <span className="welcome-eyebrow">
-              <span className="eyebrow-dot" />
-              ADMIN MESSAGING
-            </span>
-
             <h1>Announcements</h1>
 
             <p>
-              Send important updates to individual
-              users or groups immediately, or
-              schedule them for later.
+              Send a notification now or schedule it.
             </p>
           </div>
         </div>
@@ -1057,10 +1050,6 @@ export function NotificationsPage({
             <div>
               <h2>Sent Notifications</h2>
 
-              <p>
-                View notification delivery history
-                and associated deadlines.
-              </p>
             </div>
 
             <strong className="dean-panel-total">

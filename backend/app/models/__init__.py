@@ -87,3 +87,4 @@ from app.models.dtr_correction import DTRCorrection
 from app.models.login_limit import LoginAttemptLimit
 
 from app.models.submission_receipt import SubmissionReceipt
+from app.models.internship_reminder import AttendanceAbsenceRequest, AttendanceReminderSchedule, AttendanceScheduleException, CompanyAttendanceHoliday, InternshipReminderReceipt

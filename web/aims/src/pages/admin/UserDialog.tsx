@@ -93,9 +93,6 @@ export function AdminUserDialog({
 
             <h2 id="add-user-title">Add New User</h2>
 
-            <p>
-              Create an account for an AIMS stakeholder.
-            </p>
           </div>
 
           <button

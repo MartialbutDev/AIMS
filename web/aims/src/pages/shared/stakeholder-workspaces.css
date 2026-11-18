@@ -2,8 +2,6 @@
 .aims-campus-workspace { --aims-navy:#0b0b2f; --aims-yellow:#ffcf40; --aims-ink:#202246; --aims-muted:#656780; --aims-line:#e2e3ec; --aims-paper:#f6f6fa; --blue:#0b0b2f; --ink:#202246; }
 .aims-campus-workspace .sidebar { background:#0b0b2f; }
 .aims-campus-workspace .brand-mark span { background:#ffcf40; }
-.aims-campus-workspace .citc-sidebar-subtitle strong { color:#ffcf40; }
-.aims-campus-workspace .workspace-avatar { background:#ffffff14; color:#ffcf40; }
 .aims-campus-workspace .nav-item--active { background:#ffcf40; color:#0b0b2f; }
 .aims-campus-workspace .nav-item--active:hover { background:#ffdb70; color:#0b0b2f; }
 .aims-campus-workspace .dashboard-main { background:var(--aims-paper); }
@@ -63,8 +61,7 @@
 .stake-admin-register small { display:block; font-size:11px; color:#656780; line-height:1.7; margin-top:5px; }
 .stake-admin-register button > svg { color:#0b0b2f; }
 .stake-admin-register button:hover strong { text-decoration:underline; }
-.aims-role-admin .admin-dashboard-metric { padding:20px; border-top:3px solid #d9d9ec; }
-.aims-role-admin .admin-dashboard-metric:first-child { border-top-color:#0b0b2f; }
+.aims-role-admin .admin-dashboard-metric { padding:20px; }
 .aims-role-admin .admin-dashboard-metric-value { color:#0b0b2f; font-family:Manrope,sans-serif; }
 .aims-role-admin .admin-dashboard-tasks-panel { background:#fffdf4; border-color:#e9dfbd; }
 .aims-role-admin .admin-dashboard-task-marker { background:#fff1be; color:#745b12; }
@@ -103,8 +100,6 @@
 .stake-renewal-brief small { display:block; margin-top:8px; font:400 12px 'DM Sans','Segoe UI',sans-serif; color:#656780; }
 .stake-renewal-brief p { color:#656780; }
 .stake-renewal-brief > button { display:flex; align-items:center; justify-content:space-between; width:100%; border:0; border-top:1px solid #e2e3ec; background:none; padding:16px 0 0; color:#0b0b2f; font-size:12px; font-weight:700; cursor:pointer; }
-.aims-role-career_center .cc-stat-card { border-bottom:3px solid #e5e5ef; }
-.aims-role-career_center .cc-stat-card:nth-last-child(-n+2) { border-bottom-color:#d9b13a; }
 .aims-role-career_center .cc-stat-value { color:#0b0b2f; }
 .aims-role-career_center .stake-partnership-grid { grid-template-columns:1fr 1.35fr; }
 .aims-role-career_center .stake-partnership-grid > article:first-child { order:2; }

@@ -37,7 +37,7 @@ export function DeanPartnersPage() {
     ['Expired MOAs', companies.filter(c => c.moa_status === 'expired').length],
   ] as const
   return <div className="dean-partners">
-    <header className="dean-partners__hero"><div><span>CITC · DEAN’S OFFICE</span><h1>Industry & MOA partners</h1><p>Know which partnerships are ready for student placement and which need attention.</p></div><strong>Read-only directory</strong></header>
+    <header className="dean-partners__hero"><div><h1>Industry & MOA partners</h1><p>Know which partnerships are ready for student placement and which need attention.</p></div><strong>Read-only directory</strong></header>
     <section className="dean-partners__metrics" aria-label="Partnership overview">{cards.map(([label, count]) => <article key={label}><span>{label}</span><strong>{loading || error ? '—' : count}</strong></article>)}</section>
     <section className="dean-partners__panel">
       <div className="dean-partners__heading"><div><h2>Partnership directory</h2><p>Agreement records are maintained by the Career Center and administrator.{data && ` Status as of ${date(data.asOf)} (Philippine time).`}</p></div><button onClick={refresh} disabled={loading}>Refresh</button></div>

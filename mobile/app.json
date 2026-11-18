@@ -2,7 +2,7 @@
   "expo": {
     "name": "AIMS",
     "slug": "aims",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -20,7 +20,7 @@
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 13,
+      "versionCode": 14,
       "adaptiveIcon": {
         "backgroundColor": "#0b0b2f",
         "foregroundImage": "./assets/images/aims-identity-icon.png"
@@ -50,7 +50,8 @@
       "expo-secure-store",
       "@react-native-community/datetimepicker",
       "expo-notifications",
-      "./plugins/with-aims-network"
+      "./plugins/with-aims-network",
+      "./plugins/with-aims-launcher-icon"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,0 +1,15 @@
+.attendance-absences { min-width:0; padding:clamp(16px,2vw,24px); border:1px solid #e2e3ec; border-radius:12px; background:#fff; color:#202246; }
+.attendance-absence-heading,.attendance-absence-actions { display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:10px 16px; }
+.attendance-absences h2 { margin:0; font-size:17px; }
+.attendance-absences p { margin:10px 0; line-height:1.5; overflow-wrap:anywhere; }
+.attendance-absences > ul { margin:14px 0 0; padding:0; list-style:none; }
+.attendance-absences li { border-top:1px solid #e2e3ec; padding:12px 0; overflow-wrap:anywhere; }
+.attendance-absence-form { display:grid; gap:12px; max-width:520px; margin-top:12px; }
+.attendance-absence-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr)); gap:12px; }
+.attendance-absence-form label { display:grid; gap:6px; min-width:0; }
+.attendance-absence-form :is(input,select,textarea) { width:100%; min-width:0; box-sizing:border-box; padding:9px 10px; border:1px solid #d8dbe6; border-radius:8px; font:inherit; }
+.attendance-absence-actions { justify-content:flex-start; }
+.attendance-absences button:not([class]) { padding:8px 12px; min-height:40px; border:1px solid #d8dbe6; border-radius:8px; background:#fff; color:#202246; font:inherit; cursor:pointer; }
+.attendance-absence-status { padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; color:#745600; background:#fff2c9; }
+.attendance-absence-status.is-approved { color:#216747; background:#e8f5ed; }
+.attendance-absence-status.is-declined { color:#953240; background:#fff1f3; }

@@ -1,5 +1,14 @@
-import type { UserRole, UserSession } from '../types/auth'
+import { formatAccountName, type UserRole, type UserSession } from '../types/auth'
 import { apiRequest } from './apiClient'
+
+interface AuthUser {
+  email: string
+  first_name: string
+  middle_name?: string | null
+  last_name: string
+  role: string
+  avatar_url?: string | null
+}
 
 export async function signIn(
   role: UserRole,
@@ -10,12 +19,7 @@ export async function signIn(
   const response = await apiRequest<{
     access_token: string
     token_type: string
-    user: {
-      email: string
-      first_name: string
-      last_name: string
-      role: string
-    }
+    user: AuthUser
   }>(role === 'student' ? '/api/v1/auth/login/student' : '/api/v1/auth/login/web', {
     method: 'POST',
     body: JSON.stringify({ email: loginIdentifier, password, remember_me: keepSignedIn }),
@@ -27,18 +31,14 @@ export async function signIn(
   return {
     role,
     email: response.user.email,
-    name: `${response.user.first_name} ${response.user.last_name}`.trim(),
+    name: formatAccountName(response.user),
     accessToken: response.access_token,
+    avatarPath: response.user.avatar_url,
   }
 }
 
 export async function getCurrentUserSession(accessToken: string): Promise<UserSession> {
-  const user = await apiRequest<{
-    email: string
-    first_name: string
-    last_name: string
-    role: string
-  }>('/api/v1/auth/me', {
+  const user = await apiRequest<AuthUser>('/api/v1/auth/me', {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
   const role = user.role === 'hte_supervisor' ? 'company' : user.role
@@ -47,8 +47,9 @@ export async function getCurrentUserSession(accessToken: string): Promise<UserSe
   }
   return {
     email: user.email,
-    name: `${user.first_name} ${user.last_name}`.trim(),
+    name: formatAccountName(user),
     role: role as UserRole,
     accessToken,
+    avatarPath: user.avatar_url,
   }
 }

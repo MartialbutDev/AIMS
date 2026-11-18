@@ -55,7 +55,7 @@ export default function ReportsScreen() {
         reportService.getActivityDistribution(),
         reportService.getRecentActivity(5),
       ]);
-      
+
       setSummary(summaryData);
       setWeeklyProgress(progressData);
       setDistribution(distributionData);
@@ -76,7 +76,7 @@ export default function ReportsScreen() {
 
   const getReportCards = (): ReportCardProps[] => {
     if (!summary) return [];
-    
+
     return [
       {
         icon: "briefcase-outline",
@@ -295,7 +295,7 @@ export default function ReportsScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        {summary && <View style={[styles.summaryCard, { backgroundColor: colors.card }]}><Text style={{ color: colors.textPrimary, fontWeight: '700' }}>AY {summary.academic_year} · Semester {summary.semester}</Text><Text style={{ color: colors.textSecondary, marginTop: 8 }}>All totals and charts below use this academic term. The progress chart shows the latest eight weeks.</Text><Text style={{ color: colors.textPrimary, marginTop: 8 }}>Coordinator approved: {summary.completion.completed} · Grade released: {summary.completion.grade_released ? 'Yes' : 'Not yet'}</Text></View>}
+        {summary && <View style={[styles.summaryCard, { backgroundColor: colors.card }]}><Text style={{ color: colors.textPrimary, fontWeight: '700' }}>AY {summary.academic_year} · Semester {summary.semester}</Text><Text style={{ color: colors.textSecondary, marginTop: 8 }}>All totals and charts below use this academic term. The progress chart shows the latest eight weeks.</Text><Text style={{ color: colors.textPrimary, marginTop: 8 }}>Coordinator approved: {summary.completion.completed}</Text></View>}
 
         {summary && (
           <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
@@ -337,17 +337,17 @@ export default function ReportsScreen() {
               key={type}
               style={[
                 styles.chartButton,
-                { 
+                {
                   backgroundColor: selectedChart === type ? colors.primary : colors.card,
                   borderColor: selectedChart === type ? colors.primary : colors.border,
                 }
               ]}
               onPress={() => setSelectedChart(type as typeof selectedChart)}
             >
-              <Ionicons 
-                name={type === "progress" ? "trending-up-outline" : "pie-chart-outline"} 
-                size={18} 
-                color={selectedChart === type ? '#FFFFFF' : colors.textSecondary} 
+              <Ionicons
+                name={type === "progress" ? "trending-up-outline" : "pie-chart-outline"}
+                size={18}
+                color={selectedChart === type ? '#FFFFFF' : colors.textSecondary}
               />
               <Text
                 style={[
@@ -369,10 +369,10 @@ export default function ReportsScreen() {
             {activities.map((item, index) => (
               <View key={item.id} style={[styles.recentActivityItem, { borderBottomColor: colors.border }]}>
                 <View style={[styles.recentActivityIcon, { backgroundColor: `${colors.primary}10` }]}>
-                  <Ionicons 
-                    name={item.type === 'application' ? 'briefcase-outline' : item.type === 'dtr' ? 'calendar-outline' : 'book-outline'} 
-                    size={20} 
-                    color={colors.accent} 
+                  <Ionicons
+                    name={item.type === 'application' ? 'briefcase-outline' : item.type === 'dtr' ? 'calendar-outline' : 'book-outline'}
+                    size={20}
+                    color={colors.accent}
                   />
                 </View>
                 <View style={styles.recentActivityContent}>
@@ -382,11 +382,11 @@ export default function ReportsScreen() {
                     {new Date(item.created_at).toLocaleDateString()}
                   </Text>
                 </View>
-                <View style={[styles.recentActivityStatus, { 
-                  backgroundColor: item.status === 'approved' || item.status === 'accepted' ? '#10B98115' : '#F59E0B15' 
+                <View style={[styles.recentActivityStatus, {
+                  backgroundColor: item.status === 'approved' || item.status === 'accepted' ? '#10B98115' : '#F59E0B15'
                 }]}>
-                  <Text style={[styles.recentActivityStatusText, { 
-                    color: item.status === 'approved' || item.status === 'accepted' ? '#10B981' : '#F59E0B' 
+                  <Text style={[styles.recentActivityStatusText, {
+                    color: item.status === 'approved' || item.status === 'accepted' ? '#10B981' : '#F59E0B'
                   }]}>
                     {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                   </Text>

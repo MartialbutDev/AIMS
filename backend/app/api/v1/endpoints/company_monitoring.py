@@ -1,11 +1,11 @@
 from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours, hour_target
 """Read-only workplace monitoring for explicitly assigned HTE supervisors."""
 import math
-from datetime import date, datetime, time, timedelta
-from typing import Literal
+from datetime import date, datetime, time, timedelta, timezone
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -18,8 +18,10 @@ from app.models.dtr import DTR, DTRStatus
 from app.models.hte_supervisor_company import HTESupervisorCompany
 from app.models.internship_deployment import InternshipDeployment, DeploymentStatus
 from app.models.journal import Journal, JournalStatus
+from app.models.internship_reminder import AttendanceReminderSchedule, AttendanceScheduleException, CompanyAttendanceHoliday
 from app.models.user import User, UserRole
 from app.services.attendance_review import payload as attendance_payload
+from app.services.internship_reminders import company_holidays_available, exceptions_available, local_time, schedule_available
 
 router = APIRouter()
 
@@ -79,10 +81,66 @@ class JournalEntry(BaseModel):
     submitted_date: datetime
 
 
+class AttendanceSchedule(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    workdays: list[Annotated[int, Field(strict=True, ge=0, le=6)]] = Field(min_length=1, max_length=7)
+    clock_in_at: time
+    clock_out_at: time
+    enabled: bool = True
+
+    @field_validator("workdays")
+    @classmethod
+    def unique_days(cls, value):
+        if len(set(value)) != len(value):
+            raise ValueError("Choose each workday once.")
+        return sorted(value)
+
+    @model_validator(mode="after")
+    def same_day_shift(self):
+        _validate_shift(self.clock_in_at, self.clock_out_at)
+        return self
+
+
+def _validate_shift(clock_in_at: time, clock_out_at: time):
+    if any(value.tzinfo is not None or value.second or value.microsecond for value in (clock_in_at, clock_out_at)):
+        raise ValueError("Use Philippine local times with hours and minutes.")
+    if clock_out_at <= clock_in_at:
+        raise ValueError("Clock-out must be later than clock-in on the same day.")
+
+
+def _attendance_today() -> date:
+    return local_time(datetime.now(timezone.utc)).date()
+
+
+class AttendanceExceptionInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    kind: Literal["holiday", "approved_absence", "shift_change"]
+    clock_in_at: time | None = None
+    clock_out_at: time | None = None
+
+    @model_validator(mode="after")
+    def validate_times(self):
+        if self.kind == "shift_change":
+            if self.clock_in_at is None or self.clock_out_at is None:
+                raise ValueError("Enter both times for a shift change.")
+            _validate_shift(self.clock_in_at, self.clock_out_at)
+        elif self.clock_in_at is not None or self.clock_out_at is not None:
+            raise ValueError("Days off cannot have shift times.")
+        return self
+
+
+class AttendanceException(AttendanceExceptionInput):
+    workday: date
+
+
 class MonitoringDetail(BaseModel):
     intern: Intern
     records_available: bool
     notice: str | None = None
+    reminder_schedule: AttendanceSchedule | None = None
+    reminder_exceptions: list[AttendanceException] = Field(default_factory=list)
     required_hours: int | None
     hours_notice: str | None = None
     hours_status: str = 'configured'
@@ -100,14 +158,18 @@ class MonitoringDetail(BaseModel):
     limit: int
 
 
-def scoped_deployments(db: Session, actor: User):
+def _assigned_company_ids(db: Session, actor: User):
     if actor.role != UserRole.HTE_SUPERVISOR:
         raise HTTPException(status_code=403, detail="HTE supervisor access required")
-    year, semester = get_current_academic_term()
-    companies = db.query(HTESupervisorCompany.company_id).filter(
+    return db.query(HTESupervisorCompany.company_id).filter(
         HTESupervisorCompany.supervisor_id == actor.id,
         HTESupervisorCompany.is_active.is_(True),
     )
+
+
+def scoped_deployments(db: Session, actor: User):
+    companies = _assigned_company_ids(db, actor)
+    year, semester = get_current_academic_term()
     query = db.query(InternshipDeployment, User, Company).join(
         User, User.id == InternshipDeployment.student_id,
     ).join(Company, Company.id == InternshipDeployment.company_id).filter(
@@ -135,6 +197,68 @@ def intern_response(deployment, student, company) -> Intern:
         academic_year=deployment.academic_year,
         semester=deployment.semester,
     )
+
+
+class CompanyHolidaySchedule(BaseModel):
+    company_id: str
+    company_name: str
+    holidays: list[date]
+
+
+@router.get("/attendance/holidays", response_model=list[CompanyHolidaySchedule])
+def list_company_attendance_holidays(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    assigned = _assigned_company_ids(db, current_user)
+    if not company_holidays_available(db):
+        raise HTTPException(503, "Company holiday scheduling is unavailable.")
+    companies = db.query(Company.id, Company.name).filter(Company.id.in_(assigned)).order_by(Company.name, Company.id)
+    holidays = db.query(CompanyAttendanceHoliday.company_id, CompanyAttendanceHoliday.workday).filter(
+        CompanyAttendanceHoliday.company_id.in_(assigned),
+        CompanyAttendanceHoliday.workday >= _attendance_today(),
+    ).order_by(CompanyAttendanceHoliday.workday)
+    by_company: dict[str, list[date]] = {}
+    for company_id, workday in holidays:
+        by_company.setdefault(company_id, []).append(workday)
+    return [
+        CompanyHolidaySchedule(company_id=company_id, company_name=name, holidays=by_company.get(company_id, []))
+        for company_id, name in companies
+    ]
+
+
+def _lock_company_holiday_schedule(db: Session, actor: User, company_id: str, workday: date):
+    assigned = _assigned_company_ids(db, actor)
+    company = db.query(Company.id).filter(Company.id == company_id, Company.id.in_(assigned)).with_for_update().first()
+    if company is None:
+        raise HTTPException(404, "Assigned company not found.")
+    if workday < _attendance_today():
+        raise HTTPException(422, "Choose today or a future date.")
+    if not company_holidays_available(db):
+        raise HTTPException(503, "Company holiday scheduling is unavailable.")
+
+
+@router.put("/attendance/holidays/{company_id}/{workday}", status_code=204)
+def add_company_attendance_holiday(
+    company_id: str, workday: date, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    _lock_company_holiday_schedule(db, current_user, company_id, workday)
+    if db.get(CompanyAttendanceHoliday, (company_id, workday)) is None:
+        db.add(CompanyAttendanceHoliday(company_id=company_id, workday=workday, recorded_by=current_user.id))
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.delete("/attendance/holidays/{company_id}/{workday}", status_code=204)
+def remove_company_attendance_holiday(
+    company_id: str, workday: date, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    _lock_company_holiday_schedule(db, current_user, company_id, workday)
+    holiday = db.get(CompanyAttendanceHoliday, (company_id, workday))
+    if holiday is not None:
+        db.delete(holiday)
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/interns", response_model=InternPage)
@@ -200,6 +324,17 @@ def get_intern(
         result.notice = "Attendance and journal records cannot be attributed to one host company because this student has multiple deployments in the same academic term. Contact the school coordinator to reconcile the records."
         return result
 
+    if deployment.status == DeploymentStatus.DEPLOYED and schedule_available(db):
+        schedule = db.get(AttendanceReminderSchedule, deployment.id)
+        if schedule:
+            result.reminder_schedule = AttendanceSchedule.model_validate(schedule)
+            if exceptions_available(db):
+                exceptions = db.query(AttendanceScheduleException).filter(
+                    AttendanceScheduleException.deployment_id == deployment.id,
+                    AttendanceScheduleException.workday >= _attendance_today(),
+                ).order_by(AttendanceScheduleException.workday).all()
+                result.reminder_exceptions = [AttendanceException.model_validate(entry) for entry in exceptions]
+
     start = datetime.combine(deployment.deployment_date, time.min)
     attendance = db.query(DTR).filter(
         DTR.student_id == student.id, DTR.academic_year == year,
@@ -230,6 +365,88 @@ def get_intern(
         status=record.status.value, submitted_date=record.submitted_date,
     ) for record in journals.order_by(Journal.week.desc(), Journal.id).offset((journal_page - 1) * limit).limit(limit).all()]
     return result
+
+
+def _lock_active_reminder_deployment(db: Session, current_user: User, deployment_id: str):
+    query, _, _ = scoped_deployments(db, current_user)
+    entry = query.filter(
+        InternshipDeployment.id == deployment_id,
+        InternshipDeployment.status == DeploymentStatus.DEPLOYED,
+        User.is_active.is_(True),
+    ).with_for_update(of=InternshipDeployment).first()
+    if entry is None:
+        raise HTTPException(404, "Active intern deployment not found")
+    return entry[0]
+
+
+@router.put("/interns/{deployment_id}/attendance/reminder-schedule", response_model=AttendanceSchedule)
+def set_attendance_reminder_schedule(
+    deployment_id: str,
+    body: AttendanceSchedule,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _lock_active_reminder_deployment(db, current_user, deployment_id)
+    if not schedule_available(db):
+        raise HTTPException(503, "Attendance reminder scheduling is unavailable.")
+
+    schedule = db.get(AttendanceReminderSchedule, deployment_id)
+    if schedule is None:
+        schedule = AttendanceReminderSchedule(deployment_id=deployment_id)
+        db.add(schedule)
+    schedule.workdays = body.workdays
+    schedule.clock_in_at = body.clock_in_at
+    schedule.clock_out_at = body.clock_out_at
+    schedule.enabled = body.enabled
+    schedule.updated_by = current_user.id
+    db.commit()
+    return body
+
+
+def _require_reminder_exception_schedule(db: Session, current_user: User, deployment_id: str, workday: date):
+    deployment = _lock_active_reminder_deployment(db, current_user, deployment_id)
+    if not exceptions_available(db):
+        raise HTTPException(503, "Attendance schedule exceptions are unavailable.")
+    if workday < max(_attendance_today(), deployment.deployment_date):
+        raise HTTPException(422, "Choose today or a future date on or after the deployment start.")
+    if db.get(AttendanceReminderSchedule, deployment_id) is None:
+        raise HTTPException(409, "Save the attendance reminder schedule first.")
+
+
+@router.put("/interns/{deployment_id}/attendance/reminder-exceptions/{workday}", response_model=AttendanceException)
+def set_attendance_reminder_exception(
+    deployment_id: str,
+    workday: date,
+    body: AttendanceExceptionInput,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_reminder_exception_schedule(db, current_user, deployment_id, workday)
+    entry = db.get(AttendanceScheduleException, (deployment_id, workday))
+    if entry is None:
+        entry = AttendanceScheduleException(deployment_id=deployment_id, workday=workday)
+        db.add(entry)
+    entry.kind = body.kind
+    entry.clock_in_at = body.clock_in_at
+    entry.clock_out_at = body.clock_out_at
+    entry.updated_by = current_user.id
+    db.commit()
+    return AttendanceException(workday=workday, **body.model_dump())
+
+
+@router.delete("/interns/{deployment_id}/attendance/reminder-exceptions/{workday}", status_code=204)
+def remove_attendance_reminder_exception(
+    deployment_id: str,
+    workday: date,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_reminder_exception_schedule(db, current_user, deployment_id, workday)
+    entry = db.get(AttendanceScheduleException, (deployment_id, workday))
+    if entry is not None:
+        db.delete(entry)
+    db.commit()
+    return Response(status_code=204)
 
 
 class AttendanceDecision(BaseModel):

@@ -1,2 +1,10 @@
 .account-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;max-width:1080px}.account-form{display:flex;flex-direction:column;gap:18px;padding:28px;align-self:start}.account-form h2{margin:0;color:#0b0b2f}.account-form label{display:grid;gap:8px;font-size:13px;color:#424460}.account-form input,.account-form select{box-sizing:border-box;min-height:44px;border:1px solid #d7d8e4;border-radius:6px;padding:10px 12px;font:inherit;width:100%;background:#fff;color:#0b0b2f}.account-form input:disabled{background:#f3f3f8}.account-form p{font-size:12px;color:#686b80;line-height:1.8;margin:0}.account-form button{min-height:42px;font-size:13px}.account-error,.account-success{padding:16px;border-radius:6px;background:#fff0f1;color:#982b3b;line-height:1.7}.account-success{background:#edf8f0;color:#246443}@media(max-width:750px){.account-columns{grid-template-columns:1fr}.account-form{padding:22px}}
 .company-applicant-row{display:block!important;white-space:normal;line-height:1.9;font-size:13px!important;overflow-wrap:anywhere}.company-applicant-row strong{font-size:15px;display:block}.company-applicant-row small{font-size:11px;color:#777991}.company-applicant-row[aria-pressed="true"]{border-color:#0b0b2f;background:#f5f5fa}
+
+.account-photo-form { max-width: 1080px; margin-bottom: 24px; }
+.account-photo-layout { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 18px; }
+.account-photo-preview { display: grid; flex: none; place-items: center; width: 80px; height: 80px; border-radius: 50%; background: #fff3cc; color: #0b0b2f; font-size: 26px; font-weight: 800; }
+.account-photo-controls { display: grid; flex: 1 1 280px; gap: 8px; min-width: 0; }
+.account-photo-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.account-photo-form .account-error { color: #982b3b; }
+.account-photo-form .account-success { color: #246443; }
