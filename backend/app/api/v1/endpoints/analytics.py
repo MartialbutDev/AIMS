@@ -119,9 +119,6 @@ async def get_dean_analytics(
     by_coordinator = {c.id:set() for c in coordinators}
     for assignment in assignments: by_coordinator.setdefault(assignment.coordinator_id,set()).add(assignment.student_id)
     assigned_ids = set().union(*by_coordinator.values()) if by_coordinator else set()
-    genders = {key:0 for key in ('male','female','other','prefer_not_to_say','not_provided')}
-    for student in db.query(User).filter(User.id.in_(ids),User.role==UserRole.STUDENT):
-        genders[student.gender if student.gender in genders else 'not_provided']+=1
     required_types = tuple(DeploymentService.REQUIRED_DOCUMENTS)
     documents = reporting.term(db.query(Document),Document,year,semester).filter(Document.uploaded_by.in_(assigned_ids),
         Document.type.in_(required_types)).order_by(Document.created_at.desc(),Document.id.desc()).all()
@@ -149,7 +146,7 @@ async def get_dean_analytics(
     overview = dean_analytics.snapshot(db, current_user, year, semester)
     overview.pop('_details')
     return {**overview,'enrolled_student_count':len(ids),
-        'gender_distribution':genders,'assigned_student_count':len(assigned_ids),
+        'assigned_student_count':len(assigned_ids),
         'unassigned_student_count':len(ids-assigned_ids) if current_user.role==UserRole.ADMIN else None,
         'unassigned_students_available':current_user.role==UserRole.ADMIN,
         'completion':reporting.completion_counts(db,deps), **summary(assigned_ids),

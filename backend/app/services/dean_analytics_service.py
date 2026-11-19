@@ -82,6 +82,10 @@ def snapshot(db, actor, year, semester):
         owners[row.student_id].add(row.coordinator_id)
     students = db.query(User).filter(User.id.in_(owners), User.role == UserRole.STUDENT).order_by(User.last_name, User.first_name, User.id).all()
     ids = {s.id for s in students}
+    genders = {key: 0 for key in ('male', 'female', 'other', 'prefer_not_to_say', 'not_provided')}
+    for student in students:
+        key = student.gender if student.gender in genders else 'not_provided'
+        genders[key] += 1
     def records(model, field):
         return reporting.term(db.query(model), model, year, semester).filter(field.in_(ids))
 
@@ -176,6 +180,7 @@ def snapshot(db, actor, year, semester):
             'review_items': sum(counts.values()) + completion_review})
     return {**reporting.term_metadata(year, semester), 'generated_at': clock.isoformat(),
         'progress': progress.result(),
+        'gender_distribution': genders,
         'overview': {key: totals[key] for key in ('students_in_oversight', 'awaiting_deployment', 'active_interns', 'pending_completion', 'approved_completion')},
         'stages': [{'key': key, 'label': label, 'count': stage_counts[key]} for key, label in STAGES.items()],
         'workloads': list(workloads.values()),

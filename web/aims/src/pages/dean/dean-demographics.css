@@ -1,0 +1,19 @@
+.dean-demographics__rows { display:grid; gap:18px; }
+.dean-demographics__row { display:grid; grid-template-columns:150px minmax(0,1fr) 65px; gap:16px; align-items:center; }
+.dean-demographics__label { font-size:13px; font-weight:600; overflow-wrap:anywhere; }
+.dean-demographics__track { height:16px; border-radius:5px; overflow:hidden; background:#edf0f6; }
+.dean-demographics__fill { display:block; height:100%; background:var(--dean-navy); border-radius:5px; }
+.dean-demographics__fill--female { background:#b18400; }
+.dean-demographics__fill--other { background:#456e80; }
+.dean-demographics__fill--prefer_not_to_say { background:#76638c; }
+.dean-demographics__fill--not_provided { background:#8794a7; }
+.dean-demographics__value { text-align:right; }
+.dean-demographics__value strong { font-size:17px; }
+.dean-demographics__value small { font-variant-numeric:tabular-nums; }
+.dean-demographics__empty { font-size:13px; color:var(--dean-muted); line-height:1.7; }
+@media(max-width:640px) {
+  .dean-demographics__row { grid-template-columns:minmax(0,1fr) 60px; gap:8px 12px; }
+  .dean-demographics__label { grid-column:1; grid-row:1; }
+  .dean-demographics__value { grid-column:2; grid-row:1 / span 2; }
+  .dean-demographics__track { grid-column:1; grid-row:2; }
+}

@@ -8,7 +8,9 @@ export interface Workload {
   document_reviews: number; dtr_reviews: number; journal_reviews: number; completion_reviews: number; total_reviews: number
 }
 export type { InternshipProgress as DeanProgress } from '../types/internshipProgress'
+export type DeanGenderDistribution = Record<'male' | 'female' | 'other' | 'prefer_not_to_say' | 'not_provided', number>
 export interface DeanAnalytics extends AcademicTerm {
+  gender_distribution?: DeanGenderDistribution
   progress?: InternshipProgress
   generated_at: string
   overview: Record<'students_in_oversight' | 'awaiting_deployment' | 'active_interns' | 'pending_completion' | 'approved_completion', number>
