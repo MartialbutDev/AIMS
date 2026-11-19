@@ -13,6 +13,7 @@ semester designation.
 from __future__ import annotations
 
 import re
+from app.utils.orientation_certificate import generic_certificate_heading, orientation_participation, qualified_certificate_heading
 
 from typing import Any
 
@@ -458,7 +459,18 @@ def validate_orientation(
 
     compact = _compact(upper)
 
+    expected_year, _ = get_current_academic_term()
+    observed_year = _academic_year(upper)
+    observed_years = {
+        f"{start}-{end}"
+        for start, end in re.findall(r"\b(20\d{2})\s*[-\u2013]\s*(20\d{2})\b", upper)
+    }
+    year_matches = observed_years == {expected_year}
+
+
     checks = {
+
+        "academic_year_matches": True if year_matches else None,
 
         "institution_matches": (
 
@@ -466,20 +478,14 @@ def validate_orientation(
 
         ),
 
-        "document_is_certificate": any(
-
-            f"CERTIFICATEOF{kind}" in compact
-
-            for kind in (
-
-                "PARTICIPATION",
-
-                "ATTENDANCE",
-
-                "COMPLETION",
-
+        "document_is_certificate": (
+            True if qualified_certificate_heading(text)
+            else None if (
+                any(f"CERTIFICATEOF{kind}" in compact
+                    for kind in ("PARTICIPATION", "ATTENDANCE", "COMPLETION"))
+                or (generic_certificate_heading(text) and orientation_participation(text))
             )
-
+            else False
         ),
 
         "mentions_orientation": bool(
@@ -502,7 +508,7 @@ def validate_orientation(
 
     }
 
-    return _result(
+    result = _result(
 
         checks,
 
@@ -510,11 +516,9 @@ def validate_orientation(
 
             "document_kind": "orientation",
 
-            "detected_academic_year": (
-
-                _academic_year(upper)
-
-            ),
+            "detected_academic_year": observed_year,
+            "detected_academic_years": sorted(observed_years),
+            "expected_academic_year": expected_year,
 
         },
 
@@ -553,6 +557,22 @@ def validate_orientation(
         },
 
     )
+
+    if checks["document_is_certificate"] is None:
+        result["reasons"].append(
+            "Certificate heading requires manual review. Expected Certificate of "
+            "Participation, Certificate of Attendance, or Certificate of Completion."
+        )
+    if not year_matches:
+        if not observed_years:
+            reason = f"Orientation academic year is missing or unreadable; expected AY {expected_year}. Manual review required."
+        elif len(observed_years) > 1:
+            reason = f"Multiple academic years are present; expected AY {expected_year}. Manual review required."
+        else:
+            reason = f"Orientation academic year {observed_year} differs from active AY {expected_year}. Manual review required."
+        result["reasons"].append(reason)
+    return result
+
 
 def validate_cor(
 

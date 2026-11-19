@@ -1,5 +1,6 @@
 """Conservative header-first identification; content matching is not authenticity."""
 import re
+from app.utils.orientation_certificate import generic_certificate_heading, orientation_participation, qualified_certificate_heading
 from app.services.ocr_service import DocumentLimitError, OCRService, ocr_budget
 from app.utils.untitled_documents import body_candidates
 from app.utils.official_document_evidence import OFFICIAL_TYPES, official_evidence
@@ -81,21 +82,16 @@ def identify_header(text: str, expected_type: str) -> dict:
             'header_region': 'first_page_top_40_percent'}
 
 def _generic_certificate_header(header: str) -> bool:
-    # Accept split visual headings such as "CERTIFICATE\nOF PARTICIPATION".
-    lines = [_compact_title(line) for line in (header or '')[:2400].splitlines() if line.strip()]
-    titles = {'CERTIFICATEOFPARTICIPATION', 'CERTIFICATEOFATTENDANCE', 'CERTIFICATEOFCOMPLETION'}
-    return any(''.join(lines[start:start + count]) in titles
-               for start in range(len(lines)) for count in (1, 2, 3))
+    return generic_certificate_heading(header)
 
 
 def confirm_orientation_context(identification: dict, header: str, content: str) -> dict:
     """A generic certificate needs orientation event context, never title alone."""
     if (identification.get('expected_type') != 'orientation'
         or identification.get('status') != 'uncertain'
-        or not _generic_certificate_header(header)):
+        or not qualified_certificate_heading(header)):
         return identification
-    normalized = re.sub(r'\s+', ' ', content or '').upper()
-    if not re.search(r'\b(?:OJT|ON[ -]THE[ -]JOB[ -]TRAINING|INTERNSHIP)\s+ORIENTATION\b', normalized):
+    if not orientation_participation(header + '\n' + content):
         return identification
     return {**identification, 'status': 'matched', 'detected_type': 'orientation',
             'candidates': ['orientation'], 'method': 'header_first_with_content_confirmation',

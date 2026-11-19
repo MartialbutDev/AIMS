@@ -200,7 +200,8 @@ class OCRService:
                     raise ValueError("Password-protected PDF")
                 for page in document:
                     _remaining_time()
-                    text = page.get_text("text").strip()
+                    # Use visual reading order rather than PDF object insertion order.
+                    text = page.get_text("text", sort=True).strip()
                     _remaining_time()
                     if len(text) < OCRService.MIN_PDF_TEXT_CHARS:
                         scale = _render_scale(page.rect.width, page.rect.height)
