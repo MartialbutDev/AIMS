@@ -10,6 +10,7 @@ from app.models.notification import Notification
 from app.models.notification_settings import NotificationSettings
 from app.models.user import User
 from app.services.notification_scope import destinations, value
+from app.services.onboarding_notifications import onboarding_message
 from app.services.internship_reminders import REMINDERS, SOURCE, reminder_is_current
 
 logger = logging.getLogger(__name__)
@@ -153,8 +154,8 @@ def phone_preview(notification):
         return CATEGORY_PREVIEWS['announcement']
     if source == 'coordinator_reminder' and kind in REMINDER_PREVIEWS:
         return REMINDER_PREVIEWS[kind]
-    if source == 'onboarding' and status in {'rejected', 'returned', 'needs_revision'}:
-        return ('Onboarding needs attention', 'Check your orientation and COR feedback in AIMS.')
+    if source == 'onboarding':
+        return onboarding_message(data.get('document_kind'), status)
     if source == 'deployment' and status == 'deployed':
         return ('Internship deployment approved', 'Check your placement details in AIMS.')
     if source == 'completion' and value(data.get('action')) == 'completed':

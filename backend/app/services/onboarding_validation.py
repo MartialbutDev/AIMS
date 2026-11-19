@@ -662,7 +662,9 @@ def validate_cor(
         ),
 
         # An unpublished target must not prevent otherwise valid COR onboarding.
-        "practicum_hours_matches": hours_match if required_hours is not None else True,
+        "practicum_hours_matches": (
+            True if required_hours is None or hours_match else None
+        ),
 
     }
 
@@ -677,6 +679,10 @@ def validate_cor(
             else None
 
         )
+
+    observed_hours = re.search(r"\b(\d+)\s*(?:HRS?\.?|HOURS?)\b", row or "")
+    detected_hours = int(observed_hours.group(1)) if observed_hours else None
+    hours_review_required = required_hours is not None and not hours_match
 
     layout = layout_details or {}
 
@@ -724,7 +730,7 @@ def validate_cor(
 
     )
 
-    return _result(
+    result = _result(
 
         checks,
 
@@ -736,6 +742,8 @@ def validate_cor(
             "detected_program_code": detected_program,
             "program_required_hours": required_hours,
             "hours_check_status": 'not_configured' if required_hours is None else 'configured',
+            "detected_practicum_hours": detected_hours,
+            "practicum_hours_review_required": hours_review_required,
             "matched_subject_code": matched_code,
 
             "configured_subject_codes": codes,
@@ -861,3 +869,15 @@ def validate_cor(
         },
 
     )
+
+    if hours_review_required:
+        observed = (
+            f"{detected_hours} hours" if detected_hours is not None
+            else "hours that could not be confirmed"
+        )
+        result["reasons"].append(
+            f"COR practicum hours need manual review: the document shows {observed}; "
+            f"the configured requirement is {required_hours} hours. "
+            "Reviewing this document does not change the configured completion target."
+        )
+    return result

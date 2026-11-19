@@ -8,6 +8,7 @@ import uuid
 from sqlalchemy import inspect
 from app.models.notification import Notification, NotificationType
 from app.services.notification_scope import NotificationScope, destinations, value
+from app.services.onboarding_notifications import onboarding_message
 
 
 def enqueue(db, recipients, kind, title, message, data=None, scope=None, exclude_actor=True):
@@ -80,8 +81,26 @@ def capture(db, flush_context, instances):
             if not obj.id: obj.id = str(uuid.uuid4())
             if not changed('review_status'): continue
             status = obj.review_status or 'pending_review'
-            emit({sid} | staff | scope.roles['admin'], 'document', f'Onboarding: {status.replace("_", " ")}',
-                 'An onboarding submission needs attention or has a review decision.', source='onboarding', status=status, student_id=sid, submission_id=obj.id, document_kind=obj.document_kind)
+            if not new and not state.attrs.review_status.history.deleted:
+                # An expired ORM field assigned its existing value has no old
+                # value in history. Compare the stored status before alerting.
+                table = state.mapper.local_table
+                persisted = db.connection().execute(
+                    table.select().with_only_columns(table.c.review_status)
+                    .where(table.c.id == obj.id)
+                ).scalar_one_or_none()
+                if persisted == status:
+                    continue
+            title, message = onboarding_message(obj.document_kind, status)
+            payload = dict(source='onboarding', status=status, student_id=sid,
+                           submission_id=obj.id, document_kind=obj.document_kind)
+            # Auto-verification happens during the student's upload request.
+            # Preserve that result alert while excluding staff's own review actions.
+            auto_verified_by_uploader = (
+                status == 'verified' and db.info.get('notification_actor_id') == sid
+            )
+            enqueue(db, {sid} | staff | scope.roles['admin'], 'document', title, message,
+                    payload, scope, exclude_actor=not auto_verified_by_uploader)
         elif name == 'InternshipDeployment':
             if getattr(obj, '_completion_workflow', False): continue
             if not changed('status'): continue
