@@ -1,3 +1,4 @@
+import type { InternshipProgress } from '../types/internshipProgress'
 import { apiRequest } from './apiClient'
 
 export interface AcademicTerm { academic_year: string; semester: string }
@@ -6,7 +7,9 @@ export interface Workload {
   coordinator_id: string; coordinator_name: string; assigned_students: number; active_interns: number
   document_reviews: number; dtr_reviews: number; journal_reviews: number; completion_reviews: number; total_reviews: number
 }
+export type { InternshipProgress as DeanProgress } from '../types/internshipProgress'
 export interface DeanAnalytics extends AcademicTerm {
+  progress?: InternshipProgress
   generated_at: string
   overview: Record<'students_in_oversight' | 'awaiting_deployment' | 'active_interns' | 'pending_completion' | 'approved_completion', number>
   stages: { key: string; label: string; count: number }[]

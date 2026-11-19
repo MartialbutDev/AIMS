@@ -1,0 +1,28 @@
+.internship-progress { --dean-navy:#0b0b2f; --dean-muted:#626579; min-width:0; border:1px solid #e1e3ed; border-radius:16px; padding:25px; background:white; color:#0b0b2f; }
+.internship-progress__heading { margin-bottom:24px; }
+.internship-progress__heading h2 { margin:0 0 7px; font-size:19px; letter-spacing:-.3px; }
+.internship-progress__heading p { margin:0; color:#626579; font-size:12px; line-height:1.7; }
+.internship-progress__table-wrap { overflow-x:auto; }
+.internship-progress .internship-progress__data table { width:100%; border-collapse:collapse; font-size:12px; min-width:0; }
+.internship-progress .internship-progress__data :is(th,td) { padding:15px 12px; text-align:right; border-bottom:1px solid #eceef5; }
+.internship-progress .internship-progress__data th:first-child { text-align:left; min-width:0; }
+.internship-progress__data thead th { background:#f6f6fa; color:#565a70; font-size:11px; font-weight:600; }
+.internship-progress__sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.internship-progress__footnote { margin:22px 0 0!important; color:#626579; font-size:11px; line-height:1.8; border-top:1px solid #eef0f5; padding-top:14px; }
+.internship-progress__plot > p[role="status"] { font-size:13px; line-height:1.7; }
+.internship-progress summary:focus-visible { outline:3px solid #a47700; outline-offset:3px; }
+@media(max-width:640px) { .internship-progress { padding:18px; } .internship-progress .internship-progress__data :is(th,td) { padding:12px 6px; } }
+.internship-progress__legend { display:flex; flex-wrap:wrap; gap:20px; margin-bottom:18px; color:var(--dean-muted); font-size:12px; }
+.internship-progress__legend span { display:inline-flex; align-items:center; gap:8px; }
+.internship-progress__legend i { width:20px; height:3px; display:inline-block; }
+.internship-progress__plot { min-width:0; }
+.internship-progress__plot svg { display:block; overflow:visible; }
+.internship-progress__plot text { fill:var(--dean-muted); font-size:11px; }
+.internship-progress__plot circle { cursor:crosshair; }
+.internship-progress__plot circle:focus-visible { outline:2px solid #a66b00; outline-offset:3px; }
+.internship-progress__detail { font-size:12px; line-height:1.7; color:var(--dean-muted); min-height:22px; margin-top:6px!important; }
+.internship-progress__data { margin-top:12px; }
+.internship-progress__data summary { padding:10px 0; color:var(--dean-navy); font-size:13px; font-weight:600; cursor:pointer; }
+.internship-progress__data table { min-width:0; margin-top:8px; }
+.internship-progress__data th:first-child { min-width:0; white-space:nowrap; }
+.internship-progress__excluded { color:#79531b; background:#fff9e6; border:1px solid #e6d59c; border-radius:8px; padding:12px; margin-top:12px!important; line-height:1.7; font-size:12px; }

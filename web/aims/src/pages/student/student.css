@@ -1095,3 +1095,51 @@
 .sw-today-shift { display:flex; flex-wrap:wrap; gap:12px 28px; margin:12px 0 0; }
 .sw-today-shift dt { font-size:13px; }
 .sw-today-shift dd { margin:4px 0 0; font-weight:700; }
+.student-hours-chart { min-width:0; border-top:3px solid #0b0b2f; }
+.student-hours-chart .sw-section-head { gap:12px; flex-wrap:wrap; }
+.student-hours-chart .student-hours-term,.student-hours-chart .student-hours-note { color:#626579; font-size:12px; line-height:1.7; margin:8px 0; }
+.student-hours-legend { display:flex; flex-wrap:wrap; gap:18px; margin:18px 0; color:#53647b; font-size:12px; }
+.student-hours-legend span { display:inline-flex; align-items:center; gap:8px; }
+.student-hours-legend i { display:inline-block; width:20px; height:3px; background:#0b0b2f; }
+.student-hours-legend .student-hours-target-key { background:none; border-top:3px dashed #a66b00; height:0; }
+.student-hours-target-notice { font-size:13px; color:#79531b; line-height:1.7; }
+.student-hours-plot { min-width:0; }
+.student-hours-plot svg { display:block; overflow:visible; }
+.student-hours-plot text { fill:#626579; font-size:11px; }
+.student-hours-plot circle { cursor:crosshair; }
+.student-hours-plot circle:focus-visible { outline:2px solid #a66b00; outline-offset:3px; }
+.student-hours-chart .student-hours-detail { color:#53647b; font-size:12px; line-height:1.7; min-height:22px; margin:6px 0; }
+.student-hours-data summary { padding:10px 0; cursor:pointer; font-size:13px; font-weight:600; }
+.student-hours-table { min-width:0; overflow-x:auto; }
+.student-hours-chart .student-hours-table table { min-width:0; width:100%; border-collapse:collapse; font-size:12px; }
+.student-hours-chart .student-hours-table :is(th,td) { padding:12px 8px; text-align:right; border-bottom:1px solid #eceef5; }
+.student-hours-chart .student-hours-table th:first-child { text-align:left; white-space:nowrap; }
+.student-hours-sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.sw-access .signup-policies { min-width:0; margin:4px 0; padding:16px; border:1px solid #dfe2ec; border-radius:12px; }
+.sw-access .signup-policies legend { padding:0 6px; font-size:14px; font-weight:700; color:#0b0b2f; }
+.sw-access .signup-policies > p { margin:0 0 14px; font-size:12px; color:#626579; line-height:1.6; }
+.signup-policy-row + .signup-policy-row { margin-top:18px; }
+.sw-access button.signup-policy-link { min-height:36px; padding:4px 0; background:none; border:0; color:#24245c; font:inherit; font-size:13px; font-weight:700; text-align:left; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.signup-policy-dialog { width:min(720px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); border:1px solid #dfe2ec; border-radius:16px; padding:0; background:white; color:#0b0b2f; box-sizing:border-box; box-shadow:0 24px 80px #0003; }
+.signup-policy-dialog[open] { display:flex; flex-direction:column; }
+.signup-policy-dialog::backdrop { background:#0b0b2f99; }
+.signup-policy-dialog > header { display:flex; flex:0 0 auto; justify-content:space-between; align-items:flex-start; gap:16px; padding:20px 24px; border-bottom:1px solid #e5e7ef; }
+.signup-policy-dialog h2 { margin:0; font-size:20px; line-height:1.4; }
+.signup-policy-dialog header p { margin:6px 0 0; color:#626579; font-size:12px; }
+.signup-policy-dialog button { min-height:42px; padding:9px 14px; font-size:13px; font-weight:600; border:1px solid #d5d9e4; border-radius:8px; background:white; color:#0b0b2f; cursor:pointer; }
+.signup-policy-body { overflow-y:auto; overscroll-behavior:contain; min-height:0; max-height:60dvh; padding:20px 24px; line-height:1.75; font-size:14px; }
+.signup-policy-body section + section { margin-top:22px; }
+.signup-policy-body h3 { margin:0 0 7px; font-size:15px; line-height:1.5; }
+.signup-policy-body p { margin:0; color:#44516a; overflow-wrap:anywhere; }
+.signup-policy-dialog > footer { display:flex; flex:0 0 auto; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:16px 24px; border-top:1px solid #e5e7ef; }
+.signup-policy-dialog footer p { margin:0; max-width:340px; font-size:12px; color:#626579; line-height:1.6; }
+.signup-policy-dialog button.signup-policy-done { background:#0b0b2f; border-color:#0b0b2f; color:white; }
+.signup-policy-dialog button:disabled { background:#f0f1f6; border-color:#e1e3ed; color:#747c8e; cursor:default; }
+.signup-policy-dialog :focus-visible,.signup-policies :focus-visible { outline:3px solid #a66b00; outline-offset:3px; }
+@media(max-width:480px) { .signup-policy-dialog > header,.signup-policy-dialog > footer { padding:16px; } .signup-policy-body { padding:18px 16px; } .signup-policy-dialog h2 { font-size:18px; } .signup-policy-dialog .signup-policy-done { width:100%; } }
+
+.sw-access .signup-policy-choice { display:flex; align-items:flex-start; gap:10px; }
+.sw-access .signup-policy-choice > input { flex:0 0 18px; width:18px; height:18px; min-height:18px; margin:6px 0 0; padding:0; accent-color:#0b0b2f; }
+.signup-policy-choice-copy { min-width:0; line-height:1.8; color:#30384b; font-size:13px; }
+.sw-access .signup-policy-choice-copy label { display:inline; font-size:13px; font-weight:400; cursor:pointer; }
+.sw-access .signup-policy-choice-copy .signup-policy-link { display:inline; min-height:0; padding:0; line-height:inherit; }

@@ -1,3 +1,6 @@
+import type { ApplicationActivity, CompanyApplicationActivity } from './applicationActivity'
+import type { InternshipProgress } from './internshipProgress'
+
 export interface DashboardMetric {
   label: string
   value: string
@@ -19,6 +22,9 @@ export interface CompletionCounts {
 }
 
 export interface DashboardData {
+  company_application_activity?: CompanyApplicationActivity
+  application_activity?: ApplicationActivity
+  progress?: InternshipProgress
   academic_year?: string
   semester?: string
   completion?: CompletionCounts

@@ -93,3 +93,14 @@ export interface Activity { id: string; title: string; description: string; stat
 export interface Weekly { week: string; dtr: number; journals: number; applications: number }
 export interface Placement { id: string; company_name: string; position: string; reason: string; status: string; academic_year: string; semester: string; student_decision?: string; partnership_status?: string; partnership_notes?: string; history?: { id?: string; action: string; actor_name?: string; reason?: string; details?: { reason?: string; notes?: string }; created_at: string }[] }
 export interface Correction { id: string; dtr_id: string; status: string; reason: string; proposed_time_in?: string; proposed_time_out?: string; proposed?: { time_in: string; time_out: string }; company_reason?: string; coordinator_reason?: string; history?: { action: string; reason?: string }[] }
+
+export interface ApprovedHoursProgress {
+  academic_year: string
+  semester: string
+  as_of: string
+  timezone: string
+  approved_hours: number
+  required_hours: number | null
+  hours_status: string
+  points: { date: string; daily_hours: number; cumulative_hours: number }[]
+}

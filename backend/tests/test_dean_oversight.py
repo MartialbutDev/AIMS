@@ -1,7 +1,7 @@
 """Term isolation, unique-student stages, read-only scope and workload semantics."""
 import sys
 import unittest
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -132,6 +132,8 @@ class DeanOversightTests(unittest.TestCase):
         self.assertEqual(data['overview']['students_in_oversight'], 1)
         self.assertEqual(data['overview']['active_interns'], 0)
         self.assertEqual(next(row['count'] for row in data['stages'] if row['key'] == 'record_conflict'), 1)
+        self.assertEqual(data['progress']['months'], [])
+        self.assertEqual(data['progress']['excluded']['conflicts'], 1)
 
     def test_cancelled_accepted_application_does_not_await_deployment(self):
         self.f.deployment.status = DeploymentStatus.CANCELLED
@@ -139,6 +141,7 @@ class DeanOversightTests(unittest.TestCase):
         data = self.snapshot()
         self.assertEqual(data['overview']['awaiting_deployment'], 0)
         self.assertEqual(data['stages'][0]['count'], 1)
+        self.assertEqual(data['progress']['months'], [])
 
     def test_term_validation_role_boundaries_and_pagination(self):
         for query in ['?academic_year=2026-2027', '?semester=1', '?academic_year=2026-2028&semester=1', '?academic_year=2026-2027&semester=3']:
@@ -154,6 +157,108 @@ class DeanOversightTests(unittest.TestCase):
             self.assertEqual(self.get().status_code, 403)
             self.assertEqual(self.get('/terms').status_code, 403)
             self.assertEqual(self.get('/attention?academic_year=2026-2027&semester=1&category=pending_reviews').status_code, 403)
+
+    def progress(self, year='2026-2027', semester='1'):
+        with patch.object(service, '_now', return_value=datetime(2026, 11, 19, 10, tzinfo=timezone.utc)):
+            return self.snapshot(year, semester)['progress']
+
+    def test_monthly_progress_uses_start_and_approval_dates_with_philippine_months(self):
+        dep = self.f.deployment
+        dep.deployment_date = date(2026, 8, 31)
+        dep.confirmed_at = datetime(2026, 8, 31, 1)
+        dep.status = DeploymentStatus.COMPLETED
+        self.db.add(Case(id='monthly-completion', deployment_id=dep.id, status='completed',
+            submitted_at=datetime(2026, 9, 29), approved_by='c1', approved_at=datetime(2026, 9, 30, 16, 10)))
+        self.db.commit()
+        progress = self.progress()
+        self.assertEqual(progress['timezone'], 'Asia/Manila')
+        self.assertEqual(progress['months'], [
+            {'month': '2026-08', 'started_students': 1, 'approved_completions': 0},
+            {'month': '2026-09', 'started_students': 0, 'approved_completions': 0},
+            {'month': '2026-10', 'started_students': 0, 'approved_completions': 1},
+        ])
+        self.assertFalse(any(progress['excluded'].values()))
+        self.f.as_user('dean1', UserRole.DEAN)
+        data = self.get().json()
+        self.assertEqual(data['progress']['months'], progress['months'])
+        self.assertNotIn('approved_by', str(data['progress']))
+        self.assertNotIn('s1', str(data['progress']))
+
+    def test_monthly_progress_is_scoped_to_designations_and_selected_term(self):
+        self.f.deployment.deployment_date = date(2026, 8, 1)
+        self.f.deployment.confirmed_at = datetime(2026, 8, 1, 1)
+        for identifier, student, year, semester in [
+            ('foreign', 's2', '2026-2027', '1'),
+            ('previous', 's1', '2025-2026', '2'),
+        ]:
+            self.db.add(Application(id=identifier+'-app', student_id=student, company_id='partner',
+                academic_year=year, semester=semester, position='Synthetic intern', status=ApplicationStatus.ACCEPTED))
+            self.db.flush()
+            self.db.add(Deployment(id=identifier+'-dep', application_id=identifier+'-app', student_id=student,
+                company_id='partner', academic_year=year, semester=semester, status=DeploymentStatus.DEPLOYED,
+                confirmed_by='c1', confirmed_at=datetime(2026, 7, 1, 1), deployment_date=date(2026, 7, 1)))
+        self.db.add(Designation(id='old-designation', coordinator_id='c1', assigned_by_dean_id='dean1',
+            academic_year='2025-2026', semester='2', is_active=True))
+        self.db.add(Assignment(id='old-assignment', coordinator_id='c1', student_id='s1', academic_year='2025-2026', semester='2'))
+        self.db.commit()
+        self.assertEqual(self.progress()['months'], [{'month':'2026-08','started_students':1,'approved_completions':0}])
+        self.assertEqual(self.progress('2025-2026','2')['months'], [{'month':'2026-07','started_students':1,'approved_completions':0}])
+        self.db.get(Designation, 'd2').assigned_by_dean_id = 'admin'
+        self.db.commit()
+        self.assertEqual(sum(m['started_students'] for m in self.progress()['months']), 2)
+        self.db.get(Designation, 'd2').is_active = False
+        self.db.commit()
+        self.assertEqual(sum(m['started_students'] for m in self.progress()['months']), 1)
+        self.assertEqual(self.progress('2026-2027','2')['months'], [])
+
+    def test_monthly_progress_does_not_invent_missing_start_dates_or_legacy_approvals(self):
+        self.f.deployment.status = DeploymentStatus.COMPLETED
+        self.f.deployment.deployment_date = None
+        self.f.deployment.confirmed_at = None
+        self.db.commit()
+        progress = self.progress()
+        self.assertEqual(progress['months'], [])
+        self.assertEqual(progress['excluded']['start_dates'], 1)
+        self.assertEqual(progress['excluded']['historical_completions'], 1)
+
+    def test_monthly_progress_does_not_treat_future_events_as_actual_activity(self):
+        dep = self.f.deployment
+        dep.confirmed_at = datetime(2026, 11, 1, 1)
+        dep.deployment_date = date(2026, 12, 1)
+        self.db.commit()
+        self.assertEqual(self.progress()['months'], [])
+        self.assertEqual(self.progress()['excluded']['future_events'], 1)
+        dep.deployment_date = date(2026, 11, 1)
+        dep.status = DeploymentStatus.COMPLETED
+        self.db.add(Case(id='future-approval', deployment_id=dep.id, status='completed',
+            submitted_at=datetime(2026, 11, 18), approved_by='c1', approved_at=datetime(2026, 12, 1)))
+        self.db.commit()
+        progress = self.progress()
+        self.assertEqual(progress['months'], [{'month':'2026-11','started_students':1,'approved_completions':0}])
+        self.assertEqual(progress['excluded']['future_events'], 1)
+
+    def test_monthly_progress_does_not_count_unconfirmed_or_empty_scope(self):
+        self.f.deployment.status = DeploymentStatus.PRE_DEPLOYMENT
+        self.db.commit()
+        self.assertEqual(self.progress()['months'], [])
+        self.db.get(Designation, 'd1').is_active = False
+        self.db.commit()
+        self.assertEqual(self.progress()['months'], [])
+
+    def test_monthly_progress_crosses_calendar_year_without_missing_january(self):
+        dep = self.f.deployment
+        dep.deployment_date = date(2026, 12, 15)
+        dep.confirmed_at = datetime(2026, 12, 15, 1)
+        dep.status = DeploymentStatus.COMPLETED
+        self.db.add(Case(id='new-year-completion', deployment_id=dep.id, status='completed',
+            submitted_at=datetime(2026, 12, 31), approved_by='c1', approved_at=datetime(2026, 12, 31, 16, 1)))
+        self.db.commit()
+        with patch.object(service, '_now', return_value=datetime(2027, 2, 1, tzinfo=timezone.utc)):
+            months = self.snapshot()['progress']['months']
+        self.assertEqual(months, [
+            {'month':'2026-12','started_students':1,'approved_completions':0},
+            {'month':'2027-01','started_students':0,'approved_completions':1},
+        ])
 
 
 if __name__ == '__main__':

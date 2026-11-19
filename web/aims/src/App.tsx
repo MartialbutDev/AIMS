@@ -1,3 +1,4 @@
+import { useUsageActivity } from "./hooks/useUsageActivity"
 
 import {
   Navigate,
@@ -205,6 +206,7 @@ function App() {
     logout,
   } = useAuthSession()
 
+  useUsageActivity(isRestoring ? undefined : session?.accessToken)
   const navigate = useNavigate()
 
   if (isRestoring) {

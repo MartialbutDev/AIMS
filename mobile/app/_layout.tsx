@@ -1,3 +1,4 @@
+import { useUsageActivity } from "../src/hooks/useUsageActivity";
 
 import React, { useEffect } from "react";
 import { AppState } from "react-native";
@@ -22,6 +23,7 @@ import {
 function RootLayoutNav() {
   const { isDark, colors } = useTheme();
   const area = useSegments()[0];
+  useUsageActivity(area === '(student)' || area === 'onboarding');
   useEffect(() => {
     if (area !== '(student)' && area !== 'onboarding') return;
     let cancelled = false;

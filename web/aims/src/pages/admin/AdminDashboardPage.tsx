@@ -1,3 +1,4 @@
+import { SystemUsage } from "./SystemUsage"
 import { internshipMetrics } from '../../services/analyticsService'
 
 import { Icon } from '../../components/Icons'
@@ -61,6 +62,8 @@ export function AdminDashboardPage({
           Add User
         </button>
       </div>
+
+      <SystemUsage />
 
       <section className="stake-admin-desk" aria-label="Administration priorities">
         <div className="stake-admin-desk-title"><h2>Accounts and assignments</h2></div>

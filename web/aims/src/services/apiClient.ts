@@ -45,7 +45,7 @@ export async function apiRequest<T>(
     throw new ApiResponseError(message, response.status)
   }
 
-  if (options.method && !['GET', 'HEAD'].includes(options.method.toUpperCase()) && !path.startsWith('/api/v1/notifications/')) window.dispatchEvent(new Event('aims-workflow-changed'))
+  if (options.method && !['GET', 'HEAD'].includes(options.method.toUpperCase()) && !path.startsWith('/api/v1/notifications/') && path !== '/api/v1/analytics/activity') window.dispatchEvent(new Event('aims-workflow-changed'))
 
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>

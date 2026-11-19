@@ -20,6 +20,7 @@ from app.models.internship_deployment import InternshipDeployment as Deployment,
 from app.models.internship_completion import InternshipCompletionCase as Case
 from app.services import reporting_scope as reporting
 from app.services.deployment_service import DeploymentService
+from app.services.internship_progress import ProgressHistory, record_conflict
 
 
 STAGES = {
@@ -39,6 +40,10 @@ CATEGORIES = {
     'pending_reviews': 'Pending document, DTR and journal reviews',
     'record_conflict': 'Records needing reconciliation',
 }
+
+
+def _now():
+    return datetime.now(timezone.utc)
 
 
 def resolve_term(year=None, semester=None):
@@ -67,6 +72,7 @@ def available_terms(db, actor):
 
 
 def snapshot(db, actor, year, semester):
+    clock = _now()
     coordinator_ids = reporting.dean_coordinator_ids(db, actor, year, semester)
     coordinators = db.query(User).filter(User.id.in_(coordinator_ids), User.role == UserRole.COORDINATOR).order_by(User.last_name, User.first_name, User.id).all()
     coordinator_ids = {c.id for c in coordinators}
@@ -108,6 +114,7 @@ def snapshot(db, actor, year, semester):
     names = {c.id: f'{c.first_name} {c.last_name}' for c in coordinators}
     totals = Counter(students_in_oversight=len(ids))
     stage_counts = Counter()
+    progress = ProgressHistory(clock)
     rows = []
     workloads = {c.id: {'coordinator_id': c.id, 'coordinator_name': names[c.id], 'assigned_students': 0,
         'active_interns': 0, 'document_reviews': 0, 'dtr_reviews': 0, 'journal_reviews': 0,
@@ -121,13 +128,7 @@ def snapshot(db, actor, year, semester):
         active = False
         pending = False
         approved = False
-        conflict = len(deps) > 1 or len(owners[sid]) > 1 or bool(deps and accepted[sid]) or len(accepted[sid]) > 1
-        if dep and dep.status == DeploymentStatus.DEPLOYED:
-            conflict |= not bool(dep.confirmed_by and dep.confirmed_at and dep.deployment_date)
-        if case:
-            conflict |= case.status not in ('requested', 'company_confirmed', 'returned', 'completed')
-            conflict |= dep.status != DeploymentStatus.DEPLOYED and case.status != 'completed'
-            conflict |= case.status == 'completed' and not (dep.status == DeploymentStatus.COMPLETED and case.approved_by and case.approved_at)
+        conflict = record_conflict(deps, len(owners[sid]), len(accepted[sid]), case)
         if conflict:
             stage = 'record_conflict'
             issues['record_conflict'] = ['Placement or completion records need coordinator reconciliation.']
@@ -149,6 +150,7 @@ def snapshot(db, actor, year, semester):
                 missing = [f'{label}: {latest.get((sid, kind), "not submitted")}' for kind, label in DeploymentService.REQUIRED_DOCUMENTS.items() if latest.get((sid, kind)) != 'verified']
                 if missing:
                     issues['missing_requirements'] = missing
+        progress.add(sid, dep, case, conflict)
         counts = reviews[sid] if stage not in ('approved', 'legacy_completed', 'record_conflict') else Counter()
         if counts:
             issues['pending_reviews'] = [f'{count} {kind} awaiting review' for kind, count in counts.items() if count]
@@ -172,7 +174,8 @@ def snapshot(db, actor, year, semester):
             'coordinator_ids': sorted(owners[sid]), 'coordinator_name': ', '.join(names[cid] for cid in sorted(owners[sid])),
             'company_name': companies.get(company_id), 'stage': STAGES[stage], 'issues': issues,
             'review_items': sum(counts.values()) + completion_review})
-    return {**reporting.term_metadata(year, semester), 'generated_at': datetime.now(timezone.utc).isoformat(),
+    return {**reporting.term_metadata(year, semester), 'generated_at': clock.isoformat(),
+        'progress': progress.result(),
         'overview': {key: totals[key] for key in ('students_in_oversight', 'awaiting_deployment', 'active_interns', 'pending_completion', 'approved_completion')},
         'stages': [{'key': key, 'label': label, 'count': stage_counts[key]} for key, label in STAGES.items()],
         'workloads': list(workloads.values()),

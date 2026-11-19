@@ -1,3 +1,4 @@
+import { InternshipProgressChart } from '../../components/InternshipProgressChart'
 import { internshipMetrics } from '../../services/analyticsService'
 import { useState } from 'react'
 import { Icon } from '../../components/Icons'
@@ -60,6 +61,10 @@ export function CoordinatorDashboardPage({ data, name, onNavigate }: Coordinator
             : <article className="citc-metric" key={metric.label}>{content}</article>
         })}
       </section>
+
+      <InternshipProgressChart key={(data.academic_year ?? '') + (data.semester ?? '')} progress={data.progress}
+        description={'Monthly internship starts and coordinator-approved completions for your assigned students.' + (data.academic_year && data.semester ? ' AY ' + data.academic_year + ' · Semester ' + data.semester + '.' : '')}
+        emptyMessage="No dated internship activity is available for your assigned students in this term." />
 
       <div className="citc-section-heading"><div><h2>Quick actions</h2></div><span>Current student assignments</span></div>
       <section className="citc-shortcuts" aria-label="Coordinator quick actions">

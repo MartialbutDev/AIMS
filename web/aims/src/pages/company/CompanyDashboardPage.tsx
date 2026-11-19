@@ -1,3 +1,4 @@
+import { CompanyApplicationChart } from './CompanyApplicationChart'
 import { internshipMetrics } from '../../services/analyticsService'
 import { useState } from 'react'
 import { Icon } from '../../components/Icons'
@@ -28,6 +29,9 @@ export function CompanyDashboardPage({ data, name, onNavigate }: CompanyDashboar
         </div>
         <div className="stake-employer-register"><span className="stake-kicker">AT YOUR ESTABLISHMENT</span>{metrics.length ? metrics.map(metric => <div className="stake-employer-metric" key={metric.label}><span><Icon name={metric.icon} size={19} /><span>{metric.label}<small>{metric.change}</small></span></span><strong>{metric.value}</strong></div>) : <p className="stake-note">Company metrics will appear when available.</p>}</div>
       </section>
+
+      <CompanyApplicationChart key={(data.academic_year ?? '') + (data.semester ?? '')} activity={data.company_application_activity}
+        term={data.academic_year && data.semester ? 'AY ' + data.academic_year + ' · Semester ' + data.semester + '.' : 'Dashboard academic term.'} />
 
       <nav className="stake-employer-links" aria-label="Partner workspace shortcuts"><button type="button" onClick={() => onNavigate('interns')}><Icon name="briefcase" size={22} /><span><strong>Intern monitoring</strong><small>Attendance, approved hours, and submitted journals</small></span><Icon name="arrow" size={17} /></button><button type="button" onClick={() => onNavigate('applications')}><Icon name="users" size={22} /><span><strong>Applicant desk</strong><small>Review student interest in your establishment</small></span><Icon name="arrow" size={17} /></button><button type="button" onClick={() => onNavigate('notifications')}><Icon name="bell" size={22} /><span><strong>University updates</strong><small>Stay connected with internship announcements</small></span><Icon name="arrow" size={17} /></button></nav>
 

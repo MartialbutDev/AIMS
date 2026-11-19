@@ -1,3 +1,4 @@
+import { ApplicationActivityChart } from './ApplicationActivityChart'
 import { internshipMetrics } from '../../services/analyticsService'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -124,7 +125,7 @@ export function CareerDashboardPage({
             className="cc-button cc-button-primary"
             onClick={() => onNavigate('companies')}
           >
-            Manage Companies
+            Manage companies
             <Icon name="arrow" size={16} />
           </button>
         </div>
@@ -133,12 +134,12 @@ export function CareerDashboardPage({
       <section className="stake-career-brief" aria-label="Partnership agreement priorities">
         <div>
           <h2>Partner companies</h2>
-          <p>Manage company profiles and signed MOAs for student placements.</p>
+          <p>Company profiles and signed MOAs.</p>
           <button type="button" className="stake-yellow-button" onClick={() => onNavigate('companies')}>
-            View partner companies <Icon name="arrow" size={17} />
+            View companies <Icon name="arrow" size={17} />
           </button>
         </div>
-        <div className="stake-renewal-brief"><span>Agreement watch</span><strong>{loading || error ? '—' : stats.expiring.length}<small>expiring within 30 days</small></strong><p>{loading ? 'Checking partnership records…' : error ? 'Agreement status is unavailable.' : (stats.expired + ' expired · ' + stats.pending + ' unsigned')}</p><button type="button" onClick={() => onNavigate('companies')}>Review agreements <Icon name="arrow" size={16} /></button></div>
+        <div className="stake-renewal-brief"><span>MOA status</span><strong>{loading || error ? '—' : stats.expiring.length}<small>expiring within 30 days</small></strong><p>{loading ? 'Loading MOAs…' : error ? 'MOA data unavailable.' : (stats.expired + ' expired · ' + stats.pending + ' unsigned')}</p><button type="button" onClick={() => onNavigate('companies')}>Review agreements <Icon name="arrow" size={16} /></button></div>
       </section>
 
       {error && (
@@ -149,18 +150,25 @@ export function CareerDashboardPage({
 
       <section className="cc-stats">
         {[
-          ['Active Partners', stats.total, 'Registered active HTEs'],
-          ['Current MOAs', stats.signed, 'No renewal due within 30 days'],
-          ['Unsigned MOAs', stats.pending, 'Awaiting agreements'],
-          ['Expiring Soon', stats.expiring.length, 'Within 30 days'],
-          ['Expired MOAs', stats.expired, 'Need attention'],
+          ['Active partners', stats.total, 'All terms'],
+          ['Current MOAs', stats.signed, 'No expiry within 30 days'],
+          ['Unsigned MOAs', stats.pending, ''],
+          ['Expiring soon', stats.expiring.length, 'Within 30 days'],
+          ['Expired MOAs', stats.expired, ''],
         ].map(([label, value, detail]) => (
           <article className="cc-stat-card" key={String(label)}>
             <span className="cc-stat-label">{label}</span>
             <strong className="cc-stat-value">
               {loading || error ? '—' : value}
             </strong>
-            <span className="cc-stat-detail">{detail}</span>
+            {detail && <span className="cc-stat-detail">{detail}</span>}
+          </article>
+        ))}
+        {internshipMetrics(data).map(metric => (
+          <article className="cc-stat-card" key={metric.label}>
+            <span className="cc-stat-label">{metric.label}</span>
+            <strong className="cc-stat-value">{metric.value}</strong>
+            <span className="cc-stat-detail">{metric.change}</span>
           </article>
         ))}
         {internshipMetrics(data).map(metric => (
@@ -172,25 +180,27 @@ export function CareerDashboardPage({
         ))}
       </section>
 
+      <ApplicationActivityChart key={(data.academic_year ?? '') + (data.semester ?? '')} activity={data.application_activity}
+        term={data.academic_year && data.semester ? 'AY ' + data.academic_year + ' · Semester ' + data.semester + '.' : 'Dashboard academic term.'} />
+
       <section className="cc-bottom-grid stake-partnership-grid">
         <article className="cc-card cc-info-card cc-application-records">
           <div className="cc-section-header">
             <div>
-              <span className="cc-section-kicker">RECENT UPDATES</span>
-              <h2>Application Activity</h2>
+              <h2>Recent applications</h2>
             </div>
             <button
               type="button"
               className="cc-button cc-button-secondary"
               onClick={() => onNavigate('applications')}
             >
-              View All
+              View all
             </button>
           </div>
 
           {data.activities.length === 0 ? (
             <div className="cc-mini-empty">
-              No recent application activity available.
+              No recent applications.
             </div>
           ) : (
             <div className="activity-list">
@@ -220,19 +230,18 @@ export function CareerDashboardPage({
         <article className="cc-card cc-info-card">
           <div className="cc-section-header">
             <div>
-              <span className="cc-section-kicker">PARTNERSHIP ALERTS</span>
               <h2>MOA Monitoring</h2>
-              <p>Agreements expiring within 30 days.</p>
+              <p>Expiring within 30 days.</p>
             </div>
           </div>
 
-          {error ? <div className="cc-mini-empty">Agreement monitoring is unavailable. Reload the page to try again.</div> : loading ? (
+          {error ? <div className="cc-mini-empty">MOA data unavailable. Refresh the page.</div> : loading ? (
             <div className="cc-mini-empty">
-              Loading agreements...
+              Loading MOAs…
             </div>
           ) : stats.expiring.length === 0 ? (
             <div className="cc-mini-empty">
-              No signed MOAs are currently expiring within 30 days.
+              No MOAs expiring within 30 days.
             </div>
           ) : (
             <div className="cc-watch-list">
@@ -262,15 +271,14 @@ export function CareerDashboardPage({
       <section className="cc-card cc-info-card" style={{ marginTop: 20 }}>
         <div className="cc-section-header">
           <div>
-            <span className="cc-section-kicker">INTERNSHIP ANALYTICS</span>
-            <h2>{data.chartTitle}</h2>
-            <p>{data.chartCaption}</p>
+            <h2>Applications submitted</h2>
+            <p>{data.academic_year && data.semester ? 'AY ' + data.academic_year + ' · Semester ' + data.semester : 'By submission month'}</p>
           </div>
         </div>
 
         {data.chartValues.length === 0 ? (
           <div className="cc-mini-empty">
-            No chart data available.
+            No submissions recorded.
           </div>
         ) : (
           <div className="cc-dashboard-chart">

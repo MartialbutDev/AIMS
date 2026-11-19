@@ -29,6 +29,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as SecureStore from "expo-secure-store";
 
 import { useTheme } from "../../src/context/ThemeContext";
+import AppLogo from "../../src/components/common/AppLogo";
 
 import {
   onboardingService,
@@ -677,14 +678,17 @@ export default function StudentOnboardingScreen() {
           style={[
             styles.hero,
             {
-              backgroundColor: "#000080",
+              backgroundColor: "#0B0B2F",
             },
           ]}
         >
           <View style={styles.heroTop}>
-            <Text style={styles.heroBrand}>
-              AIMS
-            </Text>
+            <View style={styles.heroIdentity}>
+              <AppLogo size={56} decorative />
+              <Text style={styles.heroBrand}>
+                A<Text style={styles.heroBrandAccent}>I</Text>MS
+              </Text>
+            </View>
 
             <TouchableOpacity
               onPress={confirmLogout}
@@ -706,14 +710,6 @@ export default function StudentOnboardingScreen() {
                 />
               )}
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.heroIcon}>
-            <Ionicons
-              name="shield-checkmark-outline"
-              size={32}
-              color="#FFFFFF"
-            />
           </View>
 
           <Text style={styles.heroTitle}>
@@ -947,17 +943,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 16,
     marginBottom: 24,
   },
 
+  heroIdentity: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
   heroBrand: {
-    fontSize: 22,
+    flexShrink: 1,
+    fontSize: 28,
     fontWeight: "800",
     color: "#FFFFFF",
     letterSpacing: 2,
   },
 
+  heroBrandAccent: {
+    color: "#F5A623",
+  },
+
   logoutButton: {
+    flexShrink: 0,
     width: 40,
     height: 40,
     borderRadius: 20,

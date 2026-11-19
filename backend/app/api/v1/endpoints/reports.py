@@ -26,6 +26,17 @@ async def get_student_summary(
     return ReportService.get_student_summary(db=db, user_id=current_user.id)
 
 
+@router.get("/approved-hours-progress")
+async def get_approved_hours_progress(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(403, "Only students can view their approved-hours progress")
+    from app.services.student_progress import approved_hours_progress
+    return approved_hours_progress(db, current_user.id)
+
+
 @router.get("/weekly-progress")
 async def get_weekly_progress(
     weeks: int = Query(8, ge=1, le=52),

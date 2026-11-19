@@ -5,7 +5,12 @@ from app.services.document_version_service import effective_documents
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, ConfigDict
+from typing import Literal
+from app.services import user_usage
+from app.services.internship_progress import coordinator_progress
+from app.services.application_activity import career_application_activity, company_application_activity
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -25,6 +30,22 @@ from app.models.internship_completion import InternshipCompletionCase
 from app.services.deployment_service import DeploymentService
 
 router = APIRouter()
+
+class UsageHeartbeat(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    platform: Literal["web", "mobile"]
+
+
+@router.post("/activity", status_code=204)
+def report_usage(body: UsageHeartbeat, db: Session = Depends(get_db), actor: User = Depends(get_current_user)):
+    user_usage.record(db, actor.id, body.platform)
+    return Response(status_code=204)
+
+
+@router.get("/usage")
+def usage_statistics(db: Session = Depends(get_db), actor: User = Depends(require_role("admin"))):
+    return user_usage.statistics(db)
+
 
 ROLE_PRESENTATION = {
     UserRole.ADMIN: (
@@ -390,6 +411,9 @@ async def get_dashboard_analytics(
     return {
         **reporting.term_metadata(year,semester),
         "completion": reporting.completion_counts(db,reporting.deployments(db,current_user,year,semester)),
+        **({"progress": coordinator_progress(db, current_user, year, semester)} if role == UserRole.COORDINATOR else {}),
+        **({"application_activity": career_application_activity(db, current_user, year, semester)} if role == UserRole.CAREER_CENTER else {}),
+        **({"company_application_activity": company_application_activity(db, current_user, year, semester)} if role == UserRole.HTE_SUPERVISOR else {}),
         "greeting": greeting,
         "subtitle": subtitle,
         "metrics": metrics,

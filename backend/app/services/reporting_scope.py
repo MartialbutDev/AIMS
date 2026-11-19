@@ -74,8 +74,10 @@ def valid_approved_record(record, start=None, day=None):
         and math.isfinite(hours) and 0<hours<=24)
 
 
-def approved_hours(db, ids, year, semester):
-    result={id:0.0 for id in ids}
+def approved_attendance_records(db, ids, year, semester):
+    records = []
+    if not ids:
+        return records
     active=term(db.query(Deployment),Deployment,year,semester).filter(Deployment.student_id.in_(ids),
         Deployment.status.in_([DeploymentStatus.DEPLOYED,DeploymentStatus.COMPLETED])).all()
     grouped={}
@@ -84,5 +86,13 @@ def approved_hours(db, ids, year, semester):
         placements=grouped.get(row.student_id,[])
         if len(placements)>1:continue
         start=placements[0].deployment_date if placements else None
-        if valid_approved_record(row,start):result[row.student_id]+=row.total_hours
-    return {id:round(hours,2) for id,hours in result.items()}
+        if valid_approved_record(row,start):
+            records.append(row)
+    return records
+
+
+def approved_hours(db, ids, year, semester):
+    values = {id: [] for id in ids}
+    for row in approved_attendance_records(db, ids, year, semester):
+        values[row.student_id].append(row.total_hours)
+    return {id: round(math.fsum(hours), 2) for id, hours in values.items()}

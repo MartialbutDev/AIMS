@@ -1,3 +1,4 @@
+import { DeanProgressChart } from './DeanProgressChart'
 import { ActivityBadges } from '../../components/ActivityIndicators'
 import { useEffect, useRef, useState } from 'react'
 import { getDeanAnalytics, getDeanAttention, getDeanTerms, termLabel, type AcademicTerm, type AttentionCategory, type AttentionDetails, type DeanAnalytics } from '../../services/deanAnalyticsService'
@@ -112,6 +113,7 @@ export function DeanDashboardPage() {
         <div className="dean-oversight__chart">{data.stages.map(stage => <div className="dean-oversight__bar-row" key={stage.key}><span>{stage.label}</span><div className="dean-oversight__track" role="img" aria-label={`${stage.label}: ${stage.count} students`}><span style={{ width: `${stage.count / maxStage * 100}%` }} /></div><strong>{stage.count}</strong></div>)}</div>
         <p className="dean-oversight__footnote">Historical completed records without recorded coordinator approval are shown separately. Conflicting records require reconciliation before they count as active or approved.</p>
       </section>
+      <DeanProgressChart key={data.academic_year + data.semester} progress={data.progress} />
       <section className="dean-oversight__panel" aria-labelledby="dean-workload-heading">
         <div className="dean-oversight__section-heading"><div><h2 id="dean-workload-heading">Coordinator workload</h2></div><span>{data.workloads.length} coordinators</span></div>
         <div className="dean-oversight__table-wrap"><table><caption className="dean-oversight__sr-only">Coordinator workload for {termLabel(data)}</caption><thead><tr><th scope="col">Coordinator</th><th scope="col">Assigned students</th><th scope="col">Active interns</th><th scope="col">Documents</th><th scope="col">DTRs</th><th scope="col">Journals</th><th scope="col">Final approvals</th><th scope="col">Total review items</th></tr></thead><tbody>
