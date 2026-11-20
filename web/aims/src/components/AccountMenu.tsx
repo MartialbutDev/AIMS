@@ -33,7 +33,7 @@ export function AccountMenu({ session, onLogout, notificationsOpen, onOpen }: { 
     items[next]?.focus()
   }}>
     <button type="button" ref={trigger} className="aims-account-trigger" aria-label="Account menu" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => { if (open) close(); else { onOpen(); setOpenedAt(identity) } }} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); onOpen(); setOpenedAt(identity) } }}>
-      <AccountAvatar className="aims-account-initial" session={session.role === 'student' ? { ...session, avatarPath: null } : session} /><span className="aims-account-chevron" aria-hidden="true"><Icon name="chevron" size={13} /></span>
+      <AccountAvatar className="aims-account-initial" session={session} /><span className="aims-account-chevron" aria-hidden="true"><Icon name="chevron" size={13} /></span>
     </button>
     {open && <div className="aims-account-panel" id={id} role="menu" aria-label="Your account">
       <div className="aims-account-identity" role="presentation"><strong>{session.name}</strong><span>{session.email}</span><small>{roleLabels[session.role]}</small></div>

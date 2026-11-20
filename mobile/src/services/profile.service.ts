@@ -1,5 +1,6 @@
 // src/services/profile.service.ts
 import api from './api';
+import type { Gender } from '../constants/profile';
 import * as SecureStore from 'expo-secure-store';
 
 export interface UserProfile {
@@ -8,6 +9,8 @@ export interface UserProfile {
   student_id: string;
   first_name: string;
   last_name: string;
+  middle_name?: string | null;
+  gender?: Gender | null;
   phone: string | null;
   role: string;
   is_active: boolean;
@@ -19,7 +22,9 @@ export interface UserProfile {
 export interface UpdateProfileData {
   first_name?: string;
   last_name?: string;
-  phone?: string;
+  phone?: string | null;
+  middle_name?: string | null;
+  gender?: Gender | null;
   student_id?: string;
 }
 

@@ -209,6 +209,12 @@ def process_push_deliveries(db):
                     'to': device.token,
                     'title': title,
                     'body': body,
+                    'subtitle': {
+                        'application': 'Applications', 'dtr': 'Attendance',
+                        'journal': 'Weekly journals', 'document': 'Documents',
+                        'announcement': 'Announcements',
+                    }.get(value(notification.type), 'Internship updates'),
+                    'priority': 'high',
                     'sound': 'default',
                     'channelId': 'aims',
                     'data': {'notification_id': notification.id, 'route': notification_route(notification)},

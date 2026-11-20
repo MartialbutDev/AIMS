@@ -1,5 +1,6 @@
+import { GenderField } from '../../components/GenderField'
 import { updateCurrentSession } from '../../services/sessionStorage'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { changeAccountPassword, getAccount, requestVerification, saveAccount, type AccountProfile } from '../../services/accountService'
 import { formatAccountName, type UserSession } from '../../types/auth'
 import './account-editor.css'
@@ -8,17 +9,18 @@ import { ProfilePhotoEditor } from './ProfilePhotoEditor'
 
 export function AccountEditor({session,onLogout}:{session:UserSession;onLogout:()=>void}) {
   const [profile,setProfile]=useState<AccountProfile|null>(null)
+  const pending = useRef(false)
   const [error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false)
   const [current,setCurrent]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState('')
   useEffect(()=>{let active=true;getAccount().then(p=>{if(active)setProfile(p)}).catch(e=>{if(active)setError(String(e.message))});return()=>{active=false}},[])
-  async function perform(action:()=>Promise<void>){setBusy(true);setError('');setMessage('');try{await action()}catch(e){setError(e instanceof Error?e.message:'Could not save changes.')}finally{setBusy(false)}}
-  function save(e:FormEvent){e.preventDefault();if(!profile)return;void perform(async()=>{const updated=await saveAccount({first_name:profile.first_name.trim(),middle_name:profile.middle_name?.trim()||null,last_name:profile.last_name.trim(),phone:profile.phone?.trim()||null});setProfile(updated);updateCurrentSession(session.accessToken,{name:formatAccountName(updated)});setMessage('Your account details were saved.')})}
+  async function perform(action:()=>Promise<void>){if(pending.current)return;pending.current=true;setBusy(true);setError('');setMessage('');try{await action()}catch(e){setError(e instanceof Error?e.message:'Could not save changes.')}finally{pending.current=false;setBusy(false)}}
+  function save(e:FormEvent){e.preventDefault();if(!profile)return;void perform(async()=>{const updated=await saveAccount({first_name:profile.first_name.trim(),middle_name:profile.middle_name?.trim()||null,last_name:profile.last_name.trim(),phone:profile.phone?.trim()||null,...(session.role==='student'?{gender:profile.gender??null}:{})});setProfile(updated);updateCurrentSession(session.accessToken,{name:formatAccountName(updated)});setMessage('Your account details were saved.')})}
   function change(e:FormEvent){e.preventDefault();if(password!==confirm){setError('The new passwords do not match.');return}void perform(async()=>{await changeAccountPassword(current,password);setCurrent('');setPassword('');setConfirm('');setMessage('Your password was changed. Sign in again.');onLogout()})}
   return <section className="workspace-page"><header className="workspace-page-heading"><div><h1>Account settings</h1></div></header>
     {error&&<p className="account-error" role="alert">{error}</p>}{message&&<p className="account-success" role="status">{message}</p>}
     {session.role !== 'student' && <ProfilePhotoEditor session={session} />}
     {!profile&&!error&&<p>Loading account…</p>}{profile&&<div className="account-columns"><form className="panel account-form" onSubmit={save}><h2>Personal details</h2><label>Email<input value={profile.email} disabled /></label><p>{profile.is_verified?'Email verified':'Email awaiting verification'}</p>{!profile.is_verified&&<button type="button" className="outline-button" disabled={busy} onClick={()=>void perform(async()=>{const result=await requestVerification();setMessage(result.message)})}>Send verification email</button>}
-    {(['first_name','middle_name','last_name','phone'] as const).map(field=><label key={field}>{({first_name:'First name',middle_name:'Middle name',last_name:'Last name',phone:'Phone number'})[field]}<input autoComplete={field==='phone'?'tel':field==='first_name'?'given-name':field==='last_name'?'family-name':'additional-name'} maxLength={field==='phone'?20:100} required={field==='first_name'||field==='last_name'} value={profile[field]||''} onChange={e=>setProfile({...profile,[field]:e.target.value})}/></label>)}<button className="primary-button" disabled={busy}>Save details</button></form>
+    {(['first_name','middle_name','last_name','phone'] as const).map(field=><label key={field}>{({first_name:'First name',middle_name:'Middle name',last_name:'Last name',phone:'Phone number'})[field]}<input autoComplete={field==='phone'?'tel':field==='first_name'?'given-name':field==='last_name'?'family-name':'additional-name'} maxLength={field==='phone'?20:100} required={field==='first_name'||field==='last_name'} value={profile[field]||''} onChange={e=>setProfile({...profile,[field]:e.target.value})}/></label>)}{session.role==='student'&&<GenderField value={profile.gender??null} disabled={busy} onChange={gender=>setProfile({...profile,gender})}/>}<button className="primary-button" disabled={busy}>Save details</button></form>
     <form className="panel account-form" onSubmit={change}><h2>Change password</h2><label>Current password<input type="password" autoComplete="current-password" required value={current} onChange={e=>setCurrent(e.target.value)}/></label><label>New password<input type="password" autoComplete="new-password" minLength={8} maxLength={128} required value={password} onChange={e=>setPassword(e.target.value)}/></label><label>Confirm new password<input type="password" autoComplete="new-password" required value={confirm} onChange={e=>setConfirm(e.target.value)}/></label><p>Use at least 8 characters and a password you have not used here before.</p><button className="primary-button" disabled={busy}>Change password</button><button type="button" className="outline-button" onClick={onLogout} disabled={busy}>Sign out</button></form></div>}
     <SessionManager onLogout={onLogout} />
   </section>

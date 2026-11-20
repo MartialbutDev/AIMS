@@ -50,6 +50,11 @@
   justify-content:space-between;
   padding:0 9px;
 }
+.sw-sidebar .sidebar-account {
+  gap:14px;
+  margin:18px 0 12px;
+  padding:14px;
+}
 .sw-sidebar .brand {
   color:white;
 }
@@ -66,7 +71,8 @@
   padding-right:4px;
 }
 .sw-sidebar nav>div+div {
-  margin-top:20px;
+  margin-top:24px;
+  padding-top:4px;
   border-top:1px solid #ffffff24;
 }
 .sw-sidebar nav>div>p {
@@ -75,13 +81,13 @@
   text-transform:uppercase;
   font-weight:700;
   color:#adb5ce;
-  margin:20px 12px 8px;
+  margin:16px 12px 12px;
 }
 .sw-sidebar nav a {
   color:#d5d9e7;
   display:grid;
   grid-template-columns:32px minmax(0,1fr) auto;
-  column-gap:10px;
+  column-gap:12px;
   align-items:center;
   min-height:48px;
   padding:6px 10px;
@@ -91,7 +97,7 @@
   text-decoration:none;
   font-size:13px;
   line-height:1.5;
-  margin:4px 0;
+  margin:6px 0;
 }
 .sw-nav-icon {
   display:grid;
@@ -1143,3 +1149,32 @@
 .signup-policy-choice-copy { min-width:0; line-height:1.8; color:#30384b; font-size:13px; }
 .sw-access .signup-policy-choice-copy label { display:inline; font-size:13px; font-weight:400; cursor:pointer; }
 .sw-access .signup-policy-choice-copy .signup-policy-link { display:inline; min-height:0; padding:0; line-height:inherit; }
+
+
+.sw-profile-photo-actions {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-top:4px;
+}
+.sw-profile-photo-actions > button {
+  min-height:44px;
+  max-width:100%;
+  padding:10px 16px;
+  margin:0;
+  font-size:13px;
+  line-height:1.35;
+}
+.sw-profile-account-link {
+  margin-top:20px;
+  padding-top:16px;
+  border-top:1px solid #e5e9f2;
+}
+.sw-profile-account-link > .sw-link {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  max-width:100%;
+  overflow-wrap:anywhere;
+}

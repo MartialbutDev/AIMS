@@ -512,3 +512,5 @@
 }
 
 .brand-image { display: block; width: 42px; height: 42px; flex: 0 0 42px; object-fit: contain; border-radius: 11px; }
+
+.sidebar-account-avatar:has(img) { border-radius: 50%; }

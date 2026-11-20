@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <!-- AIMS small-icon variant: academic cap, A and an internship journey orbit. -->
+  <path fill="#fff" d="M48 7 13 21l35 14 35-14L48 7Zm-23 23v9c12 7 34 7 46 0v-9l-23 9-23-9Z"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-width="4" d="M79 24v16"/>
+  <circle fill="#fff" cx="79" cy="42" r="4"/>
+  <path fill="#fff" fill-rule="evenodd" d="m42 46-19 38h12l5-11h16l5 11h12L54 46H42Zm6 11-5 10h10l-5-10Z"/>
+  <path fill="none" stroke="#fff" stroke-linecap="round" stroke-width="4" d="M17 60C-2 83 29 89 64 73c16-7 26-18 23-25"/>
+</svg>

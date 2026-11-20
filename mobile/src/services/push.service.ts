@@ -16,7 +16,18 @@ export async function registerPushDevice(requestPermission = true): Promise<stri
   const {data: preferences} = await api.get('/notifications/settings')
   if (!preferences.push_enabled) { await unregisterPushDevice(); return 'Push is disabled in your preferences.' }
   const Notifications = await import('expo-notifications')
-  if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('aims',{name:'AIMS updates',importance:Notifications.AndroidImportance.DEFAULT})
+  if (Platform.OS === 'android') {
+    // Keep the same channel ID so Android preserves the user's alert preferences.
+    await Notifications.setNotificationChannelAsync('aims', {
+      name: 'AIMS internship updates',
+      description: 'Applications, documents, attendance, journals and internship updates.',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: 'default',
+      enableVibrate: true,
+      vibrationPattern: [0, 200],
+      lightColor: '#FFD33D',
+    })
+  }
   let permission = await Notifications.getPermissionsAsync()
   if (!permission.granted && requestPermission) permission = await Notifications.requestPermissionsAsync()
   if (!permission.granted) { await unregisterPushDevice(); return 'Allow notifications for AIMS in your phone settings, then reconnect this phone.' }

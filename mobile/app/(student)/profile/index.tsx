@@ -2,7 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   Alert,
   ScrollView,
@@ -18,6 +18,8 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { AccountHeader, AccountHero, ActionButton } from "../../../src/components/account/AccountUI";
+import { GenderSelector } from "../../../src/components/account/GenderSelector";
+import { genderLabel, type Gender } from "../../../src/constants/profile";
 import { APP_VERSION } from "../../../src/constants/app";
 
 import { useTheme } from "../../../src/context/ThemeContext";
@@ -35,6 +37,8 @@ interface UserProfile {
   student_id: string;
   first_name: string;
   last_name: string;
+  middle_name?: string | null;
+  gender?: Gender | null;
   phone: string | null;
   role: string;
   is_active: boolean;
@@ -74,10 +78,9 @@ export default function ProfileScreen() {
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [editPhone, setEditPhone] = useState("");
-
-  useEffect(() => {
-    loadProfile();
-  }, []);
+  const [editMiddleName, setEditMiddleName] = useState("");
+  const [editGender, setEditGender] = useState<Gender | null>(null);
+  const savingRef = useRef(false);
 
   // Refresh coordinator details whenever the student opens the Profile tab.
   // A request ID prevents a previous screen visit from overwriting fresh data.
@@ -113,7 +116,20 @@ export default function ProfileScreen() {
     }, [loadOnboarding])
   );
 
-  const loadProfile = async () => {
+  // ✅ Fetch documents
+  const loadDocuments = useCallback(async () => {
+    try {
+      setLoadingDocs(true);
+      const response = await api.get("/documents/");
+      setDocuments(response.data);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+    } finally {
+      setLoadingDocs(false);
+    }
+  }, []);
+
+  const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -122,12 +138,11 @@ export default function ProfileScreen() {
       setEditFirstName(data.first_name);
       setEditLastName(data.last_name);
       setEditPhone(data.phone || "");
+      setEditMiddleName(data.middle_name || "");
+      setEditGender(data.gender ?? null);
 
       const avatar = await authService.getAvatar();
-      console.log('📸 Profile - Avatar URL:', avatar);
-      if (avatar) {
-        setAvatarUri(avatar);
-      }
+      setAvatarUri(avatar || null);
 
       // ✅ Load documents
       await loadDocuments();
@@ -138,20 +153,9 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadDocuments]);
 
-  // ✅ Fetch documents
-  const loadDocuments = async () => {
-    try {
-      setLoadingDocs(true);
-      const response = await api.get("/documents/");
-      setDocuments(response.data);
-    } catch (error) {
-      console.error("Error fetching documents:", error);
-    } finally {
-      setLoadingDocs(false);
-    }
-  };
+  useFocusEffect(useCallback(() => { void loadProfile(); }, [loadProfile]));
 
   const refreshAvatar = async () => {
     const avatar = await authService.getAvatar();
@@ -161,18 +165,21 @@ export default function ProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (!profile) return;
+    if (!profile || savingRef.current) return;
     if (!editFirstName.trim() || !editLastName.trim()) {
       Alert.alert("Name required", "Enter your first and last name before saving.");
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
     try {
       const updated = await authService.updateProfile({
         first_name: editFirstName.trim(),
+        middle_name: editMiddleName.trim() || null,
+        gender: editGender,
         last_name: editLastName.trim(),
-        phone: editPhone.trim() || undefined,
+        phone: editPhone.trim() || null,
       });
 
       setProfile(updated);
@@ -184,6 +191,7 @@ export default function ProfileScreen() {
     } catch (error) {
       Alert.alert("Error", "Failed to update profile");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -596,7 +604,7 @@ export default function ProfileScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-        {editing && <View style={{ marginBottom: 20 }}><AccountHero icon="create-outline" title="Your details, up to date." description="Update your name, contact number and profile photo. Your student ID and email are managed by the school." label="PERSONAL INFORMATION" /></View>}
+        {editing && <View style={{ marginBottom: 20 }}><AccountHero icon="create-outline" title="Your details, up to date." description="Update your personal details and profile photo. Your student ID and email are managed by the school." label="PERSONAL INFORMATION" /></View>}
         <View style={[styles.avatarSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity
             style={styles.avatarContainer}
@@ -648,6 +656,7 @@ export default function ProfileScreen() {
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
                     accessibilityLabel="First name"
+                    maxLength={100}
                     editable={!saving}
                     value={editFirstName}
                     onChangeText={setEditFirstName}
@@ -656,10 +665,17 @@ export default function ProfileScreen() {
                   />
                 </View>
                 <View style={styles.fieldContainer}>
+                  <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Middle Name (optional)</Text>
+                  <TextInput style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
+                    accessibilityLabel="Middle name (optional)" editable={!saving} maxLength={100}
+                    value={editMiddleName} onChangeText={setEditMiddleName} autoComplete="additional-name" />
+                </View>
+                <View style={styles.fieldContainer}>
                   <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Last Name</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
                     accessibilityLabel="Last name"
+                    maxLength={100}
                     editable={!saving}
                     value={editLastName}
                     onChangeText={setEditLastName}
@@ -672,6 +688,7 @@ export default function ProfileScreen() {
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.textPrimary, borderColor: colors.border }]}
                     accessibilityLabel="Phone number"
+                    maxLength={20}
                     editable={!saving}
                     value={editPhone}
                     onChangeText={setEditPhone}
@@ -680,12 +697,15 @@ export default function ProfileScreen() {
                     keyboardType="phone-pad"
                   />
                 </View>
+                <GenderSelector value={editGender} onChange={setEditGender} disabled={saving} />
               </>
             ) : (
               <>
                 {renderReadOnlyField("First Name", profile.first_name)}
+                {renderReadOnlyField("Middle Name", profile.middle_name ?? null)}
                 {renderReadOnlyField("Last Name", profile.last_name)}
                 {renderReadOnlyField("Phone", profile.phone)}
+                {renderReadOnlyField("Gender", genderLabel(profile.gender))}
               </>
             )}
           </View>
@@ -693,7 +713,7 @@ export default function ProfileScreen() {
 
         {editing && <View style={{ gap: 10, marginBottom: 20 }}>
           <ActionButton title={saving ? "Saving changes…" : "Save changes"} busy={saving} onPress={() => void handleSave()} />
-          <ActionButton title="Cancel" secondary disabled={saving} onPress={() => { setEditing(false); setEditFirstName(profile.first_name); setEditLastName(profile.last_name); setEditPhone(profile.phone || ""); }} />
+          <ActionButton title="Cancel" secondary disabled={saving} onPress={() => { setEditing(false); setEditFirstName(profile.first_name); setEditLastName(profile.last_name); setEditPhone(profile.phone || ""); setEditMiddleName(profile.middle_name || ""); setEditGender(profile.gender ?? null); }} />
         </View>}
 
         {!editing && <>
