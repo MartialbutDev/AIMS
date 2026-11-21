@@ -16,7 +16,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from pytesseract import TesseractError
 
 from app.core.config import settings
-from app.core.file_storage import staged_file
+from app.core.file_storage import STORAGE_UNAVAILABLE, staged_file
 from app.core.document_upload_limits import MAX_UPLOAD_BYTES, UPLOAD_SIZE_MESSAGE
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,11 @@ OCR_TIMEOUT_MESSAGE = "Text recognition took too long. Upload a smaller file or 
 _deadline: ContextVar[float | None] = ContextVar("ocr_deadline", default=None)
 
 
-class DocumentLimitError(HTTPException):
+class DocumentInputError(HTTPException):
+    """The student can correct this file before trying again."""
+
+
+class DocumentLimitError(DocumentInputError):
     """A document limit must stop the upload rather than trigger manual review."""
 
 
@@ -65,6 +69,27 @@ def ocr_budget():
 def check_pdf_limits(document) -> None:
     if document.page_count > MAX_PDF_PAGES:
         raise DocumentLimitError(413, f"PDFs must contain no more than {MAX_PDF_PAGES} pages.")
+
+
+@contextmanager
+def open_readable_pdf(path):
+    damaged = "This PDF could not be read. Export a new copy of the original document and upload it."
+    try:
+        try:
+            pdf = fitz.open(stream=Path(path).read_bytes(), filetype="pdf")
+        except (OSError, fitz.FileNotFoundError, fitz.mupdf.FzErrorSystem) as exc:
+            raise HTTPException(503, STORAGE_UNAVAILABLE) from exc
+        with pdf:
+            if not pdf.is_pdf:
+                raise DocumentInputError(422, damaged)
+            if pdf.needs_pass:
+                raise DocumentInputError(422, "This PDF is password-protected. Upload an unlocked copy.")
+            if not pdf.page_count:
+                raise DocumentInputError(422, damaged)
+            check_pdf_limits(pdf)
+            yield pdf
+    except (fitz.FileDataError, fitz.mupdf.FzErrorFormat, fitz.mupdf.FzErrorSyntax) as exc:
+        raise DocumentInputError(422, damaged) from exc
 
 
 def check_image_limits(image: Image.Image) -> None:
@@ -128,8 +153,8 @@ class OCRService:
                     if size > MAX_UPLOAD_BYTES:
                         raise DocumentLimitError(413, UPLOAD_SIZE_MESSAGE)
                     output.write(chunk)
-            if size == 0:
-                raise HTTPException(400, "Uploaded file is empty.")
+                if size == 0:
+                    raise HTTPException(400, "Uploaded file is empty.")
 
             relative_path = f"uploads/{destination.name}"
             logger.info("Saved OCR upload to %s", destination)
@@ -153,10 +178,7 @@ class OCRService:
     def extract_header(file_path: str, file_type: str) -> str:
         """Read only the visual top 40% of page one, before content checks."""
         if file_type == 'pdf':
-            with fitz.open(file_path) as document:
-                check_pdf_limits(document)
-                if document.needs_pass or not document.page_count:
-                    raise ValueError('Unreadable PDF header')
+            with open_readable_pdf(file_path) as document:
                 page = document[0]
                 # Text coordinates are unrotated; transform the visual header clip.
                 visual = page.rect
@@ -194,10 +216,7 @@ class OCRService:
         """
         try:
             chunks: list[str] = []
-            with fitz.open(pdf_path) as document:
-                check_pdf_limits(document)
-                if document.needs_pass:
-                    raise ValueError("Password-protected PDF")
+            with open_readable_pdf(pdf_path) as document:
                 for page in document:
                     _remaining_time()
                     # Use visual reading order rather than PDF object insertion order.

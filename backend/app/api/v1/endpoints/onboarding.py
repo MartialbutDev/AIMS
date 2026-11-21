@@ -14,8 +14,6 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pymupdf as fitz
-
 from fastapi import (
     APIRouter,
     Depends,
@@ -63,7 +61,7 @@ from app.services.ocr_service import (
     DocumentLimitError,
     OCRService,
     check_image_limits,
-    check_pdf_limits,
+    open_readable_pdf,
 )
 from app.services.onboarding_eligibility import (
     CURRENT_COR_REQUIRED,
@@ -434,20 +432,8 @@ async def _save_private_upload(
             )
 
         if extension == ".pdf":
-            try:
-                with fitz.open(path) as pdf:
-                    check_pdf_limits(pdf)
-                    if pdf.needs_pass or not pdf.page_count:
-                        raise HTTPException(400, "PDF must be unlocked and contain at least one page.")
-
-            except HTTPException:
-                raise
-
-            except Exception as exc:
-                raise HTTPException(
-                    400,
-                    "PDF cannot be opened",
-                ) from exc
+            with open_readable_pdf(path):
+                pass  # Validate the file before recording the onboarding submission.
 
         else:
             try:

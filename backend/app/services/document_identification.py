@@ -1,7 +1,7 @@
 """Conservative header-first identification; content matching is not authenticity."""
 import re
 from app.utils.orientation_certificate import generic_certificate_heading, orientation_participation, qualified_certificate_heading
-from app.services.ocr_service import DocumentLimitError, OCRService, ocr_budget
+from app.services.ocr_service import DocumentInputError, OCRService, ocr_budget
 from app.utils.untitled_documents import body_candidates
 from app.utils.official_document_evidence import OFFICIAL_TYPES, official_evidence
 
@@ -19,7 +19,7 @@ TITLES = {
     'cor': r'(?:CERTIFICATE OF REGISTRATION|STUDENT(?:[’\']S)? ACTUAL LOAD|STUDENT ACTUAL LOAD|REGISTRATION FORM)',
     'orientation': r'(?:(?:INTERNSHIP|OJT|PRE[- ]INTERNSHIP) ORIENTATION(?: CERTIFICATE| CERTIFICATE OF (?:ATTENDANCE|PARTICIPATION))?|CERTIFICATE OF (?:ATTENDANCE|PARTICIPATION) IN (?:THE )?(?:INTERNSHIP|OJT) ORIENTATION)',
     'transcript': r'(?:TRANSCRIPT OF RECORDS|ACADEMIC TRANSCRIPT)',
-    'unrelated_receipt': r'(?:(?:OFFICIAL|SALES|SHOPPING|PAYMENT) RECEIPT|(?:SALES|TAX) INVOICE)',
+    'unrelated_receipt': r'(?:(?:(?:OFFICIAL|SALES|SHOPPING|PAYMENT|GROCERY|RETAIL|STORE|CASH|PURCHASE) )?RECEIPT|(?:(?:SALES|TAX|RETAIL) )?INVOICE)',
 }
 GENERIC_TYPES = {'requirements', 'document', 'user_id'}
 
@@ -38,7 +38,7 @@ TITLE_ALIASES = {
     'certificate_of_completion': ('CERTIFICATE OF COMPLETION', 'INTERNSHIP COMPLETION CERTIFICATE'),
     'orientation': ('OJT ORIENTATION CERTIFICATE', 'INTERNSHIP ORIENTATION CERTIFICATE'),
     'transcript': ('TRANSCRIPT OF RECORDS', 'ACADEMIC TRANSCRIPT'),
-    'unrelated_receipt': ('OFFICIAL RECEIPT', 'SALES INVOICE', 'SHOPPING RECEIPT'),
+    'unrelated_receipt': ('OFFICIAL RECEIPT', 'SALES INVOICE', 'SHOPPING RECEIPT', 'GROCERY RECEIPT'),
 }
 
 def _compact_title(text: str) -> str:
@@ -60,7 +60,9 @@ def identify_header(text: str, expected_type: str) -> dict:
     # supporting evidence, but never override another explicit title.
     if not candidates and 'EDUCATION' in lines and any(line in {'SKILLS', 'TECHNICAL SKILLS', 'WORK EXPERIENCE'} for line in lines):
         candidates.add('resume')
-    if expected_type in GENERIC_TYPES:
+    if candidates == {'unrelated_receipt'}:
+        status = 'mismatch'
+    elif expected_type in GENERIC_TYPES:
         status = 'not_applicable'
     elif len(candidates) > 1:
         status = 'ambiguous'
@@ -69,7 +71,9 @@ def identify_header(text: str, expected_type: str) -> dict:
     else:
         status = 'matched' if expected_type in candidates else 'mismatch'
     detected = next(iter(candidates)) if len(candidates) == 1 else None
-    if status == 'mismatch':
+    if detected == 'unrelated_receipt':
+        message = 'A receipt or invoice does not match the selected requirement. Upload the requested internship document.'
+    elif status == 'mismatch':
         message = f"The header identifies {detected.replace('_', ' ')}, which does not match the selected {expected_type.replace('_', ' ')}. Upload the correct document. Any current approved version remains active."
     elif status in {'uncertain', 'ambiguous'}:
         message = 'The header does not clearly identify the selected document type. Additional content checks and coordinator review are required.'
@@ -124,7 +128,7 @@ def inspect_upload(path: str, file_type: str, expected_type: str) -> dict:
     header_error = None
     try:
         header = OCRService.extract_header(path, file_type)
-    except DocumentLimitError:
+    except DocumentInputError:
         raise
     except Exception:
         header = ''
@@ -145,7 +149,7 @@ def inspect_upload(path: str, file_type: str, expected_type: str) -> dict:
     try:
         text = OCRService.extract_text(path, file_type) or ''
         error = None
-    except DocumentLimitError:
+    except DocumentInputError:
         raise
     except Exception:
         text = ''

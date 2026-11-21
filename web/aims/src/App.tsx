@@ -191,6 +191,7 @@ function DashboardRoute({
 
   return (
     <RoleDashboardPage
+      key={session.accessToken}
       session={session}
       onLogout={onLogout}
     />
@@ -202,6 +203,8 @@ function App() {
     session,
     isSigningIn,
     isRestoring,
+    restoreError,
+    retryRestore,
     login,
     logout,
   } = useAuthSession()
@@ -214,6 +217,15 @@ function App() {
       <main className="dashboard-loading">
         <span className="loading-spinner" />
         <p>Verifying your account…</p>
+      </main>
+    )
+  }
+
+  if (restoreError) {
+    return (
+      <main className="dashboard-loading" role="alert">
+        <p>AIMS could not check your sign-in. Check your connection and try again.</p>
+        <button type="button" onClick={() => void retryRestore()}>Try again</button>
       </main>
     )
   }

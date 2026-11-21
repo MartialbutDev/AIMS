@@ -44,6 +44,29 @@ class SessionTests(unittest.TestCase):
         self.assertTrue(sessions[0]['current'])
         self.assertEqual(response.json()['user']['role'], 'student')
 
+    def test_browser_cookie_is_shared_until_logout_and_requires_explicit_opt_in_to_persist(self):
+        app = FastAPI()
+        app.include_router(auth.router, prefix="/api/v1/auth")
+        app.dependency_overrides[get_db] = lambda: self.db
+        base = "/api/v1/auth"
+        headers = {"X-AIMS-Browser": "1"}
+        with TestClient(app, base_url="https://example.test") as client:
+            for remember in (False, True):
+                signed_in = client.post(base + "/login/student", headers={"X-AIMS-Web-Role": "student"},
+                    json={"email": "one@example.invalid", "password": "Test-password-123", "remember_me": remember})
+                self.assertEqual(signed_in.status_code, 200)
+                cookie = signed_in.headers["set-cookie"].lower()
+                for flag in ("httponly", "secure", "samesite=strict", "path=/api/v1/auth"):
+                    self.assertIn(flag, cookie)
+                self.assertEqual("max-age=" in cookie, remember)
+                self.assertEqual(client.get(base + "/browser-session").status_code, 403)
+                restored = client.get(base + "/browser-session", headers=headers)
+                self.assertEqual(restored.json()["user"]["id"], "one")
+                bearer = {"Authorization": "Bearer " + restored.json()["access_token"]}
+                self.assertEqual(client.post(base + "/logout", headers=bearer).status_code, 200)
+                self.assertIsNone(client.get(base + "/browser-session", headers=headers).json())
+                self.assertEqual(client.get(base + "/me", headers=bearer).status_code, 401)
+
     def test_student_account_does_not_gain_staff_web_login_access(self):
         response = self.client.post('/auth/login/web', json={'email': 'one@example.invalid', 'password': 'Test-password-123'})
         self.assertEqual(response.status_code, 403)
@@ -104,7 +127,7 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(self.call(a).status_code,401);self.assertEqual(self.db.query(AuthSession).count(),0)
 
     def test_legacy_token_cannot_return_after_logout_others(self):
-        from jose import jwt
+        import jwt
         from app.core.config import settings
         token=jwt.encode({'sub':'one','exp':(service.now()+timedelta(hours=1)).timestamp()},settings.SECRET_KEY,algorithm=settings.ALGORITHM)
         current=self.token();self.call(current)

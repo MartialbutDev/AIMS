@@ -45,7 +45,7 @@ from app.services.student_document_feedback import student_document_payload, stu
 from app.core.file_storage import stored_file
 from app.services.submission_recovery import Submission, SubmissionKey
 from app.core.document_upload_limits import MAX_UPLOAD_BYTES, UPLOAD_SIZE_MESSAGE
-from app.services.ocr_service import DocumentLimitError, OCRService, ocr_budget
+from app.services.ocr_service import DocumentInputError, OCRService, ocr_budget
 from app.services.document_identification import identify_header, identify_from_body
 from app.utils.official_document_evidence import OFFICIAL_TYPES, official_evidence
 from app.services.document_version_service import annotate, current_approved, review_times
@@ -364,7 +364,7 @@ async def identify_document_type(
             with ocr_budget():
                 try:
                     header = await run_in_threadpool(OCRService.extract_header, str(path), file_type)
-                except DocumentLimitError:
+                except DocumentInputError:
                     raise
                 except Exception:
                     return {'status': 'unavailable', 'suggested_type': None,
@@ -375,7 +375,7 @@ async def identify_document_type(
                     try:
                         body = await run_in_threadpool(OCRService.extract_text, str(path), file_type)
                         result = identify_from_body(result, body or '')
-                    except DocumentLimitError:
+                    except DocumentInputError:
                         raise
                     except Exception:
                         pass  # The user can still choose a type manually.

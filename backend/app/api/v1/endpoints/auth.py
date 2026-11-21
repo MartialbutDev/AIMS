@@ -8,9 +8,9 @@ import asyncio
 import hashlib
 import logging
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.mailer import email_is_configured, send_action_email
 from app.core.security import (
+    _user_from_access_token,
     oauth2_scheme,
     create_access_token,
     decode_token,
@@ -76,10 +77,12 @@ def revoke_session(session_id: str,token: str=Depends(oauth2_scheme),
 
 
 @router.post('/logout')
-def logout_session(token: str=Depends(oauth2_scheme),
+def logout_session(request: Request, response: Response, token: str=Depends(oauth2_scheme),
                    user: User=Depends(get_current_user),db: Session=Depends(get_db)):
     from app.services import auth_session_service as sessions
     sessions.ready(db,True);sessions.revoke(db,user,sessions.digest(token))
+    if request.cookies.get(BROWSER_COOKIE) == token:
+        response.delete_cookie(BROWSER_COOKIE, path=BROWSER_COOKIE_PATH, httponly=True, samesite='strict', secure=_secure_cookie(request))
     return {'message':'Signed out'}
 
 GENERIC_RESET_MESSAGE = (
@@ -115,6 +118,68 @@ def _token_response(user: User, user_agent: str | None = None, remember_me: bool
         agent = user_agent if user_agent and any(name in user_agent for name in ('Mozilla', 'Android', 'iPhone', 'iPad')) else fallback_agent
         track(db, user, token, decode_token(token), agent)
     return LoginResponse(access_token=token,token_type="bearer",user=user)
+
+
+BROWSER_COOKIE = "aims_web_session"
+BROWSER_COOKIE_PATH = "/api/v1/auth"
+
+
+def _secure_cookie(request: Request) -> bool:
+    if request.url.scheme == "https":
+        return True
+    # Permit plain HTTP only for development or a loopback-only browser session.
+    return not settings.DEBUG and request.url.hostname not in {"localhost", "127.0.0.1", "::1"}
+
+
+def _set_browser_cookie(request: Request, response: Response, token: str, remember: bool):
+    max_age = None
+    if remember:
+        expires = decode_token(token)["exp"]
+        max_age = max(0, int(expires - datetime.now(timezone.utc).timestamp()))
+    response.headers["Cache-Control"] = "no-store"
+    response.set_cookie(BROWSER_COOKIE, token, path=BROWSER_COOKIE_PATH, max_age=max_age,
+                        secure=_secure_cookie(request), httponly=True, samesite="strict")
+
+
+def _login_response(user: User, request: Request, response: Response, remember: bool | None):
+    selected = request.headers.get("X-AIMS-Web-Role")
+    role = "company" if user.role == UserRole.HTE_SUPERVISOR else user.role.value
+    if selected is not None and selected != role:
+        raise HTTPException(403, "This account does not have access to the selected workspace.")
+    result = _token_response(user, request.headers.get("user-agent"), remember)
+    if selected is not None:
+        _set_browser_cookie(request, response, result.access_token, remember is True)
+    return result
+
+
+class BrowserSessionOptions(BaseModel):
+    remember_me: bool = False
+
+
+def _require_browser_header(request: Request):
+    # Browsers preflight this header. Untrusted origins cannot read a bearer.
+    if request.headers.get("X-AIMS-Browser") != "1":
+        raise HTTPException(403, "Open AIMS to continue.")
+
+
+@router.get("/browser-session", response_model=LoginResponse | None,
+            dependencies=[Depends(_require_browser_header)])
+def restore_browser_session(request: Request, response: Response, db: Session = Depends(get_db)):
+    response.headers["Cache-Control"] = "no-store"
+    token = request.cookies.get(BROWSER_COOKIE)
+    if not token:
+        return None
+    user = _user_from_access_token(token, db, request.headers.get("user-agent", ""))
+    return LoginResponse(access_token=token, user=user)
+
+
+@router.post("/browser-session", response_model=LoginResponse,
+             dependencies=[Depends(_require_browser_header)])
+def adopt_browser_session(options: BrowserSessionOptions, request: Request, response: Response,
+                          token: str = Depends(oauth2_scheme), user: User = Depends(get_current_user)):
+    # Upgrade an existing browser login without extending its original expiry.
+    _set_browser_cookie(request, response, token, options.remember_me)
+    return LoginResponse(access_token=token, user=user)
 
 
 def _authenticate(
@@ -234,6 +299,7 @@ async def register_student(
 def login_student(
     login_data: LoginRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     user = _authenticate(
@@ -243,7 +309,7 @@ def login_student(
         login_data.password,
         mobile=True,
     )
-    return _token_response(user, request.headers.get("user-agent"), login_data.remember_me)
+    return _login_response(user, request, response, login_data.remember_me)
 
 
 @router.post(
@@ -307,6 +373,7 @@ async def register_web_user(
 def login_web_user(
     login_data: LoginRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     user = _authenticate(
@@ -316,7 +383,7 @@ def login_web_user(
         login_data.password,
         mobile=False,
     )
-    return _token_response(user, request.headers.get("user-agent"), login_data.remember_me)
+    return _login_response(user, request, response, login_data.remember_me)
 
 
 @router.post("/login/form")

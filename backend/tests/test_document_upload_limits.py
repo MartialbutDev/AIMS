@@ -10,7 +10,7 @@ from PIL import Image
 import pymupdf
 
 from app.core import document_upload_limits
-from app.models.document import Document
+from app.models.document import Document, DocumentType
 from app.services import ocr_service
 import test_document_versions as fixtures
 
@@ -25,8 +25,8 @@ class DocumentLimitTests(unittest.TestCase):
         self.folder.mkdir()
         self.enterContext(patch.object(ocr_service, "UPLOAD_DIR", self.folder))
 
-    def upload(self, filename, payload):
-        return self.client.post("/documents/upload", data={"document_type": "resume"},
+    def upload(self, filename, payload, document_type="resume"):
+        return self.client.post("/documents/upload", data={"document_type": document_type},
                                 files={"file": (filename, payload)})
 
     def assert_rejected_without_persisting(self, filename, payload, status, message):
@@ -40,6 +40,55 @@ class DocumentLimitTests(unittest.TestCase):
     def test_oversized_file_leaves_no_partial_upload(self):
         with patch.object(ocr_service, "MAX_UPLOAD_BYTES", 1024 * 1024):
             self.assert_rejected_without_persisting("resume.pdf", b"x" * (1024 * 1024 + 1), 413, "10 MB")
+
+    def test_invalid_pdfs_do_not_replace_or_leave_files(self):
+        self.fixture.doc("current-resume")
+        with pymupdf.open() as pdf:
+            pdf.new_page()
+            locked = pdf.tobytes(encryption=pymupdf.PDF_ENCRYPT_AES_256,
+                                 owner_pw="fixture-owner", user_pw="fixture-reader")
+        cases = [(b"%PDF-1.7 truncated", 422, "Export a new copy"),
+                 (b"this is not a PDF", 422, "Export a new copy"),
+                 (locked, 422, "unlocked copy"), (b"", 400, "empty")]
+        for payload, status, message in cases:
+            with self.subTest(message=message):
+                self.assert_rejected_without_persisting("candidate.pdf", payload, status, message)
+                preview = self.client.post("/documents/identify", files={"file": ("candidate.pdf", payload)})
+                self.assertEqual(preview.status_code, status, preview.text)
+                self.assertIn(message, preview.json()["detail"])
+                self.assertEqual(self.fixture.current().id, "current-resume")
+
+    def test_ocr_outage_is_retryable_without_saving_a_replacement(self):
+        self.fixture.doc("current-resume")
+        with pymupdf.open() as pdf:
+            pdf.new_page()
+            payload = pdf.tobytes()
+        with patch.object(ocr_service.pytesseract, "image_to_string",
+                          side_effect=ocr_service.pytesseract.TesseractNotFoundError()):
+            self.assert_rejected_without_persisting("scan.pdf", payload, 503, "retry")
+        self.assertEqual(self.fixture.current().id, "current-resume")
+
+    def test_receipt_rejected_in_generic_categories_but_valid_supporting_file_can_be_reviewed(self):
+        receipt = "GROCERY RECEIPT\nCash payment at checkout for bread and milk. Thank you for shopping."
+        supporting = ("University Student Identification\nAlex M. Rivera\n"
+                      "University student identification for the current semester. Issued by the office "
+                      "of student affairs. Present this card on campus. Keep your fee receipt separately.")
+        def selectable(text):
+            with pymupdf.open() as pdf:
+                pdf.new_page().insert_textbox(pymupdf.Rect(35, 35, 555, 300), text)
+                return pdf.tobytes()
+        for kind in (DocumentType.USER_ID, DocumentType.REQUIREMENTS, DocumentType.DOCUMENT):
+            with self.subTest(kind=kind):
+                old = self.fixture.doc("approved-" + kind.value, kind=kind)
+                result = self.upload("candidate.pdf", selectable(receipt), kind.value)
+                self.assertEqual(result.status_code, 200, result.text)
+                self.assertEqual(result.json()["status"], "rejected")
+                self.assertEqual(self.fixture.current(kind).id, old.id)
+                result = self.upload("candidate.pdf", selectable(supporting), kind.value)
+                self.assertEqual(result.status_code, 200, result.text)
+                self.assertEqual(result.json()["status"], "pending")
+                self.assertEqual(result.json()["document"]["version_status"], "pending_replacement")
+                self.assertEqual(self.fixture.current(kind).id, old.id)
 
     def test_too_many_pdf_pages_rejected_before_ocr(self):
         with pymupdf.open() as pdf:

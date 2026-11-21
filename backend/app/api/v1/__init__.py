@@ -267,30 +267,6 @@ router.include_router(
 )
 
 
-# ============================================================
-# DEBUG: PRINT REGISTERED ROUTES
-# ============================================================
-
-print("\n" + "=" * 60)
-print("AIMS API V1 - REGISTERED ROUTES")
-print("=" * 60)
-
-for route in router.routes:
-    if hasattr(route, "path"):
-        methods = getattr(route, "methods", None)
-
-        if methods:
-            method_text = ", ".join(sorted(methods))
-        else:
-            method_text = "N/A"
-
-        print(f"{method_text:20} {route.path}")
-
-print("=" * 60)
-print("All AIMS API routers registered successfully!")
-print("=" * 60 + "\n")
-
-
 # Read-only host-company intern monitoring.
 router.include_router(company_monitoring.router, prefix="/company", tags=["Company monitoring"])
 

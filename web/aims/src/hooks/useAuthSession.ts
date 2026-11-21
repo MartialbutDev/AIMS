@@ -1,134 +1,90 @@
-
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../services/apiClient'
-import { getCurrentUserSession, signIn } from '../services/authService'
+import { restoreBrowserSession, signIn } from '../services/authService'
 import type { UserRole, UserSession } from '../types/auth'
-import { SESSION_KEY, readStoredSession, saveStoredSession, clearStoredSession } from '../services/sessionStorage'
-
-// ============================================================
-// AUTHENTICATION SESSION HOOK
-// ============================================================
+import {
+  SESSION_EVENT_KEY, forgetLegacySession, isSignedOut, readLegacySession, readStoredSession,
+  sessionEvent, setCurrentSession, shareSessionChange,
+} from '../services/sessionStorage'
 
 export function useAuthSession() {
-  const [session, setSession] = useState<UserSession | null>(
-    readStoredSession,
-  )
-
+  const [session, setSession] = useState<UserSession | null>(readStoredSession)
   const [isSigningIn, setIsSigningIn] = useState(false)
+  const [isRestoring, setIsRestoring] = useState(true)
+  const [restoreError, setRestoreError] = useState(false)
+  const pending = useRef<AbortController | null>(null)
 
-  // Only restored sessions require an initial validation.
-  const [tokenToRestore, setTokenToRestore] = useState<
-    string | null
-  >(() => readStoredSession()?.accessToken ?? null)
-
-  const [isRestoring, setIsRestoring] = useState(
-    () => Boolean(readStoredSession()),
-  )
-
-  useEffect(() => { const update = () => setSession(readStoredSession()); const sync = (event: StorageEvent) => { if (event.key === SESSION_KEY || event.key === null) update() }; window.addEventListener('aims-session-updated', update); window.addEventListener('storage', sync); return () => { window.removeEventListener('aims-session-updated', update); window.removeEventListener('storage', sync) } }, [])
-
-  // ==========================================================
-  // RESTORE AND VALIDATE EXISTING SESSION
-  // ==========================================================
+  const restore = useCallback(async () => {
+    pending.current?.abort()
+    const controller = new AbortController()
+    pending.current = controller
+    const marker = sessionEvent()
+    setRestoreError(false)
+    setIsRestoring(true)
+    try {
+      const restored = await restoreBrowserSession(controller.signal)
+      if (controller.signal.aborted || marker !== sessionEvent()) return
+      // Announce a legacy migration so older tabs drop stale account information.
+      if (restored && readLegacySession()) shareSessionChange(restored)
+      else {
+        forgetLegacySession()
+        setCurrentSession(restored)
+      }
+    } catch {
+      if (!controller.signal.aborted) setRestoreError(true)
+    } finally {
+      if (pending.current === controller && !controller.signal.aborted) setIsRestoring(false)
+    }
+  }, [])
 
   useEffect(() => {
-    if (!tokenToRestore) {
-      return
+    const update = () => setSession(readStoredSession())
+    const sync = (event: StorageEvent) => {
+      if (event.key !== SESSION_EVENT_KEY && event.key !== null) return
+      pending.current?.abort()
+      setCurrentSession(null)
+      setRestoreError(false)
+      if (isSignedOut()) setIsRestoring(false)
+      else void restore()
     }
-
-    let isCurrent = true
-
-    getCurrentUserSession(tokenToRestore)
-      .then((verifiedSession) => {
-        if (!isCurrent) {
-          return
-        }
-
-        saveStoredSession(verifiedSession)
-
-        setSession(verifiedSession)
-      })
-      .catch((error: unknown) => {
-        if (!isCurrent) {
-          return
-        }
-
-        console.warn(
-          'AIMS session restoration failed:',
-          error,
-        )
-
-        clearStoredSession()
-        setSession(null)
-      })
-      .finally(() => {
-        if (!isCurrent) {
-          return
-        }
-
-        setIsRestoring(false)
-        setTokenToRestore(null)
-      })
-
+    const pageShow = (event: PageTransitionEvent) => { if (event.persisted) void restore() }
+    window.addEventListener('aims-session-updated', update)
+    window.addEventListener('storage', sync)
+    window.addEventListener('pageshow', pageShow)
+    void restore()
     return () => {
-      isCurrent = false
+      pending.current?.abort()
+      window.removeEventListener('aims-session-updated', update)
+      window.removeEventListener('storage', sync)
+      window.removeEventListener('pageshow', pageShow)
     }
-  }, [tokenToRestore])
+  }, [restore])
 
-  // ==========================================================
-  // LOGIN
-  // ==========================================================
-
-  async function login(
-    role: UserRole,
-    loginIdentifier: string,
-    password: string,
-    keepSignedIn = false,
-  ): Promise<void> {
+  async function login(role: UserRole, identifier: string, password: string, remember = false) {
     setIsSigningIn(true)
-
     try {
-      const nextSession = await signIn(
-        role,
-        loginIdentifier,
-        password,
-        keepSignedIn,
-      )
-
-      saveStoredSession(nextSession, keepSignedIn)
-
-      // The login endpoint has just issued this token.
-      // Do not immediately repeat session restoration.
-      setTokenToRestore(null)
+      const next = await signIn(role, identifier, password, remember)
+      pending.current?.abort()
+      shareSessionChange(next)
+      setRestoreError(false)
       setIsRestoring(false)
-      setSession(nextSession)
-    } finally {
-      setIsSigningIn(false)
-    }
+    } finally { setIsSigningIn(false) }
   }
-
-  // ==========================================================
-  // LOGOUT
-  // ==========================================================
 
   async function logout() {
-    try { await apiRequest('/api/v1/auth/logout', { method: 'POST', signal: AbortSignal.timeout(10000) }) } catch { /* Local sign-out remains available offline. */ }
-    clearStoredSession()
-
-    setTokenToRestore(null)
+    const token = readStoredSession()?.accessToken
+    pending.current?.abort()
+    shareSessionChange(null)
+    setRestoreError(false)
     setIsRestoring(false)
-    setSession(null)
+    if (!token) return
+    try {
+      await apiRequest('/api/v1/auth/logout', {
+        method: 'POST', credentials: 'include', headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10000),
+      })
+    } catch { /* Sign-out in this browser also works offline. */ }
   }
 
-  // ==========================================================
-  // EXPOSE AUTHENTICATION STATE
-  // ==========================================================
-
-  return {
-    session,
-    isSigningIn,
-    isRestoring,
-    login,
-    logout,
-  }
+  return { session, isSigningIn, isRestoring, restoreError, retryRestore: restore, login, logout }
 }
