@@ -67,7 +67,7 @@ class BootstrapTests(unittest.TestCase):
             self.assertTrue({'academic_requirements','academic_requirement_events'}<=set(inspect(c).get_table_names()))
             self.assertTrue({'internship_attendance_schedules','internship_attendance_exceptions','internship_reminder_receipts','company_attendance_holidays','attendance_absence_requests','user_usage_activity'}<=set(inspect(c).get_table_names()))
             self.assertTrue({'company_intakes','company_intake_events'} <= set(inspect(c).get_table_names()))
-            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'y15c79ea61ce')
+            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'aa37e91c83ea')
         e.dispose()
     def test_login_throttle_migration_creates_expiry_index_on_existing_installation(self):
         engine = create_engine("sqlite://")
@@ -112,8 +112,13 @@ class BootstrapTests(unittest.TestCase):
             connection.exec_driver_sql("CREATE TABLE internship_deployments (id VARCHAR(36) PRIMARY KEY)")
             connection.exec_driver_sql("CREATE TABLE companies (id VARCHAR(36) PRIMARY KEY)")
             connection.exec_driver_sql("INSERT INTO internship_deployments VALUES ('active-internship')")
+            connection.exec_driver_sql("INSERT INTO companies VALUES ('existing-company')")
             command.stamp(config, "s59c13ea05ce")
             command.upgrade(config, "head")
+            self.assertEqual(tuple(connection.exec_driver_sql(
+                "SELECT id, ustp_coverage, nature_of_partnership, moa_notarized, "
+                "moa_notarized_year, moa_effectivity_years FROM companies"
+            ).one()), ("existing-company", None, None, None, None, None))
             self.assertEqual(
                 inspect(connection).get_pk_constraint("internship_reminder_receipts")["constrained_columns"],
                 ["deployment_id", "kind", "period"],

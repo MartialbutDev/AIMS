@@ -19,6 +19,51 @@ class CompanyCapacityFormTests(unittest.TestCase):
         policy=self.db.query(CompanyIntake).filter_by(company_id=company['id']).one()
         self.assertIsNone(policy.confirmation_reference); self.assertIsNone(policy.supporting_file)
         self.assertEqual(self.db.query(CompanyIntakeEvent).filter_by(intake_id=policy.id).count(),1)
+    def test_partnership_details_round_trip_and_legacy_fields_survive_edit(self):
+        payload = {
+            'name': 'Synthetic Agency', 'intern_capacity': 5,
+            'industry': 'Information technology', 'ustp_coverage': 'USTP Cagayan de Oro',
+            'nature_of_partnership': 'Internship placement', 'address': 'Synthetic office',
+            'moa_notarized': True, 'moa_notarized_year': 2026, 'moa_effectivity_years': 3,
+            'contact_person': 'Synthetic Contact', 'contact_phone': '09123456789',
+            'website': 'https://example.org', 'is_moa_signed': True,
+            'moa_reference': 'MOA-2026-001', 'moa_signed_at': '2026-01-01',
+            'moa_effective_at': '2026-02-01', 'moa_expires_at': '2029-02-01',
+            'contact_email': 'office@example.org', 'description': 'Existing profile description',
+        }
+        created = self.client.post('/companies/', json=payload)
+        self.assertEqual(created.status_code, 201, created.text)
+        path = '/companies/' + created.json()['id']
+        saved = self.client.get(path).json()
+        for field, value in payload.items():
+            if field != 'intern_capacity':
+                self.assertEqual(saved[field], value, field)
+        updated = self.client.put(path, json={'moa_notarized': False, 'moa_notarized_year': None})
+        self.assertEqual(updated.status_code, 200, updated.text)
+        saved = self.client.get(path).json()
+        self.assertIs(saved['moa_notarized'], False)
+        self.assertIsNone(saved['moa_notarized_year'])
+        self.assertTrue(saved['is_moa_signed'])
+        self.assertEqual(saved['moa_effectivity_years'], 3)
+        self.assertEqual(saved['moa_expires_at'], '2029-02-01')
+        self.assertEqual(saved['contact_email'], payload['contact_email'])
+        self.assertEqual(saved['description'], payload['description'])
+        self.assertEqual(saved['intake']['capacity'], 5)
+
+        dated = self.client.put(path, json={'moa_notarized_at': '2027-03-14'})
+        self.assertEqual(dated.status_code, 200, dated.text)
+        saved = self.client.get(path).json()
+        self.assertEqual(saved['moa_notarized_at'], '2027-03-14')
+        self.assertEqual(saved['moa_notarized_year'], 2027)
+        self.assertTrue(saved['moa_notarized'])
+        self.assertEqual(saved['moa_signed_at'], payload['moa_signed_at'])
+
+
+    def test_invalid_partnership_dates_and_durations_are_rejected(self):
+        for fields in ({'moa_notarized_year': 26}, {'moa_effectivity_years': 0}, {'moa_effectivity_years': 1.5}):
+            response = self.client.put('/companies/partner', json=fields)
+            self.assertEqual(response.status_code, 422, response.text)
+
     def test_invalid_or_missing_capacity_does_not_create_company(self):
         before=self.db.query(Company).count()
         for capacity in [None,0,-1,1.5,True,100001]:

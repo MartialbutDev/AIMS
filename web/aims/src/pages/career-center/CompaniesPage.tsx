@@ -29,13 +29,16 @@ type CompanyForm = {
   intern_capacity: string
   intake_version: number
   name: string
-  description: string
   address: string
   contact_person: string
-  contact_email: string
   contact_phone: string
   industry: string
   website: string
+  ustp_coverage: string
+  nature_of_partnership: string
+  moa_notarized_at: string
+  moa_notarized_year: string
+  moa_effectivity_years: string
   is_active: boolean
   is_moa_signed: boolean
   moa_reference: string
@@ -48,13 +51,16 @@ const emptyForm: CompanyForm = {
   intern_capacity: '',
   intake_version: 0,
   name: '',
-  description: '',
   address: '',
   contact_person: '',
-  contact_email: '',
   contact_phone: '',
   industry: '',
   website: '',
+  ustp_coverage: '',
+  nature_of_partnership: '',
+  moa_notarized_at: '',
+  moa_notarized_year: '',
+  moa_effectivity_years: '',
   is_active: true,
   is_moa_signed: false,
   moa_reference: '',
@@ -130,13 +136,16 @@ function companyToForm(company: CareerCompany): CompanyForm {
     intern_capacity: company.intake?.capacity == null ? "" : String(company.intake.capacity),
     intake_version: company.intake?.version || 0,
     name: company.name,
-    description: company.description ?? '',
     address: company.address ?? '',
     contact_person: company.contact_person ?? '',
-    contact_email: company.contact_email ?? '',
     contact_phone: company.contact_phone ?? '',
     industry: company.industry ?? '',
     website: company.website ?? '',
+    ustp_coverage: company.ustp_coverage ?? '',
+    nature_of_partnership: company.nature_of_partnership ?? '',
+    moa_notarized_at: company.moa_notarized_at ?? '',
+    moa_notarized_year: company.moa_notarized_year?.toString() ?? '',
+    moa_effectivity_years: company.moa_effectivity_years?.toString() ?? '',
     is_active: company.is_active,
     is_moa_signed: company.is_moa_signed,
     moa_reference: company.moa_reference ?? '',
@@ -153,13 +162,16 @@ function toPayload(form: CompanyForm): CareerCompanyPayload {
     intern_capacity: Number(form.intern_capacity),
     intake_version: form.intake_version,
     name: form.name.trim(),
-    description: nullable(form.description),
     address: nullable(form.address),
     contact_person: nullable(form.contact_person),
-    contact_email: nullable(form.contact_email),
     contact_phone: nullable(form.contact_phone),
     industry: nullable(form.industry),
     website: nullable(form.website),
+    ustp_coverage: nullable(form.ustp_coverage),
+    nature_of_partnership: nullable(form.nature_of_partnership),
+    moa_notarized_at: nullable(form.moa_notarized_at),
+    moa_notarized_year: form.moa_notarized_year === '' ? null : Number(form.moa_notarized_year),
+    moa_effectivity_years: form.moa_effectivity_years === '' ? null : Number(form.moa_effectivity_years),
     is_active: form.is_active,
     is_moa_signed: form.is_moa_signed,
     moa_reference: nullable(form.moa_reference),
@@ -206,6 +218,9 @@ function FormField({
   onChange,
   type = 'text',
   placeholder,
+  min,
+  max,
+  maxLength,
   required = false,
 }: {
   label: string
@@ -213,6 +228,9 @@ function FormField({
   onChange: (value: string) => void
   type?: string
   placeholder?: string
+  min?: number
+  max?: number
+  maxLength?: number
   required?: boolean
 }) {
   return (
@@ -223,6 +241,9 @@ function FormField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        min={min}
+        max={max}
+        maxLength={maxLength}
         required={required}
       />
     </label>
@@ -302,6 +323,8 @@ export function CompaniesPage({
       const matchesSearch = [
         company.name,
         company.industry,
+        company.ustp_coverage,
+        company.nature_of_partnership,
         company.contact_person,
         company.contact_email,
         company.address,
@@ -878,6 +901,11 @@ export function CompaniesPage({
                 <div className="cc-detail-grid">
                   {[
                     ['Intern slots', selected.intake?.capacity == null ? 'Not set' : `${selected.intake.remaining} available / ${selected.intake.capacity} total`],
+                    ['USTP coverage', selected.ustp_coverage],
+                    ['Nature of partnership', selected.nature_of_partnership],
+                    ['MOA notarized', formatDate(selected.moa_notarized_at ?? null)],
+                    ['Year notarized', selected.moa_notarized_year?.toString()],
+                    ['Effectivity (years)', selected.moa_effectivity_years?.toString()],
                     ['Contact person', selected.contact_person],
                     ['Email', selected.contact_email],
                     ['Phone', selected.contact_phone],
@@ -930,73 +958,102 @@ export function CompaniesPage({
                     <div className="cc-form-grid">
                       <div className="cc-field-full">
                         <FormField
-                          label="Company Name *"
+                          label="Company/Agency Name *"
                           value={form.name}
                           onChange={(value) => updateForm('name', value)}
-                          placeholder="Enter registered company name"
+                          maxLength={255}
                           required
                         />
                       </div>
 
-                      <label className="cc-field">
-                        <span>Number of interns *</span>
-                        <input type="number" min="1" max="100000" step="1" required value={form.intern_capacity} onChange={event => updateForm('intern_capacity', event.target.value)} />
-                      </label>
-
                       <FormField
-                        label="Industry"
+                        label="Nature of Business"
                         value={form.industry}
                         onChange={(value) => updateForm('industry', value)}
-                        placeholder="e.g. Information Technology"
+                        maxLength={100}
                       />
 
                       <FormField
-                        label="Website"
-                        value={form.website}
-                        onChange={(value) => updateForm('website', value)}
-                        placeholder="https://example.com"
+                        label="USTP Coverage"
+                        value={form.ustp_coverage}
+                        onChange={(value) => updateForm('ustp_coverage', value)}
+                        maxLength={255}
                       />
 
                       <FormField
-                        label="Contact Person"
-                        value={form.contact_person}
-                        onChange={(value) => updateForm('contact_person', value)}
-                        placeholder="Full name"
-                      />
-
-                      <FormField
-                        label="Contact Email"
-                        type="email"
-                        value={form.contact_email}
-                        onChange={(value) => updateForm('contact_email', value)}
-                        placeholder="contact@company.com"
-                      />
-
-                      <FormField
-                        label="Contact Phone"
-                        type="tel"
-                        value={form.contact_phone}
-                        onChange={(value) => updateForm('contact_phone', value)}
-                        placeholder="Contact number"
+                        label="Nature of Partnership"
+                        value={form.nature_of_partnership}
+                        onChange={(value) => updateForm('nature_of_partnership', value)}
+                        maxLength={255}
                       />
 
                       <FormField
                         label="Address"
                         value={form.address}
                         onChange={(value) => updateForm('address', value)}
-                        placeholder="Company address"
+                        maxLength={500}
                       />
 
-                      <label className="cc-field cc-field-full">
-                        <span>Description</span>
-                        <textarea
-                          rows={3}
-                          value={form.description}
-                          onChange={(event) =>
-                            updateForm('description', event.target.value)
+                      <label className="cc-field">
+                        <span>MOA Notarized</span>
+                        <input
+                          type="date"
+                          min="1000-01-01"
+                          max="9999-12-31"
+                          value={form.moa_notarized_at}
+                          onChange={({ target: { value } }) =>
+                            setForm((current) => ({
+                              ...current,
+                              moa_notarized_at: value,
+                              moa_notarized_year: value.slice(0, 4),
+                            }))
                           }
-                          placeholder="Brief company description..."
                         />
+                      </label>
+
+                      <label className="cc-field">
+                        <span>Year Notarized</span>
+                        <input
+                          type="number"
+                          min="1000"
+                          max="9999"
+                          value={form.moa_notarized_year}
+                          readOnly={Boolean(form.moa_notarized_at)}
+                          onChange={(event) => updateForm('moa_notarized_year', event.target.value)}
+                        />
+                      </label>
+
+                      <FormField
+                        label="Effectivity (Years)"
+                        value={form.moa_effectivity_years}
+                        onChange={(value) => updateForm('moa_effectivity_years', value)}
+                        type="number" min={1} max={9999}
+                      />
+
+                      <FormField
+                        label="Contact Person"
+                        value={form.contact_person}
+                        onChange={(value) => updateForm('contact_person', value)}
+                        maxLength={100}
+                      />
+
+                      <FormField
+                        label="Contact Phone"
+                        value={form.contact_phone}
+                        onChange={(value) => updateForm('contact_phone', value)}
+                        type="tel" maxLength={20}
+                      />
+
+                      <FormField
+                        label="Website"
+                        value={form.website}
+                        onChange={(value) => updateForm('website', value)}
+                        maxLength={255}
+                      />
+
+                      <label className="cc-field">
+                        <span>Number of interns *</span>
+                        <input type="number" min="1" max="100000" step="1" required value={form.intern_capacity} onChange={event => updateForm('intern_capacity', event.target.value)} />
                       </label>
                     </div>
                   </div>

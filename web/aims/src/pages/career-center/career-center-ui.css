@@ -730,6 +730,7 @@
 }
 
 .cc-field input,
+.cc-field select,
 .cc-field textarea {
   width: 100%;
   min-width: 0;
@@ -745,6 +746,7 @@
 }
 
 .cc-field input:focus,
+.cc-field select:focus,
 .cc-field textarea:focus {
   border-color: #92adf2;
   box-shadow: 0 0 0 3px rgba(40, 88, 215, 0.07);

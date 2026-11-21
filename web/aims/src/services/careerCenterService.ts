@@ -16,6 +16,11 @@ export interface CareerCompany {
   contact_phone: string | null
   industry: string | null
   website: string | null
+  ustp_coverage: string | null
+  nature_of_partnership: string | null
+  moa_notarized_at: string | null
+  moa_notarized_year: number | null
+  moa_effectivity_years: number | null
 
   is_active: boolean
   is_moa_signed: boolean
@@ -40,6 +45,11 @@ export interface CareerCompanyPayload {
   contact_phone?: string | null
   industry?: string | null
   website?: string | null
+  ustp_coverage?: string | null
+  nature_of_partnership?: string | null
+  moa_notarized_at?: string | null
+  moa_notarized_year?: number | null
+  moa_effectivity_years?: number | null
 
   is_active?: boolean
   is_moa_signed?: boolean

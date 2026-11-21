@@ -14,6 +14,12 @@ class CompanyBase(BaseModel):
     contact_phone: Optional[str] = Field(None, max_length=20)
     industry: Optional[str] = Field(None, max_length=100)
     website: Optional[str] = Field(None, max_length=255)
+    ustp_coverage: str | None = Field(default=None, max_length=255)
+    nature_of_partnership: str | None = Field(default=None, max_length=255)
+    moa_notarized: bool | None = Field(default=None, strict=True)
+    moa_notarized_at: date | None = Field(default=None, ge=date(1000, 1, 1))
+    moa_notarized_year: int | None = Field(default=None, ge=1000, le=9999, strict=True)
+    moa_effectivity_years: int | None = Field(default=None, gt=0, le=9999, strict=True)
 
 
 class CompanyCreate(CompanyBase):
@@ -36,6 +42,12 @@ class CompanyUpdate(BaseModel):
     contact_phone: Optional[str] = Field(None, max_length=20)
     industry: Optional[str] = Field(None, max_length=100)
     website: Optional[str] = Field(None, max_length=255)
+    ustp_coverage: str | None = Field(default=None, max_length=255)
+    nature_of_partnership: str | None = Field(default=None, max_length=255)
+    moa_notarized: bool | None = Field(default=None, strict=True)
+    moa_notarized_at: date | None = Field(default=None, ge=date(1000, 1, 1))
+    moa_notarized_year: int | None = Field(default=None, ge=1000, le=9999, strict=True)
+    moa_effectivity_years: int | None = Field(default=None, gt=0, le=9999, strict=True)
 
     is_active: Optional[bool] = None
     is_moa_signed: Optional[bool] = None

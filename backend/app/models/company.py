@@ -1,7 +1,7 @@
 
 import uuid
 
-from sqlalchemy import Boolean, Column, Date, DateTime, String, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
 
 from app.core.database import Base
@@ -25,6 +25,12 @@ class Company(Base):
     contact_phone = Column(String(20), nullable=True)
     industry = Column(String(100), nullable=True)
     website = Column(String(255), nullable=True)
+    ustp_coverage = Column(String(255), nullable=True)
+    nature_of_partnership = Column(String(255), nullable=True)
+    moa_notarized = Column(Boolean, nullable=True)
+    moa_notarized_at = Column(Date, nullable=True)
+    moa_notarized_year = Column(Integer, nullable=True)
+    moa_effectivity_years = Column(Integer, nullable=True)
 
     is_active = Column(Boolean, nullable=False, default=True)
     is_moa_signed = Column(Boolean, nullable=False, default=False)

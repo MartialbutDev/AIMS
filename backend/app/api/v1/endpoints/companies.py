@@ -115,6 +115,12 @@ def normalize_moa_state(company: Company) -> None:
     validate_moa_dates(company)
 
 
+def sync_notarization_date(company: Company) -> None:
+    if company.moa_notarized_at is not None:
+        company.moa_notarized = True
+        company.moa_notarized_year = company.moa_notarized_at.year
+
+
 def check_duplicate_name(
     db: Session,
     name: str,
@@ -313,6 +319,7 @@ async def create_company(
 
     # Unsigned agreements cannot retain signed MOA dates.
     normalize_moa_state(company)
+    sync_notarization_date(company)
 
     try:
         db.add(company)
@@ -378,6 +385,7 @@ async def update_company(
 
     # Prevent unsigned MOAs from retaining signed dates.
     normalize_moa_state(company)
+    sync_notarization_date(company)
 
     try:
         if has_capacity:
