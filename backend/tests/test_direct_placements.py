@@ -52,6 +52,8 @@ class DirectPlacementTests(unittest.TestCase):
             self.db.add(Company(id=identifier,name=identifier.title()+' Company',is_active=True,is_moa_signed=identifier!='pending',moa_reference='FIXTURE-MOA' if identifier!='pending' else None,
                 moa_signed_at=self.today-timedelta(days=60) if identifier!='pending' else None,moa_effective_at=self.today-timedelta(days=30) if identifier!='pending' else None,moa_expires_at=self.today+timedelta(days=365) if identifier!='pending' else None))
         self.db.flush()  # Persist companies before supervisor-company links.
+        from company_intake_fixtures import configure_intake
+        configure_intake(self.db, ["partner", "pending", "other"])
         for company in ['partner','pending']:
             self.db.add(HTESupervisorCompany(id='hte-'+company,supervisor_id='hte',company_id=company,is_active=True))
         self.db.add(HTESupervisorCompany(id='hte-other',supervisor_id='hte2',company_id='other',is_active=True))

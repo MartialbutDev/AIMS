@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { dtrService, type DTR } from '../services/dtr.service';
 
 export default function AttendanceBreakControls({ record, onChange }: { record: DTR; onChange: (record: DTR) => void }) {
-  const { colors } = useTheme();
+  const { isDark, colors } = useTheme();
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const sending = useRef(false), requestId = useRef('');
   if (record.time_out || record.status !== 'pending') return null;
@@ -26,8 +26,8 @@ export default function AttendanceBreakControls({ record, onChange }: { record: 
     <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>Lunch and recorded breaks are excluded from working hours. Changes take effect when saved by the server. {active ? 'End this break before clocking out.' : 'Start a break when you stop working.'}</Text>
     <Text style={{ color: colors.textSecondary }}>Completed breaks: {Math.round((record.break_seconds || 0) / 6) / 10} minutes</Text>
     {!!error && <Text accessibilityRole="alert" style={{ color: colors.textPrimary }}>{error}</Text>}
-    <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void changeBreak()} style={{ padding: 14, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', opacity: busy ? .6 : 1 }}>
-      <Text style={{ color: '#fff', fontWeight: '700' }}>{busy ? 'Saving…' : active ? 'End break' : 'Start break'}</Text>
+    <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={() => void changeBreak()} style={[{ padding: 14, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', opacity: busy ? .6 : 1 }, isDark && { backgroundColor: Boolean(busy) ? colors.surfaceTertiary : colors.accent }]}>
+      <Text style={[{ color: '#fff', fontWeight: '700' }, isDark && { color: (Boolean(busy) ? colors.textSecondary : colors.onAccent) }]}>{busy ? 'Saving…' : active ? 'End break' : 'Start break'}</Text>
     </TouchableOpacity>
   </View>;
 }

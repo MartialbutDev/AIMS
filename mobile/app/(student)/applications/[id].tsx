@@ -129,8 +129,8 @@ export default function ApplicationDetailScreen() {
         <View style={styles.centerContent}>
           <Ionicons name="document-text-outline" size={64} color={colors.border} />
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>Application not found</Text>
-          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={fetchApplicationDetail}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]} onPress={fetchApplicationDetail}>
+            <Text style={[styles.retryButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Retry</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

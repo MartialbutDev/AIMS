@@ -25,6 +25,7 @@ from app.core.assignment_access import (
 from app.core.security import get_current_user, require_role
 
 from app.models.user import User, UserRole
+from app.services import company_intake as intake_service
 from app.models.company import Company
 from app.models.application import Application, ApplicationStatus
 from app.models.document import Document
@@ -351,6 +352,8 @@ async def create_application(
         academic_year,
         semester,
     )
+
+    intake_service.require_capacity(db, company.id, academic_year, semester, new_application=True)
 
     application = Application(
         id=str(uuid.uuid4()),
@@ -720,6 +723,7 @@ async def update_application_status(
                 direct_service.ensure_application_ready(db, application)
             if requested_status == ApplicationStatus.ACCEPTED:
                 direct_service.require_no_direct_conflict(db, application.student_id, application.academic_year, application.semester, application.id)
+                intake_service.require_capacity(db, application.company_id, application.academic_year, application.semester, new_application=False)
 
             if requested_status in (
                 ApplicationStatus.ACCEPTED,

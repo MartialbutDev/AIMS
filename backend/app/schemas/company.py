@@ -17,6 +17,7 @@ class CompanyBase(BaseModel):
 
 
 class CompanyCreate(CompanyBase):
+    intern_capacity: int = Field(gt=0, le=100000, strict=True)
     is_moa_signed: bool = False
     moa_reference: Optional[str] = Field(None, max_length=120)
     moa_signed_at: Optional[date] = None
@@ -25,6 +26,8 @@ class CompanyCreate(CompanyBase):
 
 
 class CompanyUpdate(BaseModel):
+    intern_capacity: int | None = Field(default=None, gt=0, le=100000, strict=True)
+    intake_version: int | None = Field(default=None, ge=0, strict=True)
     name: Optional[str] = Field(None, min_length=2, max_length=255)
     description: Optional[str] = None
     address: Optional[str] = Field(None, max_length=500)
@@ -43,7 +46,20 @@ class CompanyUpdate(BaseModel):
     moa_expires_at: Optional[date] = None
 
 
+class CompanyIntakeSummary(BaseModel):
+    academic_year: str
+    semester: str
+    capacity: int | None
+    accepted: int
+    remaining: int | None
+    accepting: bool
+    status: str
+    can_apply: bool
+    version: int
+
+
 class CompanyResponse(CompanyBase):
+    intake: CompanyIntakeSummary | None = None
     id: str
     is_active: bool
     is_moa_signed: bool

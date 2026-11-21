@@ -1,7 +1,7 @@
 import { apiRequest } from './apiClient'
 import type { CareerCompany } from './careerCenterService'
 
-export type MoaStatus = 'current' | 'expiring' | 'expired' | 'unsigned' | 'upcoming' | 'incomplete' | 'inactive'
+export type MoaStatus = 'current' | 'expiring'
 export interface DeanPartner extends CareerCompany {
   moa_status: MoaStatus
   moa_ready: boolean

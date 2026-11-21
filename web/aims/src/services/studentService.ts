@@ -68,7 +68,7 @@ export interface StudentDocument {
   academic_year?: string; semester?: string; created_at?: string; review_notes?: string
   version_status?: string; version_label?: string; is_current_approved?: boolean; current_approved_id?: string
 }
-export interface Company { id: string; name: string; industry?: string; description?: string; address?: string; contact_email?: string; contact_phone?: string; is_active: boolean; is_moa_signed: boolean; moa_effective_at?: string; moa_expires_at?: string }
+export interface Company { intake?: import('./companyIntakeService').IntakeSummary; id: string; name: string; industry?: string; description?: string; address?: string; contact_email?: string; contact_phone?: string; is_active: boolean; is_moa_signed: boolean; moa_effective_at?: string; moa_expires_at?: string }
 export interface Application { id: string; company_id: string; company_name?: string; position: string; status: string; applied_date: string; academic_year: string; semester: string; feedback?: string; cover_letter?: string }
 export interface Journey { stage: string; application_status: string; academic_year: string; semester: string; is_current_term: boolean; endorsement: { ready: boolean; status: string; review_notes?: string }; deployment_status?: string }
 export interface OnboardingSubmission { id: string; document_kind?: string; original_filename: string; review_status: string; review_notes?: string; student_feedback?: StudentFeedback }

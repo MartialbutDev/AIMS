@@ -199,9 +199,9 @@ export default function ApplicationsScreen() {
         styles.filterChip,
         {
           backgroundColor:
-            selectedFilter === filter ? colors.primary : colors.card,
+            selectedFilter === filter ? colors.accent : colors.card,
           borderColor:
-            selectedFilter === filter ? colors.primary : colors.border,
+            selectedFilter === filter ? colors.accent : colors.border,
         },
       ]}
       onPress={() => setSelectedFilter(filter)}
@@ -211,7 +211,7 @@ export default function ApplicationsScreen() {
         style={[
           styles.filterChipText,
           {
-            color: selectedFilter === filter ? "#FFFFFF" : colors.textSecondary,
+            color: selectedFilter === filter ? colors.onAccent : colors.textSecondary,
           },
         ]}
       >
@@ -344,13 +344,11 @@ export default function ApplicationsScreen() {
               Start applying to internships to build your career
             </Text>
             <TouchableOpacity
-              style={[
-                styles.emptyStateButton,
-                { backgroundColor: colors.primary },
-              ]}
+              style={[styles.emptyStateButton,
+                { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
               onPress={() => router.push("/(student)/applications/new" as any)}
             >
-              <Text style={styles.emptyStateButtonText}>Apply Now</Text>
+              <Text style={[styles.emptyStateButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Apply Now</Text>
             </TouchableOpacity>
           </View>
         }

@@ -69,16 +69,16 @@ export default function PreDeploymentScreen() {
   const canUpload = deployment?.status === "PRE_DEPLOYMENT";
   const ready = checklist?.ready_for_deployment === true;
   const message = !deployment
-    ? "Your pre-deployment checklist will appear after your internship application is accepted."
+    ? "Your checklist opens after company acceptance."
     : deployment.status === "DEPLOYED"
-      ? "Your coordinator has confirmed your deployment. You can now submit DTR and journals."
+      ? "Deployment approved. You can record attendance and journals."
       : deployment.status === "COMPLETED"
-        ? "Your internship is completed. You can view your existing DTR and journals."
+        ? "Your internship is complete. Your records are read-only."
         : deployment.status === "CANCELLED"
           ? "This deployment has been cancelled. Contact your coordinator for the next steps."
           : ready
-            ? "All required documents are verified. Awaiting coordinator confirmation."
-            : "Submit your required documents for verification. Your coordinator will confirm your official deployment once all requirements are verified.";
+            ? "Requirements approved. Awaiting deployment approval."
+            : "Upload missing requirements or follow the review feedback.";
 
   const upload = (documentType: string) => router.push({
     pathname: "/(student)/documents/upload", params: { type: documentType },
@@ -87,7 +87,7 @@ export default function PreDeploymentScreen() {
     : deployment.status === "DEPLOYED" ? "Deployment confirmed"
     : deployment.status === "COMPLETED" ? "Internship completed"
     : deployment.status === "CANCELLED" ? "Deployment cancelled"
-    : ready ? "Ready for coordinator review" : "Prepare for deployment";
+    : ready ? "Await deployment approval" : "Prepare for deployment";
 
   const button = (label: string, onPress: () => void, primary = false, accessibilityLabel?: string) => (
     <TouchableOpacity accessibilityRole="button" accessibilityLabel={accessibilityLabel || label}
@@ -135,6 +135,8 @@ export default function PreDeploymentScreen() {
           {deployment && <View style={styles.metaRow}><Ionicons name="calendar-outline" size={15} color="#CED5E9" /><Text style={styles.metaText}>AY {deployment.academic_year} · Semester {deployment.semester}</Text></View>}
           <Text style={styles.heroBody}>{message}</Text>
           {!deployment && button("View applications", () => router.push("/(student)/applications"), true)}
+          {canUpload && ready && button("Refresh status", () => void load(true), true)}
+          {canUpload && <Text style={styles.heroBody}>Attendance opens after deployment approval.</Text>}
           {canUpload && nextDocument && button(`${nextDocument.status === "rejected" ? "Correct" : "Upload"} ${nextDocument.label}`, () => upload(nextDocument.document_type), true)}
           {deployment?.deployment_date && <View style={styles.dateRow}><Ionicons name="calendar-number-outline" size={18} color={gold} /><Text style={styles.dateText}>Deployment date · {displayDate(deployment.deployment_date)}</Text></View>}
         </View>

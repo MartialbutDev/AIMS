@@ -1,3 +1,4 @@
+import { applicationSteps, applicationStep } from '../utils/applicationFlow'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { router } from 'expo-router'
@@ -14,17 +15,11 @@ interface Journey {
   endorsement: { ready: boolean; status: string; document_id: string | null; review_notes: string | null }
   checklist: { ready_for_deployment: boolean } | null
 }
-const steps = ['Submit application', 'School endorsement', 'Company decision', 'Pre-deployment requirements', 'Coordinator deployment approval', 'Start internship']
-const guidance: Record<string, { step: number; title: string; description: string }> = {
-  upload_endorsement: { step: 1, title: 'Upload your school endorsement letter', description: 'Obtain the letter from your school, then upload it for coordinator review before your application can be forwarded to the company.' },
-  endorsement_review: { step: 1, title: 'Wait for endorsement review', description: 'Your letter is awaiting coordinator content review. Check the feedback here and refresh for updates.' },
-  coordinator_review: { step: 1, title: 'Wait for coordinator forwarding', description: 'Your endorsement letter is approved. Your coordinator will review and forward your application to the company.' },
-  company_review: { step: 2, title: 'Wait for the company decision', description: 'Your application has been forwarded. Follow any interview instructions from the company and check here for its decision.' },
-  pre_deployment: { step: 3, title: 'Complete your pre-deployment checklist', description: 'The company accepted your application. Upload the requirements shown in Pre-deployment and address coordinator feedback.' },
-  deployment_approval: { step: 4, title: 'Wait for coordinator deployment approval', description: 'Your required pre-deployment documents are verified. Your coordinator must confirm deployment before you start recording attendance.' },
-  deployed: { step: 5, title: 'Your internship is deployed', description: 'Record your daily attendance and submit weekly journals. Track your approved hours on the dashboard.' },
-  completed: { step: 6, title: 'Internship completed', description: 'Open Completion & Archive in Profile to review your archived internship records.' },
-}
+const steps = applicationSteps
+const guidance = Object.fromEntries(['upload_endorsement','endorsement_review','coordinator_review','company_review','pre_deployment','deployment_approval','deployed','completed'].map(stage => {
+  const state = applicationStep(stage)!
+  return [stage, { step: state.index, title: state.index < steps.length ? steps[state.index] : stage === 'completed' ? 'Internship completed' : 'Deployment approved', description: state.message }]
+}))
 
 export function ApplicationJourney({ applicationId }: { applicationId: string }) {
   const { colors, isDark } = useTheme()
@@ -34,6 +29,7 @@ export function ApplicationJourney({ applicationId }: { applicationId: string })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
+  const [showSteps, setShowSteps] = useState(false)
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
@@ -70,6 +66,7 @@ export function ApplicationJourney({ applicationId }: { applicationId: string })
   } else if (journey?.stage === 'completed') {
     primaryAction = { label: 'Open Completion & Archive', onPress: () => router.push('/(student)/completion') }
   }
+  if (canAct && journey && applicationStep(journey.stage)?.kind === 'refresh') primaryAction = { label: 'Refresh status', onPress: () => setRevision(value => value + 1) }
   const documentId = journey?.endorsement.document_id
 
   return <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, compact && styles.compactCard]}>
@@ -107,10 +104,10 @@ export function ApplicationJourney({ applicationId }: { applicationId: string })
           <Text style={[styles.actionLabel, { color: gold }]}>{closed ? 'APPLICATION CLOSED' : historical ? 'APPLICATION HISTORY' : stateLabels[journey.stage]}</Text>
         </View>
         <Text style={[styles.actionTitle, compact && styles.compactTitle]}>{closed ? `Application ${journey.stage}` : historical ? 'Your previous application' : current?.title}</Text>
-        <Text style={styles.actionDescription}>{closed ? 'Review the feedback below for the outcome of this application.' : historical ? `AY ${journey.academic_year} · Semester ${journey.semester}. These steps are available for reference.` : current?.description}</Text>
+        <Text style={styles.actionDescription}>{closed ? 'Review the feedback below for the outcome of this application.' : historical ? `AY ${journey.academic_year} · Semester ${journey.semester}. Read-only record.` : current?.description}</Text>
         {journey.stage === 'pre_deployment' && !journey.checklist && <Text style={styles.actionDescription}>Your coordinator is preparing the deployment checklist. Contact them if it remains unavailable.</Text>}
-        {primaryAction && <TouchableOpacity accessibilityRole="button" activeOpacity={0.8} onPress={primaryAction.onPress} style={[styles.primaryButton, { backgroundColor: gold }]}>
-          <Text style={styles.primaryButtonText}>{primaryAction.label}</Text><Ionicons name="arrow-forward" size={18} color="#0B0B2F" />
+        {primaryAction && <TouchableOpacity accessibilityRole="button" activeOpacity={0.8} onPress={primaryAction.onPress} style={[styles.primaryButton, { backgroundColor: gold }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}>
+          <Text style={[styles.primaryButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>{primaryAction.label}</Text><Ionicons name="arrow-forward" size={18} color={isDark ? (false ? colors.textSecondary : colors.onAccent) : "#0B0B2F"} />
         </TouchableOpacity>}
         {documentId && !closed && <TouchableOpacity accessibilityRole="button" activeOpacity={0.7} style={styles.documentLink}
           onPress={() => router.push({ pathname: '/(student)/documents/[id]', params: { id: documentId } })}>
@@ -123,7 +120,8 @@ export function ApplicationJourney({ applicationId }: { applicationId: string })
         <Text style={[styles.body, { color: colors.textSecondary }]}>{journey.endorsement.review_notes}</Text>
       </View>}
 
-      <View style={styles.timeline}>
+      <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showSteps }} onPress={() => setShowSteps(value => !value)} style={{ minHeight: 44, justifyContent: 'center', marginTop: 12 }}><Text style={{ color: colors.accent, fontWeight: '600' }}>{showSteps ? 'Hide steps' : 'All application steps'}</Text></TouchableOpacity>
+      {showSteps && <View style={styles.timeline}>
         {steps.map((title, index) => {
           const done = index === 0 || (!closed && !!current && index < current.step)
           const active = !closed && current?.step === index
@@ -140,7 +138,7 @@ export function ApplicationJourney({ applicationId }: { applicationId: string })
             </View>
           </View>
         })}
-      </View>
+      </View>}
     </>}
   </View>
 }

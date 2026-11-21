@@ -3,14 +3,15 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleShe
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { router } from 'expo-router';
+import { useSafeBack } from '../../hooks/useSafeBack';
 import { useTheme } from '../../context/ThemeContext';
 
 type Icon = keyof typeof Ionicons.glyphMap;
 export function AccountHeader({ title }: { title: string }) {
+  const goBack = useSafeBack();
   const { colors } = useTheme();
   return <View style={ui.header}>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={[ui.back, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={goBack} style={[ui.back, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <Ionicons name="arrow-back" size={21} color={colors.textPrimary} />
     </TouchableOpacity>
     <View style={{ flex: 1 }}><Text style={[ui.eyebrow, { color: colors.textSecondary }]}>AIMS · STUDENT</Text><Text accessibilityRole="header" style={[ui.headerTitle, { color: colors.textPrimary }]}>{title}</Text></View>

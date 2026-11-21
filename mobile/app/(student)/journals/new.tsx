@@ -292,26 +292,24 @@ export default function NewJournalScreen() {
         </View>
 
         <TouchableOpacity
-          style={[
-            styles.submitButton,
+          style={[styles.submitButton,
             { backgroundColor: colors.primary },
-            !canSubmit && styles.submitButtonDisabled,
-          ]}
+            !canSubmit && styles.submitButtonDisabled, isDark && { backgroundColor: Boolean(!canSubmit) ? colors.surfaceTertiary : colors.accent }]}
           onPress={handleSubmit}
           disabled={!canSubmit}
           activeOpacity={0.85}
         >
           {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={isDark ? (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
           ) : (
             <>
               <Ionicons
                 name="send-outline"
                 size={20}
-                color="#FFFFFF"
+                color={isDark ? (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"}
                 style={styles.submitIcon}
               />
-              <Text style={styles.submitButtonText}>Submit Journal</Text>
+              <Text style={[styles.submitButtonText, isDark && { color: (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) }]}>Submit Journal</Text>
             </>
           )}
         </TouchableOpacity>

@@ -1,3 +1,4 @@
+import { useSafeBack } from '../../../src/hooks/useSafeBack';
 // app/(student)/settings/index.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -17,6 +18,7 @@ interface SettingItem {
 }
 
 export default function SettingsScreen() {
+  const goBack = useSafeBack();
   const { colors, isDark } = useTheme();
 
   const handleLogout = () => {
@@ -106,7 +108,7 @@ export default function SettingsScreen() {
       <StatusBar style={isDark ? "light" : "dark"} backgroundColor={colors.background} />
 
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={goBack} style={styles.backButton}>
           <Ionicons name="arrow-back-outline" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Settings</Text>

@@ -132,7 +132,7 @@ export default function ProfileScreen() {
   const loadProfile = useCallback(async () => {
     try {
       setLoading(true);
-
+      
       const data = await authService.getCurrentUser();
       setProfile(data);
       setEditFirstName(data.first_name);
@@ -140,13 +140,13 @@ export default function ProfileScreen() {
       setEditPhone(data.phone || "");
       setEditMiddleName(data.middle_name || "");
       setEditGender(data.gender ?? null);
-
+      
       const avatar = await authService.getAvatar();
       setAvatarUri(avatar || null);
-
+      
       // ✅ Load documents
       await loadDocuments();
-
+      
     } catch (error) {
       console.error("Error loading profile:", error);
       Alert.alert("Error", "Failed to load profile data");
@@ -181,13 +181,13 @@ export default function ProfileScreen() {
         last_name: editLastName.trim(),
         phone: editPhone.trim() || null,
       });
-
+      
       setProfile(updated);
       setEditing(false);
       Alert.alert("Success", "Profile updated successfully!");
-
+      
       await loadProfile();
-
+      
     } catch (error) {
       Alert.alert("Error", "Failed to update profile");
     } finally {
@@ -213,18 +213,18 @@ export default function ProfileScreen() {
 
       if (!result.canceled) {
         const uri = result.assets[0].uri;
-
+        
         setUploadingAvatar(true);
         setAvatarUri(uri);
-
+        
         const updatedUser = await authService.uploadAvatar(uri);
         setProfile(updatedUser);
-
+        
         await refreshAvatar();
-
+        
         Alert.alert("Success", "Profile picture updated!");
       }
-
+      
     } catch (error: any) {
       console.error("Avatar upload error:", error);
       Alert.alert("Error", error.message || "Failed to upload avatar");
@@ -341,10 +341,10 @@ export default function ProfileScreen() {
                 No documents uploaded yet
               </Text>
               <TouchableOpacity
-                style={[styles.docUploadButton, { backgroundColor: colors.primary }]}
+                style={[styles.docUploadButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
                 onPress={() => router.push("/(student)/documents/upload")}
               >
-                <Text style={styles.docUploadButtonText}>Upload Document</Text>
+                <Text style={[styles.docUploadButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Upload Document</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -586,8 +586,8 @@ export default function ProfileScreen() {
         <View style={styles.centerContent}>
           <Ionicons name="person-outline" size={64} color={colors.border} />
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>Failed to load profile</Text>
-          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={loadProfile}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]} onPress={loadProfile}>
+            <Text style={[styles.retryButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Retry</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -606,8 +606,8 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {editing && <View style={{ marginBottom: 20 }}><AccountHero icon="create-outline" title="Your details, up to date." description="Update your personal details and profile photo. Your student ID and email are managed by the school." label="PERSONAL INFORMATION" /></View>}
         <View style={[styles.avatarSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <TouchableOpacity
-            style={styles.avatarContainer}
+          <TouchableOpacity 
+            style={styles.avatarContainer} 
             onPress={handlePickImage}
             disabled={uploadingAvatar}
           >
@@ -626,7 +626,7 @@ export default function ProfileScreen() {
               <Ionicons name="camera-outline" size={16} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
-
+          
           {avatarUri && (
             <TouchableOpacity
               style={[styles.deleteAvatarButton, { backgroundColor: `${colors.error}10` }]}
@@ -636,7 +636,7 @@ export default function ProfileScreen() {
               <Text style={[styles.deleteAvatarText, { color: colors.error }]}>Remove</Text>
             </TouchableOpacity>
           )}
-
+          
           <Text style={[styles.studentName, { color: colors.textPrimary }]}>{fullName}</Text>
           <Text style={[styles.studentId, { color: colors.textSecondary }]}>ID: {profile.student_id}</Text>
           <Text style={[styles.userRole, { color: colors.accent, backgroundColor: `${colors.primary}10` }]}>
@@ -797,8 +797,8 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}30` }]}
+        <TouchableOpacity 
+          style={[styles.logoutButton, { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}30` }]} 
           onPress={handleLogout}
         >
           <Ionicons name="log-out-outline" size={22} color={colors.error} />

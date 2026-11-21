@@ -228,9 +228,9 @@ export default function JournalsScreen() {
         styles.filterChip,
         {
           backgroundColor:
-            selectedFilter === filter ? colors.primary : colors.card,
+            selectedFilter === filter ? colors.accent : colors.card,
           borderColor:
-            selectedFilter === filter ? colors.primary : colors.border,
+            selectedFilter === filter ? colors.accent : colors.border,
         },
       ]}
       onPress={() => setSelectedFilter(filter)}
@@ -240,7 +240,7 @@ export default function JournalsScreen() {
         style={[
           styles.filterChipText,
           {
-            color: selectedFilter === filter ? "#FFFFFF" : colors.textSecondary,
+            color: selectedFilter === filter ? colors.onAccent : colors.textSecondary,
           },
         ]}
       >
@@ -258,9 +258,9 @@ export default function JournalsScreen() {
           styles.weekChip,
           {
             backgroundColor:
-              selectedWeek === week ? colors.primary : colors.card,
+              selectedWeek === week ? colors.accent : colors.card,
             borderColor:
-              selectedWeek === week ? colors.primary : colors.border,
+              selectedWeek === week ? colors.accent : colors.border,
           },
         ]}
         onPress={() => setSelectedWeek(week)}
@@ -270,7 +270,7 @@ export default function JournalsScreen() {
           style={[
             styles.weekChipText,
             {
-              color: selectedWeek === week ? "#FFFFFF" : colors.textSecondary,
+              color: selectedWeek === week ? colors.onAccent : colors.textSecondary,
             },
           ]}
         >
@@ -458,13 +458,11 @@ export default function JournalsScreen() {
               Upload your weekly internship journal as a PDF
             </Text>
             <TouchableOpacity
-              style={[
-                styles.emptyStateButton,
-                { backgroundColor: colors.primary },
-              ]}
+              style={[styles.emptyStateButton,
+                { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
               onPress={() => router.push("/(student)/journals/new" as any)}
             >
-              <Text style={styles.emptyStateButtonText}>Upload Journal</Text>
+              <Text style={[styles.emptyStateButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Upload Journal</Text>
             </TouchableOpacity>
           </View>
         }

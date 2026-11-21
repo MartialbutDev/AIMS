@@ -204,10 +204,10 @@ export default function JournalDetailScreen() {
             Journal not found
           </Text>
           <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            style={[styles.retryButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
             onPress={() => load(true)}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={[styles.retryButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Retry</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -335,13 +335,13 @@ export default function JournalDetailScreen() {
               PDF Document
             </Text>
             <TouchableOpacity
-              style={[styles.openPdfButton, { backgroundColor: colors.primary }]}
+              style={[styles.openPdfButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: Boolean(opening) ? colors.surfaceTertiary : colors.accent }]}
               onPress={handleOpenPDF}
               disabled={opening}
               activeOpacity={0.85}
             >
-              <Ionicons name="open-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.openPdfButtonText}>{opening ? "Opening…" : "Open PDF"}</Text>
+              <Ionicons name="open-outline" size={20} color={isDark ? (Boolean(opening) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
+              <Text style={[styles.openPdfButtonText, isDark && { color: (Boolean(opening) ? colors.textSecondary : colors.onAccent) }]}>{opening ? "Opening…" : "Open PDF"}</Text>
             </TouchableOpacity>
           </View>
 
@@ -426,26 +426,24 @@ export default function JournalDetailScreen() {
         {isEditable && (
           <>
             <TouchableOpacity
-              style={[
-                styles.submitButton,
+              style={[styles.submitButton,
                 { backgroundColor: colors.primary },
-                submitting && styles.submitButtonDisabled,
-              ]}
+                submitting && styles.submitButtonDisabled, isDark && { backgroundColor: Boolean(submitting) ? colors.surfaceTertiary : colors.accent }]}
               onPress={handleSubmit}
               disabled={submitting}
               activeOpacity={0.85}
             >
               {submitting ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={isDark ? (Boolean(submitting) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
               ) : (
                 <>
                   <Ionicons
                     name="send-sharp"
                     size={20}
-                    color="#FFFFFF"
+                    color={isDark ? (Boolean(submitting) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"}
                     style={{ marginRight: 8 }}
                   />
-                  <Text style={styles.submitButtonText}>
+                  <Text style={[styles.submitButtonText, isDark && { color: (Boolean(submitting) ? colors.textSecondary : colors.onAccent) }]}>
                     Submit for Review
                   </Text>
                 </>

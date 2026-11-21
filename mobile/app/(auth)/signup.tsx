@@ -1074,7 +1074,7 @@ export default function SignUpScreen() {
 
                   <TouchableOpacity
 
-                    style={[styles.signUpButton, loading && styles.signUpButtonDisabled, { backgroundColor: colors.primary }]}
+                    style={[styles.signUpButton, loading && styles.signUpButtonDisabled, { backgroundColor: colors.primary }, isDark && { backgroundColor: Boolean(loading || success) ? colors.surfaceTertiary : colors.accent }]}
 
                     onPress={handleSignUp}
 
@@ -1090,7 +1090,7 @@ export default function SignUpScreen() {
 
                     {loading ? (
 
-                      <ActivityIndicator color="#FFFFFF" />
+                      <ActivityIndicator color={isDark ? (Boolean(loading || success) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
 
                     ) : (
 
@@ -1102,13 +1102,13 @@ export default function SignUpScreen() {
 
                           size={20}
 
-                          color="#FFFFFF"
+                          color={isDark ? (Boolean(loading || success) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"}
 
                           style={styles.signUpButtonIcon}
 
                         />
 
-                        <Text style={[styles.signUpButtonText, { color: '#FFFFFF' }]}>Create Account</Text>
+                        <Text style={[styles.signUpButtonText, { color: '#FFFFFF' }, isDark && { color: (Boolean(loading || success) ? colors.textSecondary : colors.onAccent) }]}>Create Account</Text>
 
                       </View>
 

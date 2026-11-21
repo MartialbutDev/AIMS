@@ -2,7 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import {
   View,
   Modal,
   FlatList,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -26,12 +27,14 @@ interface Company {
   description: string;
   industry: string;
   is_moa_signed: boolean;
+  intake?: { capacity: number | null; accepted: number; remaining: number | null; status: string; can_apply: boolean };
 }
 
 interface Document {
   id: string;
   type: string;
   description: string;
+  original_filename?: string;
   verification_status: string;
   is_current_approved?: boolean;
   file_path?: string;
@@ -47,11 +50,19 @@ const DOCUMENT_TYPES = [
   { value: "requirements", label: "Requirements" },
 ];
 
+const intakeText = (company: Company) => {
+  const intake = company.intake;
+  const label = ({ accepting: 'Accepting interns', closed: 'Not accepting interns', full: 'Capacity reached',
+    not_configured: 'Capacity not set', unavailable: 'Availability unavailable' } as Record<string, string>)[intake?.status || 'unavailable'] || 'Availability unavailable';
+  return label + (intake?.capacity != null ? ` · ${intake.remaining} of ${intake.capacity} slots available` : '');
+};
+
 // Normalize the many shape variations we might get from the backend
 const normalizeDoc = (raw: any): Document => ({
   id: String(raw.id ?? ""),
   type: String(raw.type ?? "document").toLowerCase(),
   description: String(raw.description ?? ""),
+  original_filename: raw.original_filename,
   verification_status: String(raw.verification_status ?? "pending").toLowerCase(),
   is_current_approved: raw.is_current_approved === true,
   file_path: raw.file_path,
@@ -67,8 +78,11 @@ const toArray = <T,>(payload: any): T[] => {
 export default function NewApplicationScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
 
   const [loading, setLoading] = useState(false);
+  const [reviewVisible, setReviewVisible] = useState(false);
+  const submissionGuard = useRef(false);
   const [eligibility, setEligibility] = useState<{ allowed: boolean; reason: string | null } | null>(null);
   const [checkingEligibility, setCheckingEligibility] = useState(true);
   const [eligibilityRevision, setEligibilityRevision] = useState(0);
@@ -382,16 +396,14 @@ export default function NewApplicationScreen() {
                       Upload and wait for verification
                     </Text>
                     <TouchableOpacity
-                      style={[
-                        styles.dropdownUploadBtn,
-                        { backgroundColor: colors.primary },
-                      ]}
+                      style={[styles.dropdownUploadBtn,
+                        { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
                       onPress={() => {
                         setShowDropdown(false);
                         router.push("/(student)/documents/upload");
                       }}
                     >
-                      <Text style={styles.dropdownUploadBtnText}>
+                      <Text style={[styles.dropdownUploadBtnText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>
                         Upload {docTypeLabel}
                       </Text>
                     </TouchableOpacity>
@@ -409,16 +421,19 @@ export default function NewApplicationScreen() {
   // -------- submit --------
 
   const handleSubmit = async () => {
+    if (submissionGuard.current) return;
     if (checkingEligibility || !eligibility?.allowed) {
       return Alert.alert('Application unavailable', eligibility?.reason || 'Checking application eligibility.');
     }
     if (!selectedCompany) return Alert.alert("Error", "Please select a company");
+    if (!companies.find(company => company.id === selectedCompany)?.intake?.can_apply) return Alert.alert('Applications unavailable', 'This company is not accepting new applications. Refresh the company list.');
     if (!position.trim()) return Alert.alert("Error", "Please enter a position");
     if (!selectedResume)
       return Alert.alert("Error", "Please select a verified Resume/CV");
     if (!selectedAppLetter)
       return Alert.alert("Error", "Please select a verified Application Letter");
 
+    submissionGuard.current = true;
     setLoading(true);
     try {
       const response = await api.post("/applications/", {
@@ -428,7 +443,8 @@ export default function NewApplicationScreen() {
         application_letter_id: selectedAppLetter.id,
       });
 
-      Alert.alert("Application submitted", "Your application is awaiting coordinator review. Open your application steps to check your endorsement letter status and see your next action.", [
+      setReviewVisible(false);
+      Alert.alert("Application submitted", "Next, upload your school-issued endorsement letter.", [
         { text: "Continue to application steps", onPress: () => router.replace({ pathname: '/(student)/applications/[id]', params: { id: response.data.id } }) },
         {
           text: "View Applications",
@@ -442,14 +458,18 @@ export default function NewApplicationScreen() {
       setSelectedResume(null);
       setSelectedAppLetter(null);
     } catch (error: any) {
-      console.error("Submission error:", error);
-      if (error.response?.status === 409) setEligibilityRevision(value => value + 1);
+      if (!error.response || [408, 500, 502, 504].includes(error.response.status)) {
+        Alert.alert("Submission unconfirmed", "Check Applications before submitting again.", [{ text: "Keep editing", style: "cancel" }, { text: "View applications", onPress: () => router.push("/(student)/applications") }]);
+        return;
+      }
+      if (error.response?.status === 409) { setEligibilityRevision(value => value + 1); void fetchCompanies(); }
       Alert.alert(
         "Error",
         error.response?.data?.detail ||
           "Failed to submit application. Please try again."
       );
     } finally {
+      submissionGuard.current = false;
       setLoading(false);
     }
   };
@@ -459,10 +479,15 @@ export default function NewApplicationScreen() {
     eligibility?.allowed === true &&
     !checkingEligibility &&
     !!selectedCompany &&
+    selectedCompanyData?.intake?.can_apply === true &&
     !!position.trim() &&
     !!selectedResume &&
     !!selectedAppLetter &&
     !loading;
+
+  const disabledReason = checkingEligibility ? 'Checking eligibility…' : !eligibility?.allowed ? eligibility?.reason || 'Complete onboarding first.'
+    : !selectedCompany ? 'Choose a company.' : !selectedCompanyData?.intake?.can_apply ? 'This company is not accepting applications.'
+    : !selectedResume || !selectedAppLetter ? 'Select your current approved resume and application letter.' : !position.trim() ? 'Enter your internship position.' : '';
 
   // -------- render --------
 
@@ -495,7 +520,7 @@ export default function NewApplicationScreen() {
         contentContainerStyle={[
           styles.content,
           // extra bottom room so the fixed submit button never covers content
-          { paddingBottom: 120 + insets.bottom },
+          { paddingBottom: Math.max(190, 150 * fontScale) + insets.bottom },
         ]}
       >
         {checkingEligibility ? (
@@ -531,6 +556,63 @@ export default function NewApplicationScreen() {
           </View>
         ) : (
           <>
+            <View style={{ padding: 16, borderRadius: 12, backgroundColor: colors.card, borderTopWidth: 3, borderColor: '#0B0B2F', marginBottom: 20 }}>
+              <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 15, lineHeight: 23 }}>{selectedResume && selectedAppLetter ? 'Step 2 of 6 · Submit application' : 'Step 1 of 6 · Prepare documents'}</Text>
+              <Text style={{ color: colors.textSecondary, lineHeight: 21, marginTop: 8 }}>Select your current approved resume and application letter.</Text>
+              {!loadingDocs && (!documents.some(doc => doc.type === 'resume' && doc.is_current_approved) || !documents.some(doc => doc.type === 'application_letter' && doc.is_current_approved)) && <TouchableOpacity accessibilityRole="button" onPress={() => router.push('/(student)/documents/upload')} style={{ minHeight: 44, justifyContent: 'center', marginTop: 6 }}><Text style={{ color: colors.accent, fontWeight: '600' }}>Upload missing documents</Text></TouchableOpacity>}
+            </View>
+            {/* -------- documents -------- */}
+            <View style={styles.docSectionWrapper}>
+              <Text
+                style={[
+                  styles.docSectionTitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                Required Documents
+              </Text>
+              <Text
+                style={[
+                  styles.docSectionSubtitle,
+                  { color: colors.textTertiary },
+                ]}
+              >
+                Select your current approved resume and application letter.
+              </Text>
+
+              {loadingDocs ? (
+                <View style={styles.docLoadingContainer}>
+                  <ActivityIndicator size="small" color={colors.accent} />
+                  <Text
+                    style={[
+                      styles.docLoadingText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    Loading your documents...
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {renderDocumentDropdown(
+                    "Resume/CV",
+                    selectedResume,
+                    setSelectedResume,
+                    showResumeDropdown,
+                    setShowResumeDropdown,
+                    "resume"
+                  )}
+                  {renderDocumentDropdown(
+                    "Application Letter",
+                    selectedAppLetter,
+                    setSelectedAppLetter,
+                    showAppLetterDropdown,
+                    setShowAppLetterDropdown,
+                    "application_letter"
+                  )}
+                </>
+              )}
+            </View>
             {/* -------- company selection -------- */}
             <View style={styles.section}>
               <Text
@@ -593,6 +675,7 @@ export default function NewApplicationScreen() {
                     >
                       {company.industry}
                     </Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 8 }}>{intakeText(company)}</Text>
                     {selectedCompany === company.id && (
                       <Ionicons
                         name="checkmark-circle"
@@ -633,6 +716,7 @@ export default function NewApplicationScreen() {
                 >
                   {selectedCompanyData.name}
                 </Text>
+                <Text style={{ color: colors.textPrimary, fontSize: 14, lineHeight: 21, marginTop: 12 }}>{intakeText(selectedCompanyData)}</Text>
                 <Text
                   style={[
                     styles.selectedInfoDesc,
@@ -692,62 +776,26 @@ export default function NewApplicationScreen() {
               />
             </View>
 
-            {/* -------- documents -------- */}
-            <View style={styles.docSectionWrapper}>
-              <Text
-                style={[
-                  styles.docSectionTitle,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                Required Documents
-              </Text>
-              <Text
-                style={[
-                  styles.docSectionSubtitle,
-                  { color: colors.textTertiary },
-                ]}
-              >
-                Select from your current approved documents
-              </Text>
-
-              {loadingDocs ? (
-                <View style={styles.docLoadingContainer}>
-                  <ActivityIndicator size="small" color={colors.accent} />
-                  <Text
-                    style={[
-                      styles.docLoadingText,
-                      { color: colors.textSecondary },
-                    ]}
-                  >
-                    Loading your documents...
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  {renderDocumentDropdown(
-                    "Resume/CV",
-                    selectedResume,
-                    setSelectedResume,
-                    showResumeDropdown,
-                    setShowResumeDropdown,
-                    "resume"
-                  )}
-                  {renderDocumentDropdown(
-                    "Application Letter",
-                    selectedAppLetter,
-                    setSelectedAppLetter,
-                    showAppLetterDropdown,
-                    setShowAppLetterDropdown,
-                    "application_letter"
-                  )}
-                </>
-              )}
-            </View>
           </>
         )}
       </ScrollView>
 
+      <Modal visible={reviewVisible} transparent animationType="fade" onRequestClose={() => { if (!loading) setReviewVisible(false); }}>
+        <View style={{ flex: 1, backgroundColor: '#00000088', justifyContent: 'center', padding: 20 }}>
+          <ScrollView style={{ maxHeight: '85%', borderRadius: 18, backgroundColor: colors.card }} contentContainerStyle={{ padding: 20, gap: 16 }}>
+            <Text accessibilityRole="header" style={{ color: colors.textPrimary, fontSize: 20, fontWeight: '700' }}>Review application</Text>
+            <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>Check your company and attachments before submitting.</Text>
+            {[
+              ['Company', selectedCompanyData?.name], ['Position', position],
+              ['Resume / CV', selectedResume?.original_filename || selectedResume?.description || 'Approved resume'],
+              ['Application letter', selectedAppLetter?.original_filename || selectedAppLetter?.description || 'Approved application letter'],
+            ].map(([label, value]) => <View key={label} style={{ gap: 6 }}><Text style={{ color: colors.textSecondary, fontSize: 12 }}>{label}</Text><Text style={{ color: colors.textPrimary, fontSize: 14, lineHeight: 21, fontWeight: '600' }}>{value}</Text></View>)}
+            <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>These files stay attached to this application.</Text>
+            <TouchableOpacity accessibilityRole="button" disabled={loading || !canSubmit} onPress={handleSubmit} style={[{ minHeight: 48, backgroundColor: '#FFC629', borderRadius: 10, padding: 14, alignItems: 'center', opacity: loading || !canSubmit ? .6 : 1 }, isDark && { backgroundColor: Boolean(loading || !canSubmit) ? colors.surfaceTertiary : colors.accent }]}><Text style={[{ color: '#0B0B2F', fontWeight: '700' }, isDark && { color: (Boolean(loading || !canSubmit) ? colors.textSecondary : colors.onAccent) }]}>{loading ? 'Submitting…' : 'Submit application'}</Text></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" disabled={loading} onPress={() => setReviewVisible(false)} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: colors.accent }}>Edit details</Text></TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
       {/* -------- fixed bottom submit button -------- */}
       {!loadingCompanies && companies.length > 0 && (
         <View
@@ -760,27 +808,26 @@ export default function NewApplicationScreen() {
             },
           ]}
         >
+          {!!disabledReason && <Text accessibilityLiveRegion="polite" style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 8 }}>{disabledReason}</Text>}
           <TouchableOpacity
-            style={[
-              styles.submitButton,
+            style={[styles.submitButton,
               { backgroundColor: colors.primary },
-              !canSubmit && styles.submitButtonDisabled,
-            ]}
-            onPress={handleSubmit}
+              !canSubmit && styles.submitButtonDisabled, isDark && { backgroundColor: Boolean(!canSubmit) ? colors.surfaceTertiary : colors.accent }]}
+            onPress={() => { if (canSubmit) setReviewVisible(true); }}
             disabled={!canSubmit}
             activeOpacity={0.85}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={isDark ? (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
             ) : (
               <>
                 <Ionicons
                   name="send-outline"
                   size={20}
-                  color="#FFFFFF"
+                  color={isDark ? (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"}
                   style={styles.submitIcon}
                 />
-                <Text style={styles.submitButtonText}>Submit Application</Text>
+                <Text style={[styles.submitButtonText, isDark && { color: (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) }]}>Review application</Text>
               </>
             )}
           </TouchableOpacity>
@@ -801,7 +848,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   backButton: { padding: 4 },
-  headerTitle: { fontSize: 20, fontWeight: "700" },
+  headerTitle: { flex: 1, textAlign: "center", fontSize: 20, fontWeight: "700" },
   headerRight: { width: 32 },
   content: { paddingHorizontal: 20 },
   loadingContainer: {

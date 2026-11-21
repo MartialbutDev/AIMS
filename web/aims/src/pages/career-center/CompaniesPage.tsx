@@ -1,3 +1,4 @@
+import { IntakeAvailability } from '../../components/CompanyIntakePanel'
 import { MoaFiles } from '../../components/MoaFiles'
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
@@ -25,6 +26,8 @@ type CompanyFilter =
   | 'inactive'
 
 type CompanyForm = {
+  intern_capacity: string
+  intake_version: number
   name: string
   description: string
   address: string
@@ -42,6 +45,8 @@ type CompanyForm = {
 }
 
 const emptyForm: CompanyForm = {
+  intern_capacity: '',
+  intake_version: 0,
   name: '',
   description: '',
   address: '',
@@ -122,6 +127,8 @@ function initials(name: string): string {
 
 function companyToForm(company: CareerCompany): CompanyForm {
   return {
+    intern_capacity: company.intake?.capacity == null ? "" : String(company.intake.capacity),
+    intake_version: company.intake?.version || 0,
     name: company.name,
     description: company.description ?? '',
     address: company.address ?? '',
@@ -143,6 +150,8 @@ function toPayload(form: CompanyForm): CareerCompanyPayload {
   const nullable = (value: string) => value.trim() || null
 
   return {
+    intern_capacity: Number(form.intern_capacity),
+    intake_version: form.intake_version,
     name: form.name.trim(),
     description: nullable(form.description),
     address: nullable(form.address),
@@ -369,6 +378,11 @@ export function CompaniesPage({
 
     setFormError('')
     setSuccess('')
+
+    if (!Number.isInteger(Number(form.intern_capacity)) || Number(form.intern_capacity) < 1 || Number(form.intern_capacity) > 100000) {
+      setFormError('Enter the number of interns (1–100,000).')
+      return
+    }
 
     if (form.name.trim().length < 2) {
       setFormError('Company name must have at least two characters.')
@@ -640,6 +654,7 @@ export function CompaniesPage({
                   <th>Company</th>
                   <th>Contact</th>
                   <th>MOA Status</th>
+                  <th>Internship intake</th>
                   <th>Expiration</th>
                   <th>Account</th>
                   <th className="cc-actions-heading">Actions</th>
@@ -676,6 +691,9 @@ export function CompaniesPage({
 
                     <td>
                       <CompanyBadge company={company} />
+                    </td>
+                    <td>
+                      <IntakeAvailability value={company.intake} />
                     </td>
 
                     <td>
@@ -859,6 +877,7 @@ export function CompaniesPage({
 
                 <div className="cc-detail-grid">
                   {[
+                    ['Intern slots', selected.intake?.capacity == null ? 'Not set' : `${selected.intake.remaining} available / ${selected.intake.capacity} total`],
                     ['Contact person', selected.contact_person],
                     ['Email', selected.contact_email],
                     ['Phone', selected.contact_phone],
@@ -918,6 +937,11 @@ export function CompaniesPage({
                           required
                         />
                       </div>
+
+                      <label className="cc-field">
+                        <span>Number of interns *</span>
+                        <input type="number" min="1" max="100000" step="1" required value={form.intern_capacity} onChange={event => updateForm('intern_capacity', event.target.value)} />
+                      </label>
 
                       <FormField
                         label="Industry"

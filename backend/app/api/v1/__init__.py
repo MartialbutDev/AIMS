@@ -56,6 +56,8 @@ from app.routers.documents import documents_router
 router = APIRouter(dependencies=[Depends(academic_policy_scope)])
 router.include_router(academic_requirements.router)
 router.include_router(company_access.router)
+from app.api.v1.endpoints import company_intakes
+router.include_router(company_intakes.router)
 from app.api.v1.endpoints import moa_files
 router.include_router(moa_files.router)
 from app.api.v1.endpoints import activity_history

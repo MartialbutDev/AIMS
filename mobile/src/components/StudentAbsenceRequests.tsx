@@ -23,7 +23,7 @@ function dateInPhilippines(value: Date) {
 }
 
 export function StudentAbsenceRequests({ active, revision }: { active: boolean; revision: number }) {
-  const { colors } = useTheme();
+  const { isDark, colors } = useTheme();
   const focused = useIsFocused();
   const [items, setItems] = useState<Absence[] | null>(null);
   const [draft, setDraft] = useState<AbsenceDraft | null>(null);
@@ -149,8 +149,8 @@ export function StudentAbsenceRequests({ active, revision }: { active: boolean; 
         <Pressable accessibilityRole="button" accessibilityState={{ disabled: busy || !draft.kind }}
           disabled={busy || !draft.kind} onPress={() => void submit()}
           style={({ pressed }) => [styles.button, styles.submitButton, { backgroundColor: colors.accent },
-            (pressed || busy || !draft.kind) && styles.disabled]}>
-          <Text style={[styles.strong, { color: colors.onAccent }]}>{busy ? 'Sending…' : 'Send request'}</Text>
+            (pressed || busy || !draft.kind) && styles.disabled, isDark && { backgroundColor: Boolean(busy || !draft.kind) ? colors.surfaceTertiary : colors.accent }]}>
+          <Text style={[styles.strong, { color: colors.onAccent }, isDark && { color: (Boolean(busy || !draft.kind) ? colors.textSecondary : colors.onAccent) }]}>{busy ? 'Sending…' : 'Send request'}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" style={styles.button} disabled={busy} onPress={() => {
           setDraft(null);

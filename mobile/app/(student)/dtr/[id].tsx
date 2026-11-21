@@ -158,10 +158,10 @@ export default function DTRDetailScreen() {
             DTR record not found
           </Text>
           <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            style={[styles.retryButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
             onPress={() => fetchDTR(true)}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={[styles.retryButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Retry</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -399,7 +399,7 @@ export default function DTRDetailScreen() {
           <TouchableOpacity
             disabled={dtr.on_break}
             accessibilityState={{ disabled: Boolean(dtr.on_break) }}
-            style={[styles.actionButton, { backgroundColor: colors.primary, opacity: dtr.on_break ? .5 : 1 }]}
+            style={[styles.actionButton, { backgroundColor: colors.primary, opacity: dtr.on_break ? .5 : 1 }, isDark && { backgroundColor: Boolean(dtr.on_break) ? colors.surfaceTertiary : colors.accent }]}
             onPress={() =>
               router.push(`/(student)/dtr/time-out?id=${dtr.id}` as any)
             }
@@ -408,10 +408,10 @@ export default function DTRDetailScreen() {
             <Ionicons
               name="log-out-outline"
               size={22}
-              color="#FFFFFF"
+              color={isDark ? (Boolean(dtr.on_break) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"}
               style={{ marginRight: 10 }}
             />
-            <Text style={styles.actionButtonText}>{dtr.on_break ? 'End break before time-out' : 'Record Time-Out'}</Text>
+            <Text style={[styles.actionButtonText, isDark && { color: (Boolean(dtr.on_break) ? colors.textSecondary : colors.onAccent) }]}>{dtr.on_break ? 'End break before time-out' : 'Record Time-Out'}</Text>
           </TouchableOpacity>
         </View>
       )}

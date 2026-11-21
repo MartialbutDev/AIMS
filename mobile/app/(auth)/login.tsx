@@ -719,8 +719,7 @@ export default function LoginScreen() {
                   {/* =========================================== */}
 
                   <TouchableOpacity
-                    style={[
-                      styles.loginButton,
+                    style={[styles.loginButton,
 
                       loading &&
                         styles.loginButtonDisabled,
@@ -728,8 +727,7 @@ export default function LoginScreen() {
                       {
                         backgroundColor:
                           colors.primary,
-                      },
-                    ]}
+                      }, isDark && { backgroundColor: Boolean(loading) ? colors.surfaceTertiary : colors.accent }]}
                     onPress={() =>
                       void handleLogin()
                     }
@@ -743,7 +741,7 @@ export default function LoginScreen() {
                   >
                     {loading ? (
                       <ActivityIndicator
-                        color="#FFFFFF"
+                        color={isDark ? (Boolean(loading) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"}
                       />
                     ) : (
                       <View
@@ -754,20 +752,18 @@ export default function LoginScreen() {
                         <Ionicons
                           name="log-in-outline"
                           size={20}
-                          color="#FFFFFF"
+                          color={isDark ? (Boolean(loading) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"}
                           style={
                             styles.loginButtonIcon
                           }
                         />
 
                         <Text
-                          style={[
-                            styles.loginButtonText,
+                          style={[styles.loginButtonText,
                             {
                               color:
                                 "#FFFFFF",
-                            },
-                          ]}
+                            }, isDark && { color: (Boolean(loading) ? colors.textSecondary : colors.onAccent) }]}
                         >
                           Login
                         </Text>

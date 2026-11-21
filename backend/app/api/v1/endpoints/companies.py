@@ -9,15 +9,22 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
+from app.services import company_intake as intake_service
 from app.models.company import Company
 from app.models.user import User
 from app.schemas.company import (
     CompanyCreate,
     CompanyResponse,
+    CompanyIntakeSummary,
     CompanyUpdate,
 )
 
 router = APIRouter()
+
+def with_intakes(db, rows):
+    states = intake_service.summaries(db, rows)
+    return [CompanyResponse.model_validate(row).model_copy(update={"intake": CompanyIntakeSummary.model_validate(states[row.id])}) for row in rows]
+
 
 COMPANY_MANAGER_ROLES = {"admin", "career_center"}
 
@@ -162,7 +169,7 @@ async def get_companies(
 
     Only active companies are returned.
     """
-    return (
+    rows = (
         db.query(Company)
         .filter(Company.is_active.is_(True))
         .order_by(Company.name.asc())
@@ -170,6 +177,7 @@ async def get_companies(
         .limit(limit)
         .all()
     )
+    return with_intakes(db, rows)
 
 
 @router.get("/manage", response_model=List[CompanyResponse])
@@ -185,13 +193,14 @@ async def get_manageable_companies(
     Includes active and inactive companies.
     Only admin and career_center may access it.
     """
-    return (
+    rows = (
         db.query(Company)
         .order_by(Company.name.asc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+    return with_intakes(db, rows)
 
 
 @router.get("/all", response_model=List[CompanyResponse])
@@ -204,13 +213,14 @@ async def get_all_companies_admin(
     """
     Backward-compatible administrator directory.
     """
-    return (
+    rows = (
         db.query(Company)
         .order_by(Company.name.asc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+    return with_intakes(db, rows)
 
 
 # ============================================================
@@ -224,26 +234,18 @@ async def get_dean_partner_directory(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("dean")),
 ):
-    """Dean-only read access; includes inactive records without granting management."""
+    """Read-only directory of active partnerships, using the placement MOA checks."""
     today = datetime.now(timezone(timedelta(hours=8))).date()
-    query = db.query(Company)
-    total = query.count()
+    candidates = db.query(Company).filter(Company.is_active.is_(True), Company.is_moa_signed.is_(True))
+    # Apply the shared readiness rules before counting or slicing pages.
+    partners = [company for company in candidates.order_by(Company.name.asc(), Company.id.asc()).all()
+                if moa_state(company)['ready']]
+    total = len(partners)
     items = []
-    for company in query.order_by(Company.name.asc(), Company.id.asc()).offset(skip).limit(limit).all():
+    for company in partners[skip:skip + limit]:
         state = moa_state(company)
-        days = (company.moa_expires_at - today).days if company.moa_expires_at else None
-        if not company.is_active:
-            status = 'inactive'
-        elif not company.is_moa_signed:
-            status = 'unsigned'
-        elif days is not None and days < 0:
-            status = 'expired'
-        elif company.moa_effective_at and company.moa_effective_at > today:
-            status = 'upcoming'
-        elif state['ready']:
-            status = 'expiring' if days <= 30 else 'current'
-        else:
-            status = 'incomplete'
+        days = (company.moa_expires_at - today).days
+        status = 'expiring' if days <= 30 else 'current'
         items.append({**CompanyResponse.model_validate(company).model_dump(mode='json'),
                       'moa_status': status, 'moa_ready': state['ready'],
                       'days_to_expiry': days, 'checks': state['checks']})
@@ -272,7 +274,7 @@ async def get_company(
             detail="Company not found.",
         )
 
-    return company
+    return with_intakes(db, [company])[0]
 
 
 # ============================================================
@@ -294,7 +296,9 @@ async def create_company(
 
     Only admin and career_center can register companies.
     """
+    intake_service.require_schema(db)
     payload = company_data.model_dump()
+    capacity = payload.pop("intern_capacity")
     payload["name"] = payload["name"].strip()
 
     if len(payload["name"]) < 2:
@@ -312,13 +316,15 @@ async def create_company(
 
     try:
         db.add(company)
+        db.flush()
+        intake_service.record_capacity(db, company, current_user, capacity)
         db.commit()
         db.refresh(company)
     except Exception:
         db.rollback()
         raise
 
-    return company
+    return with_intakes(db, [company])[0]
 
 
 # ============================================================
@@ -337,9 +343,14 @@ async def update_company(
 
     Only admin and career_center can update companies.
     """
-    company = get_company_or_404(db, company_id)
+    company = intake_service.company(db, company_id, lock=True)
 
     updates = company_data.model_dump(exclude_unset=True)
+    has_capacity = "intern_capacity" in updates
+    capacity = updates.pop("intern_capacity", None)
+    version = updates.pop("intake_version", None)
+    if has_capacity and (capacity is None or version is None):
+        raise HTTPException(422, "Provide a positive intern capacity and its current version.")
 
     if "name" in updates:
         if updates["name"] is None:
@@ -369,13 +380,16 @@ async def update_company(
     normalize_moa_state(company)
 
     try:
+        if has_capacity:
+            db.flush()
+            intake_service.record_capacity(db, company, current_user, capacity, version)
         db.commit()
         db.refresh(company)
     except Exception:
         db.rollback()
         raise
 
-    return company
+    return with_intakes(db, [company])[0]
 
 
 # ============================================================

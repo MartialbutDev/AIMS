@@ -1,5 +1,6 @@
+import { ActionButton } from './account/AccountUI'
 import { useEffect, useState } from 'react'
-import { View, Text, TextInput, Button, Alert, Platform } from 'react-native'
+import { View, Text, TextInput, Alert, Platform } from 'react-native'
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker'
 import api from '../services/api'
 import { useTheme } from '../context/ThemeContext'
@@ -84,13 +85,13 @@ export default function DTRCorrectionForm({dtrId}:{dtrId:string}) {
     return <View style={{ marginBottom: 12 }}>
       <Text style={{ color: colors.textPrimary }}>{label} (AM/PM)</Text>
       <TextInput accessibilityLabel={`Requested ${label.toLowerCase()}, including AM or PM`} placeholder={placeholder} placeholderTextColor={colors.textSecondary} autoCapitalize="characters" autoCorrect={false} value={value} onChangeText={setValue} style={style}/>
-      {hasNativePicker && <Button title={`Choose ${label.toLowerCase()} time`} disabled={busy || picker !== null} onPress={() => openPicker(field)} />}
+      {hasNativePicker && <ActionButton secondary title={`Choose ${label.toLowerCase()} time`} disabled={busy || picker !== null} onPress={() => openPicker(field)} />}
       {Platform.OS === 'ios' && picker?.field === field && <>
         <DateTimePicker mode="time" display="spinner" locale="en-US" value={picker.value}
           onChange={(_, selected) => { if (selected) setPicker({ field, value: selected }) }} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Button title="Cancel" onPress={() => setPicker(null)} />
-          <Button title="Use this time" onPress={() => { applyPickedTime(field, picker.value); setPicker(null) }} />
+          <ActionButton secondary title="Cancel" onPress={() => setPicker(null)} />
+          <ActionButton secondary title="Use this time" onPress={() => { applyPickedTime(field, picker.value); setPicker(null) }} />
         </View>
       </>}
     </View>
@@ -103,6 +104,7 @@ export default function DTRCorrectionForm({dtrId}:{dtrId:string}) {
     {renderTimeField('start', 'Clock-in', start, setStart, '8:00 AM')}
     {renderTimeField('end', 'Clock-out', end, setEnd, '5:00 PM')}
     <Text style={{color:colors.textPrimary}}>Reason</Text><TextInput accessibilityLabel="Correction reason" multiline maxLength={1000} value={reason} onChangeText={setReason} style={style}/>
-    <Button title={busy?'Sending…':'Send correction request'} disabled={busy || picker !== null} onPress={submit}/>
+    <ActionButton title={busy?'Sending…':'Send correction request'} disabled={busy || picker !== null} onPress={submit}/>
   </View>
 }
+

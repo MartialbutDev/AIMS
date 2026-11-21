@@ -3,7 +3,7 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const root = path.resolve(__dirname, '..'), ts = require('typescript'), jsx = require('react/jsx-runtime');
 function nodes(tree) { if (!tree || typeof tree !== 'object') return []; return [tree, ...[tree.props?.children].flat(Infinity).flatMap(nodes)]; }
 function words(tree) { return nodes(tree).flatMap(node => [node.props?.children].flat(Infinity).filter(item => typeof item === 'string')).join(' '); }
-function fixture({ replay = false, canGoBack = true, destination = '/(auth)/login', deferred = false } = {}) {
+function fixture({ replay = false, canGoBack = true, destination = '/(auth)/login', deferred = false, modal = false } = {}) {
   let cursor = 0, calls = 0, release;
   const hooks = [], actions = [];
   const wait = deferred ? new Promise(resolve => { release = resolve; }) : Promise.resolve();
@@ -13,16 +13,16 @@ function fixture({ replay = false, canGoBack = true, destination = '/(auth)/logi
     'react-native': { ActivityIndicator: 'Spinner', ScrollView: 'ScrollView', Text: 'Text', TouchableOpacity: 'Button', View: 'View', useWindowDimensions: () => ({ width: 320, height: 568 }), StyleSheet: { create: value => value } },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
     '@expo/vector-icons': { Ionicons: 'Icon' },
-    'expo-router': { useLocalSearchParams: () => ({ replay: replay ? '1' : undefined }), router: { canGoBack: () => canGoBack, back: () => actions.push('back'), replace: route => actions.push(route) } },
+    'expo-router': { useLocalSearchParams: () => ({ replay: replay ? '1' : undefined }), router: { canGoBack: () => canGoBack, back: () => { throw new Error('GO_BACK is unavailable in this navigator'); }, replace: route => actions.push(route), dismissTo: route => actions.push(route) } },
     'expo-status-bar': { StatusBar: 'StatusBar' },
-    '../src/components/common/AppLogo': { __esModule: true, default: 'AppLogo' },
-    '../src/context/ThemeContext': { useTheme: () => ({ colors: new Proxy({}, { get: () => '#555555' }), isDark: false }) },
-    '../src/services/welcome.service': { finishWelcome: async () => { calls++; await wait; return destination; } },
+    './common/AppLogo': { __esModule: true, default: 'AppLogo' },
+    '../context/ThemeContext': { useTheme: () => ({ colors: new Proxy({}, { get: () => '#555555' }), isDark: false }) },
+    '../services/welcome.service': { finishWelcome: async () => { calls++; await wait; return destination; } },
   };
   const module = { exports: {} };
-  const source = ts.transpileModule(fs.readFileSync(path.join(root, 'app/welcome.tsx'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
+  const source = ts.transpileModule(fs.readFileSync(path.join(root, 'src/components/WelcomeTour.tsx'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
   vm.runInNewContext(source, { module, exports: module.exports, require: name => { assert(name in mocks, name); return mocks[name]; } });
-  const render = () => { cursor = 0; return module.exports.default(); };
+  const render = () => { cursor = 0; return module.exports.default({ replaying: replay, onClose: modal ? () => actions.push('close-modal') : undefined }); };
   const button = label => { const item = nodes(render()).find(node => node.type === 'Button' && (node.props.accessibilityLabel === label || words(node) === label)); assert(item, label); return item.props.onPress; };
   return { render, button, actions, release: () => release?.(), get calls() { return calls; } };
 }
@@ -37,11 +37,14 @@ async function main() {
   console.log('PASS: three-step progression, Back and Get Started');
   const skip = fixture(); skip.button('Skip')(); await settle(); assert.deepEqual(skip.actions, ['/(auth)/login']);
   console.log('PASS: Skip completes the tour and reaches sign-in');
-  const replay = fixture({ replay: true }); replay.button('Next')(); replay.button('Next')(); replay.button('Back to Help')(); await settle(); assert.deepEqual(replay.actions, ['back']);
-  const close = fixture({ replay: true }); close.button('Close tour')(); await settle(); assert.deepEqual(close.actions, ['back']);
-  console.log('PASS: replay completion and early close return to the previous screen');
-  const direct = fixture({ replay: true, canGoBack: false, destination: '/onboarding' }); direct.button('Close tour')(); await settle(); assert.deepEqual(direct.actions, ['/onboarding']);
-  console.log('PASS: a replay deep link without history preserves authenticated onboarding routing');
+  const replay = fixture({ replay: true }); replay.button('Next')(); replay.button('Next')(); replay.button('Back to Help')(); await settle(); assert.deepEqual(replay.actions, ['/(student)/settings/help-support']);
+  const close = fixture({ replay: true }); close.button('Close tour')(); await settle(); assert.deepEqual(close.actions, ['/(student)/settings/help-support']);
+  console.log('PASS: replay completion and early close open Help without a GO_BACK action');
+  const direct = fixture({ replay: true, canGoBack: false, destination: '/onboarding' }); direct.button('Close tour')(); await settle(); assert.deepEqual(direct.actions, ['/(student)/settings/help-support']);
+  console.log('PASS: a replay without history returns to the protected Help route');
+  const modal = fixture({ replay: true, modal: true }); modal.button('Next')(); modal.button('Next')(); modal.button('Back to Help')(); await settle(); assert.deepEqual(modal.actions, ['close-modal']); assert.equal(modal.calls, 0);
+  const modalClose = fixture({ replay: true, modal: true }); modalClose.button('Close tour')(); await settle(); assert.deepEqual(modalClose.actions, ['close-modal']); assert.equal(modalClose.calls, 0);
+  console.log('PASS: Help replay closes in place without navigation or changing first-launch storage');
   const duplicate = fixture({ deferred: true }); const finish = duplicate.button('Skip'); finish(); finish(); assert.equal(duplicate.calls, 1); duplicate.release(); await settle(); assert.equal(duplicate.actions.length, 1);
   console.log('PASS: rapid finish taps save and navigate only once');
 }

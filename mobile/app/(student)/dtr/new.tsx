@@ -69,7 +69,7 @@ export default function NewDTRScreen() {
     try {
       setIsGettingLocation(true);
       setLocation(null);
-
+      
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Location permission is required for DTR verification.');
@@ -170,7 +170,7 @@ export default function NewDTRScreen() {
       formData.append('date', formatDateForAPI(clockInTime));
       formData.append('time_in', formatTimeForAPI(clockInTime));
       if (tasks.trim()) formData.append('tasks_completed', tasks.trim());
-
+      
       formData.append('latitude', String(location.latitude));
       formData.append('longitude', String(location.longitude));
       formData.append('location_address', location.address);
@@ -184,28 +184,28 @@ export default function NewDTRScreen() {
       });
 
       const response = await dtrService.createDTR(formData);
-
+      
       Alert.alert(
         "✅ Time-In Recorded!",
         `Your clock-in was recorded.\n\n📍 ${location.address}\n\nYou can now Time-Out when your shift is done.`,
         [
-          {
-            text: "View DTR",
+          { 
+            text: "View DTR", 
             onPress: () => router.push(`/(student)/dtr/${response.id}` as any)
           },
-          {
-            text: "OK",
-            style: "default"
+          { 
+            text: "OK", 
+            style: "default" 
           }
         ]
       );
-
+      
       setTasks("");
       setImageIn(null);
       setLocation(null);
-
+      
       router.push("/(student)/dtr");
-
+      
     } catch (error) {
       if (showSubmissionRecovery(error, () => router.replace("/(student)/dtr"))) return;
       refreshSchedule();
@@ -319,21 +319,19 @@ export default function NewDTRScreen() {
         </View>
 
         <TouchableOpacity
-          style={[
-            styles.submitButton,
+          style={[styles.submitButton,
             { backgroundColor: colors.primary },
-            (clockInBlock || !imageIn || !location || isSubmitting || isGettingLocation) && styles.submitButtonDisabled,
-          ]}
+            (clockInBlock || !imageIn || !location || isSubmitting || isGettingLocation) && styles.submitButtonDisabled, isDark && { backgroundColor: Boolean(Boolean(clockInBlock) || !imageIn || !location || isSubmitting || isGettingLocation) ? colors.surfaceTertiary : colors.accent }]}
           onPress={handleTimeIn}
           disabled={Boolean(clockInBlock) || !imageIn || !location || isSubmitting || isGettingLocation}
           activeOpacity={0.8}
         >
           {isSubmitting ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={isDark ? (Boolean(Boolean(clockInBlock) || !imageIn || !location || isSubmitting || isGettingLocation) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
           ) : (
             <View style={styles.submitButtonContent}>
-              <Ionicons name="log-in-outline" size={20} color="#FFFFFF" style={styles.submitButtonIcon} />
-              <Text style={styles.submitButtonText}>Clock In</Text>
+              <Ionicons name="log-in-outline" size={20} color={isDark ? (Boolean(Boolean(clockInBlock) || !imageIn || !location || isSubmitting || isGettingLocation) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} style={styles.submitButtonIcon} />
+              <Text style={[styles.submitButtonText, isDark && { color: (Boolean(Boolean(clockInBlock) || !imageIn || !location || isSubmitting || isGettingLocation) ? colors.textSecondary : colors.onAccent) }]}>Clock In</Text>
             </View>
           )}
         </TouchableOpacity>

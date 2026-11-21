@@ -565,15 +565,13 @@ export default function StudentOnboardingScreen() {
         {/* Upload button */}
         {canUpload && (
           <TouchableOpacity
-            style={[
-              styles.uploadButton,
+            style={[styles.uploadButton,
               {
                 backgroundColor: colors.primary,
               },
               isUploading && {
                 opacity: 0.6,
-              },
-            ]}
+              }, isDark && { backgroundColor: Boolean(Boolean(uploading)) ? colors.surfaceTertiary : colors.accent }]}
             disabled={Boolean(uploading)}
             onPress={() =>
               void selectAndUpload(kind)
@@ -582,16 +580,16 @@ export default function StudentOnboardingScreen() {
             accessibilityRole="button"
           >
             {isUploading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={isDark ? (Boolean(Boolean(uploading)) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
             ) : (
               <>
                 <Ionicons
                   name="cloud-upload-outline"
                   size={20}
-                  color="#FFFFFF"
+                  color={isDark ? (Boolean(Boolean(uploading)) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"}
                 />
 
-                <Text style={styles.uploadButtonText}>
+                <Text style={[styles.uploadButtonText, isDark && { color: (Boolean(Boolean(uploading)) ? colors.textSecondary : colors.onAccent) }]}>
                   {submission
                     ? "Upload Corrected Document"
                     : "Choose & Upload File"}

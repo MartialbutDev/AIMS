@@ -191,6 +191,9 @@ class OnboardingWorkflowGateTests(unittest.TestCase):
             self.assertIsNotNone(self.db.get(StudentOnboardingSubmission, old_cor_id))
             self.assertNotEqual(self.record().cor_submission_id, old_cor_id)
             self.assertTrue(self.client.get("/applications/eligibility").json()["allowed"])
+            from company_intake_fixtures import configure_intake
+            configure_intake(self.db, [self.body["company_id"]], semester="2")
+            self.db.commit()
             result = self.client.post("/applications/", json=self.body)
             self.assertEqual(result.status_code, 201, result.text)
             self.assertEqual(self.db.query(Application).one().semester, "2")

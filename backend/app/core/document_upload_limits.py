@@ -1,5 +1,6 @@
 """Shared request and file size limits for document OCR endpoints."""
 
+import re
 from fastapi.responses import JSONResponse
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -19,23 +20,25 @@ class DocumentUploadLimitMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if (
-            scope["type"] != "http"
-            or scope["method"] != "POST"
-            or scope["path"].rstrip("/") not in OCR_UPLOAD_PATHS
-        ):
+        if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-
-        rejected = JSONResponse({"detail": UPLOAD_SIZE_MESSAGE}, status_code=413)
+        path = scope["path"].rstrip("/")
+        intake = scope["method"] == "PUT" and bool(re.fullmatch(r"/api/v1/companies/[^/]+/intake", path))
+        if not intake and not (scope["method"] == "POST" and path in OCR_UPLOAD_PATHS):
+            await self.app(scope, receive, send)
+            return
+        maximum = 5 * 1024 * 1024 + 64 * 1024 if intake else MAX_REQUEST_BYTES
+        message_text = "Supporting PDF must be 5 MB or smaller." if intake else UPLOAD_SIZE_MESSAGE
+        rejected = JSONResponse({"detail": message_text}, status_code=413)
         for name, value in scope["headers"]:
             if name == b"content-length":
                 try:
-                    if int(value) > MAX_REQUEST_BYTES:
+                    if int(value) > maximum:
                         await rejected(scope, receive, send)
                         return
                 except ValueError:
-                    pass  # The streamed byte count is still enforced below.
+                    pass
 
         size = 0
         over_limit = False
@@ -45,10 +48,10 @@ class DocumentUploadLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 size += len(message.get("body", b""))
-                if size > MAX_REQUEST_BYTES:
+                if size > maximum:
                     over_limit = True
                     # Starlette closes spooled multipart files on OSError.
-                    raise OSError(UPLOAD_SIZE_MESSAGE)
+                    raise OSError(message_text)
             return message
 
         async def limit_response(message):

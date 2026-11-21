@@ -1,5 +1,7 @@
+import * as Sharing from 'expo-sharing';
+import { documentLabel, uploadFileError } from '../../../src/utils/applicationFlow';
 // app/(student)/documents/upload.tsx
-import { submitWithRecovery, showSubmissionRecovery, submissionErrorMessage } from "../../../src/services/submissionRecovery";
+import { submitWithRecovery, showSubmissionRecovery, submissionErrorMessage, SubmissionUnconfirmedError } from "../../../src/services/submissionRecovery";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -10,7 +12,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
   Image,
@@ -64,8 +65,19 @@ export default function UploadDocumentScreen() {
   } = useDocumentPicker();
 
   const [uploading, setUploading] = useState(false);
+  const uploadGuard = useRef(false), unknownSubmission = useRef(false);
+  const [unconfirmed, setUnconfirmed] = useState(false);
+  const [showHelp, setShowHelp] = useState(false), [showTypes, setShowTypes] = useState(false);
+  const locked = uploading || unconfirmed;
+  const fileError = selectedFile ? uploadFileError(selectedFile) : '';
+  async function viewSelectedFile() {
+    if (!selectedFile) return;
+    try {
+      if (!await Sharing.isAvailableAsync()) { Alert.alert('Preview unavailable', 'Open this file using a document viewer on your phone.'); return; }
+      await Sharing.shareAsync(selectedFile.uri, { mimeType: selectedFile.type, dialogTitle: 'View document' });
+    } catch { Alert.alert('Could not open file', 'Choose another copy or try again.'); }
+  }
   const [selectedType, setSelectedType] = useState<string>(presetType);
-  const [description, setDescription] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const [identifying, setIdentifying] = useState(false);
@@ -81,6 +93,7 @@ export default function UploadDocumentScreen() {
       setSuggestion(null);
       return () => controller.abort();
     }
+    if (uploadFileError(selectedFile)) { setIdentifying(false); setSuggestion(null); return () => controller.abort(); }
     const file = selectedFile;
     setIdentifying(true);
     setSuggestion(null);
@@ -177,6 +190,8 @@ export default function UploadDocumentScreen() {
   };
 
   const handleUpload = async () => {
+    if (uploadGuard.current || unknownSubmission.current) return;
+    if (fileError) { Alert.alert("Choose another file", fileError); return; }
     if (!selectedFile) {
       Alert.alert("Error", "Please select a document to upload");
       return;
@@ -187,6 +202,7 @@ export default function UploadDocumentScreen() {
       return;
     }
 
+    uploadGuard.current = true;
     setUploading(true);
     setUploadProgress(0);
 
@@ -205,7 +221,6 @@ export default function UploadDocumentScreen() {
 
       formData.append("file", fileToUpload);
       formData.append("document_type", selectedType);
-      formData.append("description", description || "");
 
       const response = await submitWithRecovery<any>("/documents/upload", formData, {
         timeout: 120000,
@@ -235,23 +250,17 @@ export default function UploadDocumentScreen() {
       }
       buttons.push({ text: "OK", style: "default" });
 
-      const statusTitle =
-        response.data.status === "verified"
-          ? "Document accepted for this requirement"
-          : ["pending", "pending_review"].includes(response.data.status)
-          ? "⏳ Pending Review"
-          : response.data.status === "rejected" ? "Document rejected" : "Upload received — check review status";
-
+      const statusTitle = documentLabel(response.data.status, response.data.document?.version_status, response.data.document?.is_current_approved);
       const feedback = documentFeedback(response.data.status, response.data.student_feedback, response.data.document?.version_status);
-      const statusBody = `${feedback.reason}\n\n${feedback.next_action}`;
-
-      Alert.alert(statusTitle, `${statusBody}\n\n${response.data.status === "verified" ? "Accepted for this requirement; this does not authenticate a signature or replace other approvals." : ["pending", "pending_review"].includes(response.data.status) ? "This upload is awaiting review and is not approved yet. Any current approved version remains active." : "Check Documents for the review result and next steps."}`, buttons);
-
-      resetFile();
-      setSelectedType(presetType);
-      setDescription("");
+      Alert.alert(statusTitle, `${feedback.reason}\n${feedback.next_action}`, buttons);
+      if (response.data.status !== 'rejected') {
+        resetFile(); setSelectedType(presetType);
+      }
     } catch (error: any) {
-      if (showSubmissionRecovery(error, () => router.replace("/(student)/documents"))) return;
+      if (error instanceof SubmissionUnconfirmedError) {
+        unknownSubmission.current = true; setUnconfirmed(true);
+        showSubmissionRecovery(error, () => router.replace("/(student)/documents")); return;
+      }
       const detail = submissionErrorMessage(error, "Couldn’t upload the document. Please try again.");
       const reupload = typeof detail === "string" && detail.startsWith("Re-upload required: ");
       Alert.alert(
@@ -260,6 +269,7 @@ export default function UploadDocumentScreen() {
           typeof detail === "string" ? detail : "Failed to upload document. Please try again."
       );
     } finally {
+      if (!unknownSubmission.current) uploadGuard.current = false;
       setUploading(false);
       setUploadProgress(0);
     }
@@ -271,10 +281,10 @@ export default function UploadDocumentScreen() {
     if (isImage(selectedFile)) {
       return (
         <View style={[styles.imagePreview, { backgroundColor: colors.card }]}>
-          <Image source={{ uri: selectedFile.uri }} style={styles.previewImage} />
+          <Image source={{ uri: selectedFile.uri }} resizeMode="contain" style={styles.previewImage} />
           <TouchableOpacity
             style={[styles.removeFileButton, { backgroundColor: colors.card }]}
-            disabled={uploading}
+            disabled={locked}
             onPress={resetFile}
           >
             <Ionicons name="close-circle" size={24} color={colors.error} />
@@ -295,7 +305,7 @@ export default function UploadDocumentScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.removeFileButton, { backgroundColor: colors.card }]}
-            disabled={uploading}
+            disabled={locked}
             onPress={resetFile}
           >
             <Ionicons name="close-circle" size={24} color={colors.error} />
@@ -328,28 +338,28 @@ export default function UploadDocumentScreen() {
           style={[
             styles.typeChip,
             {
-              backgroundColor: selectedType === type.value ? colors.primary : colors.card,
-              borderColor: selectedType === type.value ? colors.primary : suggestedType?.value === type.value ? "#FFC629" : colors.border,
+              backgroundColor: selectedType === type.value ? colors.accent : colors.card,
+              borderColor: selectedType === type.value ? colors.accent : suggestedType?.value === type.value ? "#FFC629" : colors.border,
               borderWidth: suggestedType?.value === type.value ? 2 : 1,
             },
           ]}
-          disabled={uploading}
-          accessibilityLabel={`${type.label}${suggestedType?.value === type.value ? ", suggested from header" : ""}`}
+          disabled={locked}
+          accessibilityLabel={`${type.label}${suggestedType?.value === type.value ? ", suggested type" : ""}`}
           accessibilityState={{ selected: selectedType === type.value, disabled: uploading }}
-          onPress={() => setSelectedType(type.value)}
+          onPress={() => { setSelectedType(type.value); setShowTypes(false); }}
           activeOpacity={0.7}
         >
           <Text
             style={[
               styles.typeChipText,
               {
-                color: selectedType === type.value ? "#FFFFFF" : colors.textSecondary,
+                color: selectedType === type.value ? colors.onAccent : colors.textSecondary,
               },
             ]}
           >
             {type.label}
           </Text>
-          {suggestedType?.value === type.value && <Text style={{ color: selectedType === type.value ? "#FFFFFF" : colors.textPrimary, fontSize: 10, marginTop: 3 }}>Suggested</Text>}
+          {suggestedType?.value === type.value && <Text style={{ color: selectedType === type.value ? colors.onAccent : colors.textPrimary, fontSize: 10, marginTop: 3 }}>Suggested</Text>}
         </TouchableOpacity>
       ))}
     </View>
@@ -451,23 +461,29 @@ export default function UploadDocumentScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={{ padding: 16, marginBottom: 18, gap: 8, borderRadius: 12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
-          <Text accessibilityRole="header" style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>Understand your document result</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>Pending review: uploaded, not approved yet. Wait for review or follow the requested correction.</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>Verified / approved: accepted for this requirement by the current checks or review. Other application or deployment approvals may still be required.</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>Rejected: not accepted. Read the reason and upload a relevant, readable document.</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>OCR reads text and supports content checks. It does not authenticate signatures or guarantee the issuer is genuine.</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 20 }}>Replacing a file keeps the current approved version active until the replacement is approved. Earlier versions and submitted application attachments remain in history.</Text>
-          <TouchableOpacity accessibilityRole="link" onPress={() => router.push({ pathname: '/(student)/settings/guide-detail', params: { id: '5' } })} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.accent, fontWeight: '600', textDecorationLine: 'underline' }}>Read the documents and replacements guide</Text></TouchableOpacity>
-        </View>
+        <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showHelp }} onPress={() => setShowHelp(value => !value)} style={{ minHeight: 44, justifyContent: 'center', marginBottom: 12 }}><Text style={{ color: colors.accent, fontWeight: '600' }}>Document review help</Text></TouchableOpacity>
+        {showHelp && <View style={{ padding: 16, marginBottom: 18, gap: 10, borderRadius: 12, backgroundColor: colors.card }}>
+          <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>Pending review: wait for your coordinator.</Text>
+          <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>Current approved: the active file for this requirement.</Text>
+          <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>Pending replacement: your approved file stays active.</Text>
+          <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>Rejected: read the feedback and upload a corrected copy.</Text>
+          <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>Submitted applications keep their original files. Text checks do not authenticate signatures.</Text>
+        </View>}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
             Select Document
           </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>Choosing a file sends it for text extraction and a type suggestion. It is saved as a requirement only when you tap Upload. A suggestion is not approval.</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 12 }}>Choose a clear, complete copy. PDF, JPG or PNG · Up to 10 MB.</Text>
 
           {selectedFile ? (
-            renderFilePreview()
+            <View>
+              {renderFilePreview()}
+              <Text style={{ color: colors.textPrimary, fontSize: 14, lineHeight: 21, marginTop: 10 }}>{selectedFile.name}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 10 }}>
+                <TouchableOpacity accessibilityRole="button" disabled={locked} onPress={viewSelectedFile} style={{ minHeight: 44, padding: 12 }}><Text style={{ color: colors.accent, fontWeight: '600' }}>View</Text></TouchableOpacity>
+                <TouchableOpacity accessibilityRole="button" disabled={locked} onPress={() => void pickAnyFile()} style={{ minHeight: 44, padding: 12 }}><Text style={{ color: colors.accent, fontWeight: '600' }}>Change</Text></TouchableOpacity>
+              </View>
+            </View>
           ) : (
             <View
               style={[
@@ -484,26 +500,26 @@ export default function UploadDocumentScreen() {
               </Text>
               <View style={styles.pickerButtons}>
                 <TouchableOpacity
-                  style={[styles.pickerButton, { backgroundColor: colors.primary }]}
+                  style={[styles.pickerButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
                   onPress={takePhoto}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="camera-outline" size={20} color="#FFFFFF" />
-                  <Text style={styles.pickerButtonText}>Camera</Text>
+                  <Ionicons name="camera-outline" size={20} color={isDark ? (false ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
+                  <Text style={[styles.pickerButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Camera</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   ref={buttonRef}
-                  style={[styles.pickerButton, { backgroundColor: colors.primary }]}
+                  style={[styles.pickerButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
                   onPress={toggleDropdown}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="folder-outline" size={20} color="#FFFFFF" />
-                  <Text style={styles.pickerButtonText}>Choose File</Text>
+                  <Ionicons name="folder-outline" size={20} color={isDark ? (false ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
+                  <Text style={[styles.pickerButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Choose File</Text>
                   <Ionicons
                     name={dropdownVisible ? "chevron-up-outline" : "chevron-down-outline"}
                     size={16}
-                    color="#FFFFFF"
+                    color={isDark ? (false ? colors.textSecondary : colors.onAccent) : "#FFFFFF"}
                   />
                 </TouchableOpacity>
               </View>
@@ -516,42 +532,22 @@ export default function UploadDocumentScreen() {
             Document Type
           </Text>
           {selectedFile && <View accessibilityLiveRegion="polite" style={{ padding: 15, marginBottom: 16, borderRadius: 12, borderWidth: 1, borderColor: suggestedType ? "#FFC629" : colors.border, backgroundColor: colors.card }}>
-          {identifying ? <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}><ActivityIndicator size="small" color={colors.accent} /><Text style={{ color: colors.textPrimary, flex: 1 }}>Reading the header to suggest a type…</Text></View> : <>
+          {identifying ? <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}><ActivityIndicator size="small" color={colors.accent} /><Text style={{ color: colors.textPrimary, flex: 1 }}>Checking document type…</Text></View> : <>
             <Text style={{ color: colors.textPrimary, fontWeight: "700", marginBottom: 6 }}>{suggestedType ? `Suggested: ${suggestedType.label}` : "Choose the document type"}</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>{currentSuggestion?.message || "You can choose the document type manually."}</Text>
-            {suggestedType && selectedType !== suggestedType.value && <TouchableOpacity accessibilityRole="button" disabled={uploading} onPress={() => setSelectedType(suggestedType.value)} style={{ alignSelf: "flex-start", backgroundColor: colors.primary, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginTop: 12 }}><Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Use {suggestedType.label}</Text></TouchableOpacity>}
+            <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>{suggestedType ? "Check the type before uploading." : "Select the document type to continue."}</Text>
+            {suggestedType && selectedType !== suggestedType.value && <TouchableOpacity accessibilityRole="button" disabled={locked} onPress={() => setSelectedType(suggestedType.value)} style={[{ alignSelf: "flex-start", backgroundColor: colors.primary, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, marginTop: 12 }, isDark && { backgroundColor: Boolean(locked) ? colors.surfaceTertiary : colors.accent }]}><Text style={[{ color: "#FFFFFF", fontWeight: "700" }, isDark && { color: (Boolean(locked) ? colors.textSecondary : colors.onAccent) }]}>Use {suggestedType.label}</Text></TouchableOpacity>}
             {suggestedType && selectedType === suggestedType.value && <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>Suggested type selected. You can change it below.</Text>}
-            {!suggestedType && <TouchableOpacity accessibilityRole="button" disabled={uploading} onPress={() => setIdentifyAttempt((value) => value + 1)} style={{ alignSelf: "flex-start", paddingVertical: 10 }}><Text style={{ color: colors.accent, fontWeight: "600" }}>Check again</Text></TouchableOpacity>}
+            {!suggestedType && <TouchableOpacity accessibilityRole="button" disabled={locked} onPress={() => setIdentifyAttempt((value) => value + 1)} style={{ alignSelf: "flex-start", paddingVertical: 10 }}><Text style={{ color: colors.accent, fontWeight: "600" }}>Check again</Text></TouchableOpacity>}
           </>}
         </View>}
-        <DocumentTypeSelector />
+        <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: showTypes, disabled: locked }} disabled={locked} onPress={() => setShowTypes(value => !value)} style={{ minHeight: 48, padding: 14, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }}><Text style={{ color: colors.textPrimary, fontWeight: '600' }}>{DOCUMENT_TYPES.find(item => item.value === selectedType)?.label || 'Choose document type'} · Change</Text></TouchableOpacity>
+        {showTypes && <DocumentTypeSelector />}
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            Description (Optional)
-          </Text>
-          <TextInput
-            style={[
-              styles.descriptionInput,
-              {
-                backgroundColor: colors.card,
-                color: colors.textPrimary,
-                borderColor: colors.border,
-              },
-            ]}
-            placeholder="Enter a brief description..."
-            placeholderTextColor={colors.textSecondary}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
-        </View>
-
-
-
+        {!!fileError && <Text accessibilityRole="alert" style={{ color: colors.error, lineHeight: 21, marginBottom: 12 }}>{fileError}</Text>}
+        {unconfirmed && <View style={{ padding: 14, backgroundColor: colors.card, marginBottom: 12 }}><Text style={{ color: colors.textPrimary, lineHeight: 21 }}>Check Documents before starting another upload.</Text><TouchableOpacity accessibilityRole="button" onPress={() => router.replace('/(student)/documents')} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.accent, fontWeight: '600' }}>View documents</Text></TouchableOpacity></View>}
+        {!selectedFile && <Text style={{ color: colors.textSecondary, marginBottom: 10 }}>Choose a file to upload.</Text>}
+        {selectedFile && !selectedType && <Text style={{ color: colors.textSecondary, marginBottom: 10 }}>Select the document type.</Text>}
         {uploading && uploadProgress > 0 && (
           <View style={styles.progressSection}>
             <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
@@ -569,35 +565,23 @@ export default function UploadDocumentScreen() {
         )}
 
         <TouchableOpacity
-          style={[
-            styles.uploadButton,
+          style={[styles.uploadButton,
             { backgroundColor: colors.primary },
-            (!selectedFile || !selectedType || uploading) && styles.uploadButtonDisabled,
-          ]}
+            (!selectedFile || !selectedType || locked || !!fileError || identifying) && styles.uploadButtonDisabled, isDark && { backgroundColor: Boolean(!selectedFile || !selectedType || locked || !!fileError || identifying) ? colors.surfaceTertiary : colors.accent }]}
           onPress={handleUpload}
-          disabled={!selectedFile || !selectedType || uploading}
+          disabled={!selectedFile || !selectedType || locked || !!fileError || identifying}
           activeOpacity={0.8}
         >
           {uploading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={isDark ? (Boolean(!selectedFile || !selectedType || locked || !!fileError || identifying) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
           ) : (
             <>
-              <Ionicons name="cloud-upload-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.uploadButtonText}>Upload Document</Text>
+              <Ionicons name="cloud-upload-outline" size={24} color={isDark ? (Boolean(!selectedFile || !selectedType || locked || !!fileError || identifying) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
+              <Text style={[styles.uploadButtonText, isDark && { color: (Boolean(!selectedFile || !selectedType || locked || !!fileError || identifying) ? colors.textSecondary : colors.onAccent) }]}>Upload Document</Text>
             </>
           )}
         </TouchableOpacity>
 
-        <View style={[styles.infoNote, { backgroundColor: `${colors.primary}10` }]}>
-          <Ionicons
-            name="information-circle-outline"
-            size={20}
-            color={colors.textSecondary}
-          />
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            Supported formats: JPEG, PNG, HEIC, PDF. Max file size: 10MB
-          </Text>
-        </View>
       </ScrollView>
 
       <Dropdown />
@@ -616,7 +600,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   backButton: { padding: 4 },
-  headerTitle: { fontSize: 20, fontWeight: "700" },
+  headerTitle: { flex: 1, textAlign: "center", fontSize: 20, fontWeight: "700" },
   headerRight: { width: 32 },
   content: { paddingHorizontal: 20, paddingBottom: 30 },
   section: { marginBottom: 20 },
@@ -630,8 +614,10 @@ const styles = StyleSheet.create({
   },
   pickerTitle: { fontSize: 16, fontWeight: "600", marginTop: 12 },
   pickerSubtitle: { fontSize: 13, marginTop: 4 },
-  pickerButtons: { flexDirection: "row", gap: 12, marginTop: 16, width: "100%" },
+  pickerButtons: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 16, width: "100%" },
   pickerButton: {
+    minHeight: 48,
+    flexBasis: 140,
     flexDirection: "row",
     paddingHorizontal: 20,
     paddingVertical: 12,
@@ -658,20 +644,15 @@ const styles = StyleSheet.create({
   removeFileButton: { position: "absolute", top: -10, right: -10, borderRadius: 12 },
   typeSelector: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   typeChip: {
+    maxWidth: "100%",
+    minHeight: 44,
+    justifyContent: "center",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
   },
-  typeChipText: { fontSize: 13, fontWeight: "500" },
-  descriptionInput: {
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    minHeight: 80,
-    borderWidth: 1,
-    textAlignVertical: "top",
-  },
+  typeChipText: { flexShrink: 1, fontSize: 13, fontWeight: "500" },
   ocrSection: { marginBottom: 20 },
   ocrHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   ocrTitle: { fontSize: 16, fontWeight: "600" },

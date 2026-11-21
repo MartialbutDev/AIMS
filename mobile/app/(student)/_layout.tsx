@@ -268,15 +268,13 @@ export default function StudentLayout() {
 
         <TouchableOpacity
           onPress={retryAccess}
-          style={[
-            styles.retryButton,
+          style={[styles.retryButton,
             {
               backgroundColor: colors.primary,
-            },
-          ]}
+            }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
           activeOpacity={0.8}
         >
-          <Text style={styles.retryButtonText}>
+          <Text style={[styles.retryButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>
             Retry
           </Text>
         </TouchableOpacity>

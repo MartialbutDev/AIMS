@@ -1,6 +1,7 @@
+import WelcomeTour from '../../../src/components/WelcomeTour';
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../src/context/ThemeContext';
 import { APP_VERSION, APP_BUILD } from '../../../src/constants/app';
@@ -108,9 +109,10 @@ const guides = [
 
 export default function HelpSupportScreen() {
   const { colors } = useTheme();
+  const [tourOpen, setTourOpen] = useState(false);
   const [search, setSearch] = useState(''), [expanded, setExpanded] = useState<string | null>(null);
   const filtered = faqs.filter(item => `${item.question} ${item.answer}`.toLowerCase().includes(search.trim().toLowerCase()));
-  return <AccountPage title="Help & support">
+  return <><Modal visible={tourOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setTourOpen(false)}>{tourOpen && <WelcomeTour replaying onClose={() => setTourOpen(false)} />}</Modal><AccountPage title="Help & support">
     <AccountHero icon="help-buoy-outline" title="A little guidance, every step." description="Find answers and practical guides for your internship journey." label="STUDENT SUPPORT" />
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 15, paddingHorizontal: 14 }}>
       <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
@@ -122,9 +124,9 @@ export default function HelpSupportScreen() {
       <Text style={{ flex: 1, color: colors.textPrimary, fontWeight: '600', fontSize: 14, lineHeight: 21 }}>{item.question}</Text><Ionicons name={expanded === item.id ? 'remove' : 'add'} size={21} color={colors.accent} />
     </TouchableOpacity>{expanded === item.id && <Text style={[ui.description, { color: colors.textSecondary, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 }]}>{item.answer}</Text>}</Panel>)}
     {!filtered.length && <Panel><Ionicons name="search-outline" size={26} color={colors.textTertiary} /><Text style={{ color: colors.textPrimary, fontWeight: '600' }}>No matching topics</Text><Text style={[ui.description, { color: colors.textSecondary }]}>Try a shorter phrase, such as documents or DTR.</Text></Panel>}
-    <Panel><MenuRow icon="sparkles-outline" title="Replay the welcome tour" detail="Prepare, track and complete your internship in three quick steps." onPress={() => router.push({ pathname: '/welcome', params: { replay: '1' } })} /></Panel>
+    <Panel><MenuRow icon="sparkles-outline" title="Replay the welcome tour" detail="Prepare, track and complete your internship in three quick steps." onPress={() => setTourOpen(true)} /></Panel>
     <SectionLabel title="Step-by-step guides" />
     <Panel>{guides.map(guide => <MenuRow key={guide.id} icon={guide.icon} title={guide.title} detail={guide.detail} onPress={() => router.push({ pathname: '/(student)/settings/guide-detail', params: { id: guide.id } })} />)}</Panel>
     <Panel><MenuRow icon="school-outline" title="Need school assistance?" detail="Contact your assigned coordinator or school administrator through official school channels." /><Text style={[ui.description, { color: colors.textSecondary }]}>When reporting a problem, include the screen, steps you took, exact error, and version below. Keep passwords and OTPs private.</Text><Text selectable style={{ color: colors.accent, fontSize: 12, fontWeight: '600' }}>{APP_VERSION} · Build {APP_BUILD}</Text></Panel>
-  </AccountPage>;
+  </AccountPage></>;
 }

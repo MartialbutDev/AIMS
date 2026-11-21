@@ -22,7 +22,7 @@ class DeanPartnersTests(unittest.TestCase):
 
     def test_dean_reads_agreement_details_without_student_or_account_data(self):
         response = self.directory(); self.assertEqual(response.status_code, 200, response.text)
-        data = response.json(); self.assertEqual(data['total'], 3)
+        data = response.json(); self.assertEqual(data['total'], 2)
         partner = next(row for row in data['items'] if row['id'] == 'partner')
         self.assertEqual(partner['moa_reference'], 'FIXTURE-MOA')
         self.assertEqual(partner['moa_status'], 'current'); self.assertTrue(partner['moa_ready'])
@@ -44,31 +44,62 @@ class DeanPartnersTests(unittest.TestCase):
         self.db.expire_all(); self.assertEqual(self.db.get(Company,'partner').name,before)
         self.assertEqual(self.db.query(Company).count(),3)
 
-    def test_statuses_match_placement_checks_and_include_inactive(self):
+    def test_only_active_moas_are_included_with_inclusive_date_boundaries(self):
         company = self.db.get(Company,'partner')
+        fields = ('is_active','is_moa_signed','moa_reference','moa_signed_at','moa_effective_at','moa_expires_at')
+        original = {field:getattr(company,field) for field in fields}
         scenarios = [
-            ({'moa_expires_at':self.f.today+timedelta(days=30)},'expiring',True),
-            ({'moa_expires_at':self.f.today},'expiring',True),
-            ({'moa_expires_at':self.f.today-timedelta(days=1)},'expired',False),
-            ({'moa_expires_at':self.f.today+timedelta(days=90),'moa_reference':None},'incomplete',False),
-            ({'moa_reference':'MOA','moa_effective_at':self.f.today+timedelta(days=1)},'upcoming',False),
-            ({'is_active':False},'inactive',False),
+            ({'moa_expires_at':self.f.today+timedelta(days=30)},'expiring'),
+            ({'moa_expires_at':self.f.today},'expiring'),
+            ({'moa_signed_at':self.f.today,'moa_effective_at':self.f.today},'current'),
+            ({'moa_expires_at':self.f.today-timedelta(days=1)},None),
+            ({'moa_reference':None},None),
+            ({'moa_reference':' \t\n'},None),
+            ({'moa_effective_at':self.f.today+timedelta(days=1)},None),
+            ({'moa_signed_at':self.f.today+timedelta(days=1)},None),
+            ({'moa_signed_at':None},None),
+            ({'moa_effective_at':None},None),
+            ({'moa_expires_at':None},None),
+            ({'is_active':False},None),
+            ({'is_moa_signed':False},None),
         ]
-        for changes, status, ready in scenarios:
-            for key,value in changes.items(): setattr(company,key,value)
-            self.db.commit()
-            row = next(item for item in self.directory().json()['items'] if item['id']=='partner')
-            self.assertEqual((row['moa_status'],row['moa_ready']),(status,ready))
-        unsigned = next(item for item in self.directory().json()['items'] if item['id']=='pending')
-        self.assertEqual(unsigned['moa_status'],'unsigned'); self.assertFalse(unsigned['moa_ready'])
+        for changes, status in scenarios:
+            with self.subTest(changes=changes):
+                for key,value in {**original,**changes}.items(): setattr(company,key,value)
+                self.db.commit()
+                data=self.directory().json()
+                matches=[row for row in data['items'] if row['id']=='partner']
+                if status:
+                    self.assertEqual(len(matches),1)
+                    self.assertEqual(matches[0]['moa_status'],status)
+                    self.assertTrue(matches[0]['moa_ready'])
+                    self.assertEqual(data['total'],2)
+                else:
+                    self.assertEqual(matches,[])
+                    self.assertEqual(data['total'],1)
+                self.assertNotIn('pending',[row['id'] for row in data['items']])
+
+    def test_filtering_precedes_pagination_and_total(self):
+        self.db.get(Company,'other').moa_expires_at=self.f.today-timedelta(days=1)
+        self.db.commit()
+        data=self.directory('?skip=0&limit=1').json()
+        self.assertEqual(data['total'],1)
+        self.assertEqual([row['id'] for row in data['items']],['partner'])
+        self.assertEqual(self.directory('?skip=1&limit=1').json()['items'],[])
+
+    def test_empty_when_no_active_moas_remain(self):
+        for company in self.db.query(Company).all(): company.is_active=False
+        self.db.commit()
+        data=self.directory().json()
+        self.assertEqual(data['items'],[]); self.assertEqual(data['total'],0)
 
     def test_pagination_is_complete_and_validated(self):
         seen = []
-        for skip in range(3):
+        for skip in range(2):
             response = self.directory(f'?skip={skip}&limit=1'); self.assertEqual(response.status_code,200)
-            self.assertEqual(response.json()['total'],3); seen.extend(row['id'] for row in response.json()['items'])
-        self.assertEqual(len(set(seen)),3)
-        self.assertEqual(self.directory('?skip=3&limit=1').json()['items'],[])
+            self.assertEqual(response.json()['total'],2); seen.extend(row['id'] for row in response.json()['items'])
+        self.assertEqual(len(set(seen)),2)
+        self.assertEqual(self.directory('?skip=2&limit=1').json()['items'],[])
         for query in ['?skip=-1','?limit=0','?limit=501']:
             self.assertEqual(self.directory(query).status_code,422)
 

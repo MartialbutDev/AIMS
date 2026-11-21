@@ -42,6 +42,8 @@ class FeatureCompletionTests(unittest.TestCase):
         self.db.add(self.application)
         self.db.add(DTR(id='d1',student_id='s1',date=datetime(2026,10,23),time_in=time(8),status=DTRStatus.PENDING,image_in_path='dtr_uploads/in.jpg',academic_year='2026-2027',semester='1'))
         self.db.flush()
+        from company_intake_fixtures import configure_intake
+        configure_intake(self.db, ["co1", "co2"])
         approve_onboarding(self.db, self.student.id)
         self.db.commit()
         for file in ['dtr_uploads/in.jpg','documents/resume.pdf']:

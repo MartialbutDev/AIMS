@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { apiRequest } from '../../services/apiClient'
 import './company-access.css'
 
-const categories = ['Documents', 'Placements', 'Completion', 'Academic requirements', 'Signed MOAs']
+const categories = ['Documents', 'Placements', 'Completion', 'Academic requirements', 'Signed MOAs', 'Company intake']
 interface Activity {
   id: string
   category: string

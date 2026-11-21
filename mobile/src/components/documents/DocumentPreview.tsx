@@ -1,3 +1,4 @@
+import { useTheme } from '../../context/ThemeContext';
 // src/components/documents/DocumentPreview.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect } from "react";
@@ -42,6 +43,7 @@ export default function DocumentPreview({
   onClose,
   onDownload,
 }: DocumentPreviewProps) {
+  const { colors, isDark } = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [isPDF, setIsPDF] = useState(false);
@@ -153,13 +155,13 @@ export default function DocumentPreview({
           <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
           <Text style={styles.errorText}>Failed to load document</Text>
           <TouchableOpacity 
-            style={styles.retryButton}
+            style={[styles.retryButton, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
             onPress={() => {
               setError(false);
               detectFileType();
             }}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={[styles.retryButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Retry</Text>
           </TouchableOpacity>
         </View>
       );
@@ -198,12 +200,12 @@ export default function DocumentPreview({
                 <Ionicons name="document-outline" size={64} color="#EF4444" />
                 <Text style={styles.errorText}>Cannot preview PDF</Text>
                 <TouchableOpacity 
-                  style={styles.openBrowserButton}
+                  style={[styles.openBrowserButton, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
                   onPress={() => {
                     Linking.openURL(imageUri);
                   }}
                 >
-                  <Text style={styles.openBrowserButtonText}>Open in Browser</Text>
+                  <Text style={[styles.openBrowserButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Open in Browser</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -278,9 +280,9 @@ export default function DocumentPreview({
             <Text style={styles.footerButtonText}>Close</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.footerButton, styles.footerButtonPrimary]} onPress={handleDownload}>
-            <Ionicons name="download-outline" size={22} color="#FFFFFF" />
-            <Text style={styles.footerButtonText}>Download</Text>
+          <TouchableOpacity style={[styles.footerButton, styles.footerButtonPrimary, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]} onPress={handleDownload}>
+            <Ionicons name="download-outline" size={22} color={isDark ? (false ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
+            <Text style={[styles.footerButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Download</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

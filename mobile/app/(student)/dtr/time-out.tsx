@@ -358,26 +358,24 @@ export default function TimeOutDTRScreen() {
 
         {/* ----- Submit ----- */}
         <TouchableOpacity
-          style={[
-            styles.submitButton,
+          style={[styles.submitButton,
             { backgroundColor: colors.primary },
-            !canSubmit && styles.submitButtonDisabled,
-          ]}
+            !canSubmit && styles.submitButtonDisabled, isDark && { backgroundColor: Boolean(!canSubmit) ? colors.surfaceTertiary : colors.accent }]}
           onPress={handleTimeOut}
           disabled={!canSubmit}
           activeOpacity={0.85}
         >
           {loading ? (
             <>
-              <ActivityIndicator color="#FFFFFF" />
-              <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>
+              <ActivityIndicator color={isDark ? (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
+              <Text style={[styles.submitButtonText, { marginLeft: 8 }, isDark && { color: (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) }]}>
                 Clocking out…
               </Text>
             </>
           ) : (
             <View style={styles.submitButtonContent}>
-              <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.submitButtonText}>Clock Out</Text>
+              <Ionicons name="log-out-outline" size={20} color={isDark ? (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
+              <Text style={[styles.submitButtonText, isDark && { color: (Boolean(!canSubmit) ? colors.textSecondary : colors.onAccent) }]}>Clock Out</Text>
             </View>
           )}
         </TouchableOpacity>

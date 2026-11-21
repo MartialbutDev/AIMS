@@ -66,7 +66,8 @@ class BootstrapTests(unittest.TestCase):
             bootstrap(c);self.assertTrue({'internship_deployments','internship_completion_cases','auth_sessions','login_attempt_limits','submission_receipts'}<=set(inspect(c).get_table_names()))
             self.assertTrue({'academic_requirements','academic_requirement_events'}<=set(inspect(c).get_table_names()))
             self.assertTrue({'internship_attendance_schedules','internship_attendance_exceptions','internship_reminder_receipts','company_attendance_holidays','attendance_absence_requests','user_usage_activity'}<=set(inspect(c).get_table_names()))
-            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'x04b68df50bd')
+            self.assertTrue({'company_intakes','company_intake_events'} <= set(inspect(c).get_table_names()))
+            self.assertEqual(c.execute(text('SELECT version_num FROM alembic_version')).scalar_one(),'y15c79ea61ce')
         e.dispose()
     def test_login_throttle_migration_creates_expiry_index_on_existing_installation(self):
         engine = create_engine("sqlite://")
@@ -181,3 +182,6 @@ class BootstrapTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+

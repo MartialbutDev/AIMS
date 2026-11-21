@@ -1,3 +1,4 @@
+import { StageRequirementsCard } from '../../../src/components/StageRequirementsCard';
 import { useNotificationRefresh } from '../../../src/hooks/useNotificationRefresh';
 
 import { router, useFocusEffect } from "expo-router";
@@ -721,7 +722,7 @@ export default function DashboardScreen() {
         {/* INTERNSHIP PROGRESS */}
         {/* ============================================= */}
 
-        {progressError ? <View style={[styles.deploymentLink, { backgroundColor: colors.card }]}>
+        {(deployment?.status === "DEPLOYED" || deployment?.status === "COMPLETED") && (progressError ? <View style={[styles.deploymentLink, { backgroundColor: colors.card }]}>
           <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>Internship progress unavailable</Text>
           <Text style={{ color: colors.textSecondary, marginTop: 4 }}>Pull down to retry loading your academic requirements and hours.</Text>
         </View> : <InternshipProgressCard
@@ -741,23 +742,9 @@ export default function DashboardScreen() {
           semester={deployment?.semester}
           deploymentDate={deployment?.deployment_date}
           onViewCompletion={() => router.push("/(student)/completion")}
-        />}
+        />)}
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={() => navigateTo("/(student)/pre-deployment")}
-          style={[styles.deploymentLink, { backgroundColor: colors.card }]}
-          activeOpacity={0.8}
-        >
-          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}>
-            {deployment?.status === "DEPLOYED" || deployment?.status === "COMPLETED"
-              ? "View deployment details"
-              : "View pre-deployment checklist"}
-          </Text>
-          <Text style={{ color: colors.textSecondary, marginTop: 4, lineHeight: 20 }}>
-            Requirements, verification status, and coordinator confirmation
-          </Text>
-        </TouchableOpacity>
+        <StageRequirementsCard />
 
         {/* ============================================= */}
         {/* DASHBOARD STATISTICS */}

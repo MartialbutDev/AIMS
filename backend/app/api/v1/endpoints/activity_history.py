@@ -13,9 +13,11 @@ from app.models.direct_placement import DirectPlacementEvent
 from app.models.internship_completion import InternshipCompletionEvent
 from app.models.academic_requirement import AcademicRequirementEvent
 from app.models.moa_file import MoaFile
+from app.models.company_intake import CompanyIntakeEvent
+from app.services.company_intake import ready as intake_ready
 
 router = APIRouter(prefix="/admin/activity-history", tags=["Activity history"])
-Category = Literal["all", "Documents", "Placements", "Completion", "Academic requirements", "Signed MOAs"]
+Category = Literal["all", "Documents", "Placements", "Completion", "Academic requirements", "Signed MOAs", "Company intake"]
 
 
 def event_query(category, model, timestamp, actor, action, reference, actor_name=None):
@@ -32,7 +34,7 @@ def history(category: Category = "all", page: int = Query(1, ge=1, le=100000),
             db: Session = Depends(get_db), admin=Depends(require_role("admin"))):
     review, placement, completion = DocumentReview, DirectPlacementEvent, InternshipCompletionEvent
     policy, moa = AcademicRequirementEvent, MoaFile
-    events = union_all(
+    queries = [
         event_query("Documents", review, review.created_at, review.reviewer_id, review.decision, review.document_id),
         event_query("Placements", placement, placement.created_at, placement.actor_id, placement.action, placement.placement_id),
         event_query("Completion", completion, completion.created_at, completion.actor_id, completion.action, completion.case_id),
@@ -40,7 +42,11 @@ def history(category: Category = "all", page: int = Query(1, ge=1, le=100000),
                     literal("Requirements updated"), policy.requirement_id, policy.actor_name),
         event_query("Signed MOAs", moa, moa.uploaded_at, moa.uploaded_by,
                     literal("Agreement uploaded"), func.coalesce(moa.moa_reference, moa.company_id)),
-    ).subquery()
+    ]
+    if intake_ready(db):
+        intake = CompanyIntakeEvent
+        queries.append(event_query("Company intake", intake, intake.created_at, intake.actor_id, intake.action, intake.intake_id, intake.actor_name))
+    events = union_all(*queries).subquery()
     c = events.c
     query = select(c.category, c.event_id, c.occurred_at, c.action, c.reference,
                    c.recorded_name, User.first_name, User.last_name).select_from(events).outerjoin(User, User.id == c.actor_id)

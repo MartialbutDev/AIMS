@@ -345,8 +345,8 @@ export default function DocumentsScreen() {
         style={[
           styles.filterChip,
           {
-            backgroundColor: isActive ? colors.primary : colors.card,
-            borderColor: isActive ? colors.primary : colors.border,
+            backgroundColor: isActive ? colors.accent : colors.card,
+            borderColor: isActive ? colors.accent : colors.border,
           },
         ]}
         onPress={() => setSelectedFilter(filter.value)}
@@ -355,7 +355,7 @@ export default function DocumentsScreen() {
         <Text
           style={[
             styles.filterChipText,
-            { color: isActive ? "#FFFFFF" : colors.textSecondary },
+            { color: isActive ? colors.onAccent : colors.textSecondary },
           ]}
         >
           {filter.label}
@@ -367,14 +367,14 @@ export default function DocumentsScreen() {
               {
                 backgroundColor: isActive
                   ? "rgba(255,255,255,0.25)"
-                  : `${colors.primary}15`,
+                  : `${colors.accent}15`,
               },
             ]}
           >
             <Text
               style={[
                 styles.filterCountText,
-                { color: isActive ? "#FFFFFF" : colors.primary },
+                { color: isActive ? colors.onAccent : colors.accent },
               ]}
             >
               {count}
@@ -458,13 +458,11 @@ export default function DocumentsScreen() {
             </Text>
             {selectedFilter === "all" && (
               <TouchableOpacity
-                style={[
-                  styles.emptyButton,
-                  { backgroundColor: colors.primary },
-                ]}
+                style={[styles.emptyButton,
+                  { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
                 onPress={() => router.push("/(student)/documents/upload")}
               >
-                <Text style={styles.emptyButtonText}>Upload Now</Text>
+                <Text style={[styles.emptyButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Upload Now</Text>
               </TouchableOpacity>
             )}
           </View>

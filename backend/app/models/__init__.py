@@ -90,3 +90,5 @@ from app.models.submission_receipt import SubmissionReceipt
 from app.models.internship_reminder import AttendanceAbsenceRequest, AttendanceReminderSchedule, AttendanceScheduleException, CompanyAttendanceHoliday, InternshipReminderReceipt
 
 from app.models.user_usage import UserUsageActivity
+
+from app.models.company_intake import CompanyIntake, CompanyIntakeEvent

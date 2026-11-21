@@ -3,7 +3,10 @@ import { getDashboardAnalytics } from './analyticsService'
 import { apiRequest } from './apiClient'
 import type { DashboardData } from '../types/dashboard'
 
+import type { IntakeSummary } from './companyIntakeService'
+
 export interface CareerCompany {
+  intake?: IntakeSummary
   id: string
   name: string
   description: string | null
@@ -27,6 +30,8 @@ export interface CareerCompany {
 }
 
 export interface CareerCompanyPayload {
+  intern_capacity?: number
+  intake_version?: number
   name: string
   description?: string | null
   address?: string | null

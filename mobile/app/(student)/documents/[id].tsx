@@ -131,10 +131,10 @@ export default function DocumentDetailScreen() {
             Document not found
           </Text>
           <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            style={[styles.retryButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]}
             onPress={() => fetchDocument(true)}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={[styles.retryButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Retry</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -277,21 +277,19 @@ export default function DocumentDetailScreen() {
 
         {/* Open document button */}
         <TouchableOpacity
-          style={[
-            styles.previewButton,
+          style={[styles.previewButton,
             { backgroundColor: colors.primary },
-            opening && styles.previewButtonDisabled,
-          ]}
+            opening && styles.previewButtonDisabled, isDark && { backgroundColor: Boolean(opening) ? colors.surfaceTertiary : colors.accent }]}
           onPress={handlePreview}
           disabled={opening}
           activeOpacity={0.85}
         >
           {opening ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={isDark ? (Boolean(opening) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
           ) : (
             <>
-              <Ionicons name="open-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.previewButtonText}>Open Document</Text>
+              <Ionicons name="open-outline" size={20} color={isDark ? (Boolean(opening) ? colors.textSecondary : colors.onAccent) : "#FFFFFF"} />
+              <Text style={[styles.previewButtonText, isDark && { color: (Boolean(opening) ? colors.textSecondary : colors.onAccent) }]}>Open Document</Text>
             </>
           )}
         </TouchableOpacity>
