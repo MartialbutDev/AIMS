@@ -18,14 +18,12 @@ export interface CoordinatorDesignation {
   academic_year: string
   semester: string
   is_active: boolean
-  cor_faculty_names?: string[]
 }
 
 export interface CreateCoordinatorDesignation {
   coordinator_id: string
   academic_year: string
   semester: '1' | '2'
-  cor_faculty_names?: string[]
 }
 
 export interface DesignationResult {

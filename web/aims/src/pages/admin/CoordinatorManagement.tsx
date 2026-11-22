@@ -69,7 +69,6 @@ export function CoordinatorManagement() {
   // ==========================================================
 
   const [coordinatorId, setCoordinatorId] = useState('')
-  const [facultyNamesDraft, setFacultyNamesDraft] = useState<string | null>(null)
   const [academicYear, setAcademicYear] = useState('')
   const [semester, setSemester] = useState<'1' | '2'>('2')
 
@@ -177,12 +176,6 @@ export function CoordinatorManagement() {
       return
     }
 
-    const corFacultyNames = facultyNamesDraft?.split('\n').map((name) => name.trim()).filter(Boolean)
-    if (corFacultyNames && (corFacultyNames.length > 10 || corFacultyNames.some((name) => name.length < 3 || name.length > 100))) {
-      setError('Enter up to 10 faculty names, each between 3 and 100 characters.')
-      return
-    }
-
     setIsSaving(true)
 
     try {
@@ -190,7 +183,6 @@ export function CoordinatorManagement() {
         coordinator_id: coordinatorId,
         academic_year: year,
         semester,
-        cor_faculty_names: corFacultyNames,
       })
 
       setSuccess(
@@ -202,7 +194,6 @@ export function CoordinatorManagement() {
       )
 
       setCoordinatorId('')
-      setFacultyNamesDraft(null)
       await loadData()
     } catch (saveError: unknown) {
       setError(errorMessage(saveError))
@@ -254,12 +245,12 @@ export function CoordinatorManagement() {
   // SUMMARY
   // ==========================================================
 
-  const selectedDesignation = designations.find((item) =>
+  const hasActiveDesignation = designations.some((item) =>
+    item.is_active &&
     item.coordinator_id === coordinatorId &&
     item.academic_year === academicYear.trim() &&
     item.semester === semester
   )
-  const facultyNames = facultyNamesDraft ?? (selectedDesignation?.cor_faculty_names ?? []).join('\n')
 
   const activeCount = designations.filter(
     (item) => item.is_active
@@ -388,10 +379,9 @@ export function CoordinatorManagement() {
                 <select
                   id="dean-faculty"
                   value={coordinatorId}
-                  onChange={(event) => {
+                  onChange={(event) =>
                     setCoordinatorId(event.target.value)
-                    setFacultyNamesDraft(null)
-                  }}
+                  }
                   required
                   disabled={busy}
                 >
@@ -421,10 +411,9 @@ export function CoordinatorManagement() {
                   id="dean-academic-year"
                   type="text"
                   value={academicYear}
-                  onChange={(event) => {
+                  onChange={(event) =>
                     setAcademicYear(event.target.value)
-                    setFacultyNamesDraft(null)
-                  }}
+                  }
                   placeholder="2026-2027"
                   maxLength={9}
                   required
@@ -442,33 +431,16 @@ export function CoordinatorManagement() {
                 <select
                   id="dean-semester"
                   value={semester}
-                  onChange={(event) => {
+                  onChange={(event) =>
                     setSemester(
                       event.target.value as '1' | '2'
                     )
-                    setFacultyNamesDraft(null)
-                  }}
+                  }
                   disabled={busy}
                 >
                   <option value="1">1st Semester</option>
                   <option value="2">2nd Semester</option>
                 </select>
-              </div>
-
-              <div className="dean-designations-field">
-                <label htmlFor="cor-faculty-names">Faculty names on CORs</label>
-                <textarea
-                  id="cor-faculty-names"
-                  value={facultyNames}
-                  onChange={(event) => setFacultyNamesDraft(event.target.value)}
-                  aria-describedby="cor-faculty-names-hint"
-                  rows={3}
-                  maxLength={1010}
-                  disabled={busy}
-                />
-                <small id="cor-faculty-names-hint">
-                  Optional. Enter one name per line, exactly as shown on the COR.
-                </small>
               </div>
 
               <button
@@ -482,7 +454,7 @@ export function CoordinatorManagement() {
               >
                 {isSaving
                   ? 'Saving designation...'
-                  : selectedDesignation?.is_active ? 'Save designation' : 'Designate Coordinator'}
+                  : hasActiveDesignation ? 'Recheck assignments' : 'Designate Coordinator'}
               </button>
             </form>
 
@@ -532,9 +504,6 @@ export function CoordinatorManagement() {
                           <strong>
                             {designation.coordinator_name}
                           </strong>
-                          {Boolean(designation.cor_faculty_names?.length) && (
-                            <div className="dean-designations-hint">{designation.cor_faculty_names?.join(', ')}</div>
-                          )}
                         </td>
 
                         <td>
@@ -563,20 +532,6 @@ export function CoordinatorManagement() {
                         </td>
 
                         <td>
-                          <button
-                            type="button"
-                            className="dean-designations-edit-names"
-                            disabled={busy}
-                            onClick={() => {
-                              setCoordinatorId(designation.coordinator_id)
-                              setAcademicYear(designation.academic_year)
-                              setSemester(designation.semester as '1' | '2')
-                              setFacultyNamesDraft(null)
-                              document.getElementById('cor-faculty-names')?.focus()
-                            }}
-                          >
-                            Edit faculty names
-                          </button>
                           {designation.is_active ? (
                             <button
                               type="button"
