@@ -3,7 +3,7 @@
 
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, JSON, String, UniqueConstraint
 from sqlalchemy.sql import func
 
 from app.core.database import Base
@@ -57,6 +57,8 @@ class DeanCoordinatorDesignation(Base):
         nullable=False,
         default=True,
     )
+
+    cor_faculty_names = Column(JSON, nullable=False, default=list, server_default='[]')
 
     created_at = Column(
         DateTime,

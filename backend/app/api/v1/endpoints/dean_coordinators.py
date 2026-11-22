@@ -99,6 +99,7 @@ def _designation_response(
         "academic_year": designation.academic_year,
         "semester": designation.semester,
         "is_active": designation.is_active,
+        "cor_faculty_names": designation.cor_faculty_names,
     }
 
 
@@ -509,8 +510,10 @@ def designate_coordinator(
 
             db.add(designation)
 
-        db.flush()
+        if payload.cor_faculty_names is not None:
+            designation.cor_faculty_names = list(dict.fromkeys(payload.cor_faculty_names))
 
+        db.flush()
         backfill = _backfill_verified_students(
             db=db,
             academic_year=payload.academic_year,

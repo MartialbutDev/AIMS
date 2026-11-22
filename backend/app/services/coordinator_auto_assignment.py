@@ -28,6 +28,7 @@ def _name_key(value: str) -> str:
 def _coordinator_names_match(
     extracted: str,
     coordinator: User,
+    cor_faculty_names: tuple[str, ...] | list[str] = (),
 ) -> bool:
     """Use conservative matching for authorization."""
 
@@ -42,6 +43,7 @@ def _coordinator_names_match(
         and target in {
             f"{first} {last}",
             f"{first.split(' ')[0]} {last}",
+            *(_name_key(name) for name in cor_faculty_names),
         }
     )
 
@@ -124,6 +126,7 @@ def try_assign_coordinator(
         if _coordinator_names_match(
             faculty,
             coordinator,
+            designation.cor_faculty_names,
         )
     ]
 

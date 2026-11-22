@@ -99,12 +99,12 @@ class AdminDesignationTests(unittest.TestCase):
         data = self.payload(); data['academic_year'] = '2026-2028'
         self.assertEqual(self.client.post('/admin/coordinators', json=data).status_code, 422)
 
-    def onboarding(self):
+    def onboarding(self, faculty_name='faculty Fixture'):
         for kind in ['orientation', 'cor']:
             self.db.add(Submission(id=kind, student_id=self.ids['student'], document_kind=kind,
                 original_filename='fixture.pdf', file_path='fixture.pdf', media_type='application/pdf',
                 review_status='verified', validation_result={'details': {
-                    'detected_faculty': 'faculty Fixture', 'detected_academic_year': '2026-2027',
+                    'detected_faculty': faculty_name, 'detected_academic_year': '2026-2027',
                     'detected_semester': '2', 'matched_subject_code': 'IT421'}}))
         self.db.flush()
         self.db.add(StudentOnboarding(id='onboarding', student_id=self.ids['student'],
@@ -121,6 +121,28 @@ class AdminDesignationTests(unittest.TestCase):
         self.client.patch(f'/admin/coordinators/{id}/deactivate')
         self.assertEqual(self.db.query(Assignment).count(), 1)
         self.assertFalse(assignment_access.has_active_dean_designation(self.db, self.ids['faculty'], '2026-2027', '2'))
+
+    def test_saved_cor_names_recheck_pending_students_and_support_other_coordinators(self):
+        self.onboarding("C. Fixture")
+        result = self.client.post('/admin/coordinators', json=self.payload()).json()
+        self.assertEqual(result['new_student_assignments'], 0)
+        payload = self.payload(cor_faculty_names=['C. Fixture', 'Faculty Alternate Fixture'])
+        payload['coordinator_id'] = self.ids['other']
+        response = self.client.post('/admin/coordinators', json=payload)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['new_student_assignments'], 1)
+        self.assertEqual(response.json()['designation']['cor_faculty_names'], payload['cor_faculty_names'])
+        self.assertEqual(self.db.query(Assignment).one().coordinator_id, self.ids['other'])
+
+    def test_shared_cor_name_requires_admin_assignment(self):
+        payload = self.payload(cor_faculty_names=['C. Fixture'])
+        self.client.post('/admin/coordinators', json=payload)
+        self.onboarding('C. Fixture')
+        payload['coordinator_id'] = self.ids['other']
+        response = self.client.post('/admin/coordinators', json=payload)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['pending_assignment'], 1)
+        self.assertEqual(self.db.query(Assignment).count(), 0)
 
     def test_existing_assignments_are_never_replaced(self):
         self.onboarding()

@@ -58,22 +58,20 @@ def extract_cor_course_layout(
 
                 row_y = (code_word[1] + code_word[3]) / 2
 
-                faculty_header = min(
-                    faculty_headers,
-                    key=lambda w: abs(w[1] - row_y),
-                )
-
-                section_header = min(
-                    section_headers,
-                    key=lambda w: abs(w[1] - row_y),
-                )
-
-                header_y = (
-                    faculty_header[1] + faculty_header[3]
-                ) / 2
-
-                if not (header_y < row_y < header_y + 80):
+                header_pairs = [
+                    (faculty, section)
+                    for faculty in faculty_headers
+                    for section in section_headers
+                    if 0 < row_y - (faculty[1] + faculty[3]) / 2 < 80
+                    and abs((faculty[1] + faculty[3] - section[1] - section[3]) / 2) <= 7
+                    and section[0] < faculty[0]
+                ]
+                if not header_pairs:
                     continue
+                faculty_header, section_header = max(
+                    header_pairs, key=lambda pair: pair[0][1] + pair[0][3]
+                )
+                header_y = (faculty_header[1] + faculty_header[3]) / 2
 
                 faculty_x = faculty_header[0]
                 section_x = section_header[0]
@@ -96,11 +94,22 @@ def extract_cor_course_layout(
                 ):
                     continue
 
+                # Faculty headings can be centered, while names begin at the
+                # left of their cells. Anchor the column after Schedule/Room
+                # when that heading is printed on the same header row.
+                schedule_end = max(
+                    (
+                        w[2] for w in words
+                        if w[4].upper().strip(":") in {"SCHEDULE/ROOM", "SCHEDULE", "ROOM"}
+                        and abs((w[1] + w[3]) / 2 - header_y) <= 7
+                        and section_header[2] <= w[0] < w[2] < faculty_x
+                    ),
+                    default=faculty_x - 27,
+                )
                 faculty_words = sorted(
                     (
                         w for w in same_row
-                        if w[0] >= faculty_x - 27
-                        and w[0] < page.rect.width - 10
+                        if schedule_end <= w[0] < page.rect.width - 10
                     ),
                     key=lambda w: w[0],
                 )
