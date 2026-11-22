@@ -1,5 +1,5 @@
 import { AccountMenu } from './AccountMenu'
-import { sectionCategories } from '../services/activitySections'
+import { activityCategoriesForSection } from '../services/activitySections'
 import { ActivityProvider, ActivityBadges, PageActivity } from './ActivityIndicators'
 import { DTRCorrectionsPage } from '../pages/shared/DTRCorrectionsPage'
 import { NotificationCenter } from './NotificationCenter'
@@ -299,7 +299,7 @@ function DashboardWorkspace({
             >
               <span className="workspace-nav-icon"><Icon name={item.icon} size={18} /></span>
               <span className="workspace-nav-text">{item.label}</span>
-              <ActivityBadges compact categories={sectionCategories[item.slug] || []} />
+              <ActivityBadges compact categories={activityCategoriesForSection(item.slug, session.role)} />
             </button>
           ))}
         </nav>

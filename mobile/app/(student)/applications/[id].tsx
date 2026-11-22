@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../../src/context/ThemeContext";
 import api from "../../../src/services/api";
+import { notificationService } from "../../../src/services/notification.service";
 import { ApplicationJourney } from "../../../src/components/ApplicationJourney";
 
 interface ApplicationDetail {
@@ -35,20 +36,30 @@ export default function ApplicationDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState<ApplicationDetail | null>(null);
 
-  const fetchApplicationDetail = useCallback(async () => {
+  const fetchApplicationDetail = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const response = await api.get(`/applications/${id}`);
+      const notices = await notificationService.getUnreadApplicationActivity().catch(() => []);
+      if (signal?.aborted) return;
+      const response = await api.get<ApplicationDetail>(`/applications/${id}`, { signal });
+      if (signal?.aborted) return;
       setApplication(response.data);
+      const viewed = notices.filter(notice => notice.record_id === response.data.id).map(notice => notice.id);
+      void notificationService.markActivityRead(viewed).catch(() => { /* Preserve unread state for retry. */ });
     } catch (error) {
+      if (signal?.aborted) return;
       console.error("Error fetching application detail:", error);
       Alert.alert("Error", "Failed to load application details");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [id]);
 
-  useFocusEffect(useCallback(() => { void fetchApplicationDetail(); }, [fetchApplicationDetail]));
+  useFocusEffect(useCallback(() => {
+    const controller = new AbortController();
+    void fetchApplicationDetail(controller.signal);
+    return () => controller.abort();
+  }, [fetchApplicationDetail]));
 
   const getStatusColor = (status: string) => {
     const statusColors: Record<string, string> = {
@@ -129,7 +140,7 @@ export default function ApplicationDetailScreen() {
         <View style={styles.centerContent}>
           <Ionicons name="document-text-outline" size={64} color={colors.border} />
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>Application not found</Text>
-          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]} onPress={fetchApplicationDetail}>
+          <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }, isDark && { backgroundColor: false ? colors.surfaceTertiary : colors.accent }]} onPress={() => void fetchApplicationDetail()}>
             <Text style={[styles.retryButtonText, isDark && { color: (false ? colors.textSecondary : colors.onAccent) }]}>Retry</Text>
           </TouchableOpacity>
         </View>

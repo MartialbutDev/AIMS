@@ -1,4 +1,4 @@
-import { sectionCategories } from '../services/activitySections'
+import { activityCategoriesForSection } from '../services/activitySections'
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { UserSession } from '../types/auth'
 import { apiRequest } from '../services/apiClient'
@@ -77,8 +77,9 @@ export function ActivityViewed({ ready = true, revision = '', ...scope }: Scope 
   return null
 }
 export function PageActivity({ section }: { section: string }) {
-  const context = useContext(ActivityContext), categories = sectionCategories[section]
-  if (!categories) return null
+  const context = useContext(ActivityContext)
+  const categories = context ? activityCategoriesForSection(section, context.role) : []
+  if (!categories.length) return null
   if (context?.data && !context.error && !buckets(context.data, {categories}).some(b => b.unread.length || b.pending_records.length)) return null
   return <div className="activity-page-summary">{context?.error ? <span className="activity-error" role="status">Activity indicators could not refresh. <button onClick={context.refresh}>Retry</button></span> : <><span>Current-term activity</span><ActivityBadges categories={categories} /><small>Red dot: not yet viewed · Count: still awaiting action or review</small></>}</div>
 }

@@ -1,11 +1,14 @@
 // src/components/navigation/FloatingBottomTabBar.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
+import { useRef, useState } from "react";
 import { MotiView } from "moti";
 import { StyleSheet, Text, TouchableOpacity, View, Animated, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useTheme } from "../../context/ThemeContext";
+import { useNotificationRefresh } from "../../hooks/useNotificationRefresh";
+import { notificationService } from "../../services/notification.service";
 
 // ✅ Custom colors
 const LIGHT_MODE_ACTIVE = "#000080"; // Navy Blue
@@ -16,12 +19,11 @@ interface TabItem {
   icon: keyof typeof Ionicons.glyphMap;
   route: string;
   label: string;
-  badge?: number;
 }
 
 const tabs: TabItem[] = [
   { name: "home", icon: "home-outline", route: "/(student)/dashboard", label: "Home" },
-  { name: "applications", icon: "briefcase-outline", route: "/(student)/applications", label: "Applications", badge: 0 },
+  { name: "applications", icon: "briefcase-outline", route: "/(student)/applications", label: "Applications" },
   { name: "documents", icon: "document-text-outline", route: "/(student)/documents", label: "Documents" },
   { name: "dtr", icon: "calendar-outline", route: "/(student)/dtr", label: "DTR" },
   { name: "more", icon: "menu-outline", route: "/(student)/settings", label: "More" },
@@ -39,6 +41,18 @@ export default function FloatingBottomTabBar({
   const { colors, isDark } = useTheme();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
+  const [hasNewApplications, setHasNewApplications] = useState(false);
+  const activityRequest = useRef(0);
+
+  useNotificationRefresh(async () => {
+    const request = ++activityRequest.current;
+    try {
+      const unread = await notificationService.getUnreadApplicationActivity();
+      if (request === activityRequest.current) setHasNewApplications(unread.length > 0);
+    } catch {
+      // Keep the last known activity while the phone is offline.
+    }
+  });
 
   // ✅ Choose active color based on theme
   const activeColor = isDark ? DARK_MODE_ACTIVE : LIGHT_MODE_ACTIVE;
@@ -88,6 +102,7 @@ export default function FloatingBottomTabBar({
         <View style={styles.tabContainer}>
           {tabs.map((tab) => {
             const isActive = currentTab === tab.name;
+            const hasNewActivity = tab.name === "applications" && hasNewApplications;
             // ✅ Use activeColor (changes based on theme)
             const tabColor = isActive ? activeColor : colors.textSecondary;
 
@@ -97,7 +112,7 @@ export default function FloatingBottomTabBar({
                 style={[styles.tabItem, isDark && isActive && { backgroundColor: colors.accentMuted }]}
                 onPress={() => handleTabPress(tab)}
                 activeOpacity={0.7}
-                accessibilityLabel={tab.label}
+                accessibilityLabel={hasNewActivity ? `${tab.label}, new activity` : tab.label}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isActive }}
               >
@@ -114,11 +129,7 @@ export default function FloatingBottomTabBar({
                     size={24}
                     color={tabColor}
                   />
-                  {tab.badge && tab.badge > 0 ? (
-                    <View style={[styles.badge, { backgroundColor: colors.error }]}>
-                      <Text style={[styles.badgeText, isDark && { color: colors.background }]}>{tab.badge}</Text>
-                    </View>
-                  ) : null}
+                  {hasNewActivity && <View style={[styles.activityDot, { backgroundColor: colors.error }]} />}
                 </MotiView>
                 <Text
                   numberOfLines={1}
@@ -212,20 +223,12 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 2,
   },
-  badge: {
+  activityDot: {
     position: 'absolute',
-    top: -6,
-    right: -8,
-    borderRadius: 10,
-    minWidth: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '700',
+    top: -2,
+    right: -5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });

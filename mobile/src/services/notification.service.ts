@@ -21,7 +21,27 @@ export interface NotificationCount {
   unread: number;
 }
 
+interface ApplicationAlert {
+  id: string;
+  record_id: string | null;
+}
+
 export const notificationService = {
+  async getUnreadApplicationActivity(): Promise<ApplicationAlert[]> {
+    const response = await api.get<{ sections: { applications?: { unread: ApplicationAlert[] } } }>(
+      '/notifications/activity-summary',
+      { timeout: 4000 },
+    );
+    return response.data.sections.applications?.unread ?? [];
+  },
+
+  async markActivityRead(ids: readonly string[]): Promise<void> {
+    for (let start = 0; start < ids.length; start += 1000) {
+      await api.put('/notifications/activity-read', { notification_ids: ids.slice(start, start + 1000) });
+    }
+    if (ids.length) notificationsChanged();
+  },
+
   // Get all notifications
   async getNotifications(skip: number = 0, limit: number = 50): Promise<Notification[]> {
     try {
