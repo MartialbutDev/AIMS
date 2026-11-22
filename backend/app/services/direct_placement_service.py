@@ -2,7 +2,7 @@
 import hashlib
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy import inspect
 from app.core.designation_scope import dean_designation_scope
@@ -17,6 +17,7 @@ from app.models.notification import Notification, NotificationType
 from app.models.user import User, UserRole
 from app.services.endorsement_service import endorsement_state
 from app.services.onboarding_eligibility import require_approved_onboarding
+from app.services.partnership_service import moa_state
 
 ACTIVE = ('pending', 'released')
 TERMINAL_APPLICATIONS = (ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN)
@@ -60,17 +61,6 @@ def assigned_coordinator_ready(db, placement):
     coordinator = db.query(User).filter(User.id == placement.coordinator_id, User.role == UserRole.COORDINATOR, User.is_active.is_(True)).first()
     return bool(assignment and assignment.coordinator_id == placement.coordinator_id and coordinator and
                 has_active_dean_designation(db, placement.coordinator_id, placement.academic_year, placement.semester))
-
-
-def moa_state(company):
-    today = datetime.now(timezone(timedelta(hours=8))).date()
-    checks = [
-        ('Company is active', bool(company and company.is_active)),
-        ('Signed MOA is recorded', bool(company and company.is_moa_signed)),
-        ('MOA reference and signing date are recorded', bool(company and company.moa_reference and company.moa_reference.strip() and company.moa_signed_at and company.moa_signed_at <= today)),
-        ('MOA is effective and has not expired', bool(company and company.moa_effective_at and company.moa_expires_at and company.moa_effective_at <= today <= company.moa_expires_at)),
-    ]
-    return {'ready': all(passed for _, passed in checks), 'checks': [{'label': label, 'passed': passed} for label, passed in checks]}
 
 
 def basis(company):

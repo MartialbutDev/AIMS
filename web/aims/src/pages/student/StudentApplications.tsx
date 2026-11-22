@@ -1,6 +1,7 @@
 import { ApiResponseError } from '../../services/apiClient'
 import { ApplicationFlow } from './ApplicationFlow'
 import { IntakeAvailability } from '../../components/CompanyIntakePanel'
+import { intakeLabel } from '../../services/companyIntakeService'
 import { ActivityViewed } from '../../components/ActivityIndicators'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -22,7 +23,7 @@ export function StudentCompanies() {
   const approved = (type: string) => state.data?.documents.filter(doc => doc.type === type && doc.is_current_approved) || []
   const intake = state.data?.companies.find(company => company.id === selected?.id)?.intake || selected?.intake
   const reason = action.error.startsWith('Submission unconfirmed.') ? 'Check Applications before submitting again.' : state.loading ? 'Checking your requirements…' : !state.data?.eligibility.allowed ? state.data?.eligibility.reason || 'Complete onboarding before applying.'
-    : !intake?.can_apply ? 'This company is not accepting applications.' : !approved('resume').some(doc => doc.id === resume) || !approved('application_letter').some(doc => doc.id === letter) ? 'Select your current approved resume and application letter.'
+    : !intake?.can_apply ? (intake ? intakeLabel(intake) : 'This company is not accepting applications.') : !approved('resume').some(doc => doc.id === resume) || !approved('application_letter').some(doc => doc.id === letter) ? 'Select your current approved resume and application letter.'
     : position.trim().length < 2 ? 'Enter your internship position.' : ''
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()

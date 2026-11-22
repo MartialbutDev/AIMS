@@ -686,6 +686,7 @@ async def update_application_status(
 
             if requested_status == ApplicationStatus.ENDORSED:
                 from app.services.endorsement_service import require_endorsement
+                intake_service.require_placement_moa(db, application.company_id)
                 require_endorsement(db, application.student_id, application.academic_year, application.semester)
                 application.endorsed_by = current_user.id
                 application.endorsed_at = datetime.utcnow()
@@ -720,10 +721,11 @@ async def update_application_status(
             if requested_status in (ApplicationStatus.INTERVIEW, ApplicationStatus.ACCEPTED):
                 DeploymentService.require_application_eligibility(db, application.student_id,
                     application.academic_year, application.semester, application.id)
-                direct_service.ensure_application_ready(db, application)
             if requested_status == ApplicationStatus.ACCEPTED:
                 direct_service.require_no_direct_conflict(db, application.student_id, application.academic_year, application.semester, application.id)
                 intake_service.require_capacity(db, application.company_id, application.academic_year, application.semester, new_application=False)
+            if requested_status in (ApplicationStatus.INTERVIEW, ApplicationStatus.ACCEPTED):
+                direct_service.ensure_application_ready(db, application)
 
             if requested_status in (
                 ApplicationStatus.ACCEPTED,

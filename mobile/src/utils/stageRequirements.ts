@@ -5,7 +5,10 @@ interface Document extends Partial<RequirementTerm> { id?: string; type: string;
 interface Application extends RequirementTerm { id: string; status: string; applied_date: string }
 interface ChecklistItem { document_type: string; label: string; required: boolean; status: string }
 interface Deployment extends RequirementTerm { id: string; application_id: string; status: string; checklist?: { items: ChecklistItem[]; ready_for_deployment: boolean } | null }
-interface Completion extends RequirementTerm { deployment_id: string; status: string; company_confirmation?: unknown; checklist?: { required_hours: number | null; ready_to_request: boolean; dtr_count: number; journal_count: number; items: { key: string; label: string; met: boolean }[] } }
+interface Completion extends RequirementTerm {
+  deployment_id: string; status: string; company_name?: string; approved_at?: string | null; company_confirmation?: unknown
+  checklist?: { approved_hours?: number; required_hours: number | null; ready_to_request: boolean; dtr_count: number; journal_count: number; items: { key: string; label: string; met: boolean }[] }
+}
 export interface RequirementInput {
   onboarding: Onboarding; term?: RequirementTerm; documents?: Document[]; applications?: Application[]; deployment?: Deployment | null;
   applicationJourney?: { is_current_term: boolean; endorsement: { ready: boolean; status: string } } | null;
@@ -15,6 +18,17 @@ export type RequirementStatus = 'Missing' | 'Pending review' | 'Approved' | 'Rej
 export interface RequirementRow { key: string; label: string; status: RequirementStatus; note?: string }
 export interface RequirementPlan { title: string; note: string; rows: RequirementRow[]; action: { label: string; path: string; type?: string; applicationId?: string } }
 const sameTerm = (row: Partial<RequirementTerm>, term?: RequirementTerm) => !!term && row.academic_year === term.academic_year && row.semester === term.semester
+export function approvedInternship(input: RequirementInput) {
+  const { deployment, completion, term } = input
+  if (deployment?.status.toLowerCase() !== 'completed' || completion?.status !== 'completed' ||
+    completion.deployment_id !== deployment.id || !sameTerm(deployment, term) || !sameTerm(completion, term) ||
+    !completion.approved_at || !completion.company_name) return null
+  const approvedAt = new Date(/(?:Z|[+-]\d{2}:\d{2})$/i.test(completion.approved_at) ? completion.approved_at : completion.approved_at + 'Z')
+  const hours = completion.checklist?.approved_hours
+  if (!Number.isFinite(approvedAt.getTime()) || typeof hours !== 'number' || !Number.isFinite(hours) || hours < 0) return null
+  const date = approvedAt.toLocaleDateString('en-PH', { dateStyle: 'long', timeZone: 'Asia/Manila' })
+  return { id: deployment.id, company: completion.company_name, hours, date }
+}
 const status = (value?: string): RequirementStatus => ['verified', 'approved'].includes(value || '') ? 'Approved' : ['rejected', 'approval_revoked'].includes(value || '') ? 'Rejected' : value && value !== 'missing' ? 'Pending review' : 'Missing'
 export function approvedOnboarding(value: Onboarding) {
   return value.eligible === true && value.onboarding_approved !== false && !(value.onboarding_approved === undefined && value.development_onboarding_bypass) && (['orientation', 'cor'] as const).every(kind => {
@@ -105,7 +119,12 @@ export async function loadRequirementInput(get: <T>(path: string) => Promise<T>)
   const input: RequirementInput = { onboarding, term, documents, deployment: record.deployment }
   const validDeployment = record.deployment && sameTerm(record.deployment, term)
   const state = validDeployment ? record.deployment!.status.toLowerCase() : null
-  if (state === 'deployed') input.completion = await get<Completion>(`/completion/${encodeURIComponent(record.deployment!.id)}`)
+  if (state === 'deployed' || state === 'completed') {
+    input.completion = await get<Completion>(`/completion/${encodeURIComponent(record.deployment!.id)}`).catch(error => {
+      if (state === 'completed') return null
+      throw error
+    })
+  }
   if (!validDeployment) {
     input.applications = await list<Application>('/applications/')
     const application = selectApplication(input)

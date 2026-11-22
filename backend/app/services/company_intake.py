@@ -10,6 +10,7 @@ from app.models.hte_supervisor_company import HTESupervisorCompany
 from app.models.user import UserRole
 from app.core.assignment_access import get_current_academic_term
 from app.schemas.company_intake import IntakeTerm
+from app.services.partnership_service import moa_state, require_valid_moa
 
 
 def today():
@@ -75,7 +76,12 @@ def summaries(db, partners, year=None, semester=None):
         count = counts.get(partner.id, 0)
         remaining = max(0, policy.capacity - count) if policy else None
         status = 'unavailable' if not schema else 'not_configured' if not policy else 'closed' if not policy.accepting else 'full' if not remaining else 'accepting'
-        if not partner.is_active and policy:
+        agreement = moa_state(partner)
+        if agreement['expired']:
+            status = 'moa_expired'
+        elif partner.is_active and not agreement['ready']:
+            status = 'moa_unavailable'
+        elif not partner.is_active and policy:
             status = 'closed'
         result[partner.id] = dict(academic_year=year, semester=semester, capacity=policy.capacity if policy else None,
             accepted=count, remaining=remaining, accepting=bool(policy and policy.accepting), status=status,
@@ -87,15 +93,19 @@ def policy(db, identifier, year, semester):
     return db.query(CompanyIntake).filter_by(company_id=identifier, academic_year=year, semester=semester).populate_existing().first()
 
 
+def require_placement_moa(db, identifier):
+    require_valid_moa(company(db, identifier, lock=True))
+
+
 def require_capacity(db, identifier, year, semester, *, new_application):
     require_schema(db)
     # Callers hold student/application locks first, then this same company lock.
     # Edits lock the company too; the accepted count is read after lock acquisition.
-    partner = company(db, identifier, lock=True)
+    require_placement_moa(db, identifier)
     row = policy(db, identifier, year, semester)
     if not row:
         raise HTTPException(409, 'Company capacity is awaiting Career Center configuration for this term.')
-    if new_application and (not partner.is_active or not row.accepting):
+    if new_application and not row.accepting:
         raise HTTPException(409, 'This company is not accepting new internship applications for this term.')
     count = accepted_counts(db, [identifier], year, semester).get(identifier, 0)
     if count >= row.capacity:

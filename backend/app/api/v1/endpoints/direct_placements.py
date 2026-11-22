@@ -202,6 +202,9 @@ def release_to_company(placement_id: str, db: Session = Depends(get_db), actor: 
     placement = record(db, actor, placement_id, write=True)
     service.assignment_for(db, actor, placement.student_id, write=True)
     from app.services.endorsement_service import require_endorsement
+    from app.services.company_intake import require_placement_moa
+    if placement.company_id:
+        require_placement_moa(db, placement.company_id)
     require_endorsement(db, placement.student_id, placement.academic_year, placement.semester)
     service.release_application(db, placement, actor.id)
     if not placement.application_id:

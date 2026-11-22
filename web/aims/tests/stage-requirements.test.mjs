@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import test from 'node:test'
-import {requirementsForStage,loadRequirementInput} from '../src/services/stageRequirements.ts'
+import {approvedInternship,requirementsForStage,loadRequirementInput} from '../src/services/stageRequirements.ts'
 const term={academic_year:'2026-2027',semester:'2'}
 const onboarding=()=>({eligible:true,onboarding_approved:true,orientation:{id:'o',document_kind:'orientation',review_status:'verified'},cor:{id:'c',document_kind:'cor',review_status:'verified'}})
 const input=(extra={})=>({onboarding:onboarding(),term,documents:[],applications:[],...extra})
@@ -53,6 +53,20 @@ test('completion certificate belongs to the company rather than student uploads'
 test('company confirmation does not imply coordinator completion approval',()=>{
  const record=completion(true);record.status='company_confirmed';record.checklist.items.find(r=>r.key==='company').met=true
  const plan=requirementsForStage(input({deployment:deployment('deployed'),completion:record}));assert.deepEqual(plan.rows.map(r=>r.status),['Provided','Pending review'])
+})
+test('the completion card uses only a final approval and its archived hours for the current internship',()=>{
+ const record={...completion(true),status:'completed',company_name:'Northline Digital',approved_at:'2026-11-21T16:30:00',checklist:{...completion(true).checklist,approved_hours:486.5}}
+ const completed=input({deployment:deployment('COMPLETED'),completion:record})
+ assert.equal(approvedInternship(completed)?.company,'Northline Digital')
+ assert.equal(approvedInternship(completed)?.hours,486.5)
+ assert.match(approvedInternship(completed)?.date,/November 22, 2026|22 November 2026/)
+ for(const status of ['not_requested','requested','company_confirmed','completed_legacy','returned']){
+   assert.equal(approvedInternship({...completed,completion:{...record,status}}),null)
+ }
+ assert.equal(approvedInternship({...completed,deployment:deployment('deployed')}),null)
+ assert.equal(approvedInternship({...completed,completion:{...record,approved_at:null}}),null)
+ assert.equal(approvedInternship({...completed,completion:{...record,deployment_id:'different'}}),null)
+ assert.equal(approvedInternship({...completed,completion:{...record,semester:'1'}}),null)
 })
 test('completed and cancelled deployments cannot prompt new student uploads',()=>{
  for(const status of ['completed','cancelled']){const plan=requirementsForStage(input({deployment:deployment(status)}));assert.equal(plan.rows.length,0);assert.equal(plan.action.type,undefined)}

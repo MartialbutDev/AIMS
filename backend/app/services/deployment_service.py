@@ -1,5 +1,7 @@
 from app.services.document_version_service import effective_documents
 from app.services.onboarding_eligibility import onboarding_blocker, require_approved_onboarding
+from app.services.company_intake import require_placement_moa
+from app.services.partnership_service import moa_state
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -159,7 +161,7 @@ class DeploymentService:
             InternshipDeployment.status != DeploymentStatus.CANCELLED).first()
         check('unique', 'No conflicting internship deployment in this term', not conflict)
         company = db.get(Company, deployment.company_id)
-        moa = direct_service.moa_state(company)
+        moa = moa_state(company)
         for item in moa['checks']:
             check('moa', item['label'], item['passed'])
         direct = None
@@ -304,6 +306,7 @@ class DeploymentService:
         )
 
         require_approved_onboarding(db, deployment.student_id, (year, semester))
+        require_placement_moa(db, deployment.company_id)
         approval = cls.get_approval(db, deployment, actor)
         if not approval['ready']:
             raise HTTPException(409, detail={

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { router, useFocusEffect } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { ScrollView, View, Text, TextInput, TouchableOpacity, ActivityIndicator, RefreshControl, StyleSheet, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -16,15 +16,17 @@ const timestamp = (value: string) => new Date(value.endsWith('Z') ? value : valu
 
 export default function CompletionScreen() {
   const { isDark, colors } = useTheme()
+  const { id } = useLocalSearchParams<{ id?: string }>()
+  const archiveId = typeof id === 'string' ? id : null
   const [list, setList] = useState<CompletionList | null>(null)
   const [selected, setSelected] = useState<CompletionRecord | null>(null)
   const [page, setPage] = useState(1)
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter] = useState(archiveId ? 'completed' : 'all')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
-  const selectedId = useRef<string | null>(null)
+  const selectedId = useRef(archiveId)
   const sequence = useRef(0)
   const active = useRef(false)
   const text = { color: colors.textPrimary }

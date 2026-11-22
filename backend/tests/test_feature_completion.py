@@ -35,7 +35,11 @@ class FeatureCompletionTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.student=User(id='s1',first_name='Ana',last_name='Test',email='ana@example.com',hashed_password=self.password_hash,role=UserRole.STUDENT,is_active=True,is_verified=False)
         self.supervisor=User(id='h1',first_name='Company',last_name='Mentor',email='hte@example.com',hashed_password=self.password_hash,role=UserRole.HTE_SUPERVISOR,is_active=True)
-        self.db.add_all([self.student,self.supervisor,Company(id='co1',name='Assigned company'),Company(id='co2',name='Other company')])
+        today = datetime.now(timezone(timedelta(hours=8))).date()
+        assigned_company = Company(id='co1', name='Assigned company', is_moa_signed=True,
+            moa_reference='FIXTURE-MOA', moa_signed_at=today, moa_effective_at=today,
+            moa_expires_at=today + timedelta(days=60))
+        self.db.add_all([self.student, self.supervisor, assigned_company, Company(id='co2', name='Other company')])
         self.db.add(HTESupervisorCompany(supervisor_id='h1',company_id='co1',is_active=True))
         self.db.add(Document(id='resume',type=DocumentType.RESUME,uploaded_by='s1',file_path='documents/resume.pdf',original_filename='resume.pdf',verification_status='verified',academic_year='2026-2027',semester='1'))
         self.application=Application(id='a1',student_id='s1',company_id='co1',position='IT intern',status=ApplicationStatus.ENDORSED,academic_year='2026-2027',semester='1',resume_id='resume')

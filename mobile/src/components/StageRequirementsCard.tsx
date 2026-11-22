@@ -1,23 +1,24 @@
 import { useCallback, useState } from 'react'
 import { ActivityIndicator, AppState, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import api from '../services/api'
 import { useTheme } from '../context/ThemeContext'
-import { loadRequirementInput, requirementsForStage, type RequirementPlan } from '../utils/stageRequirements'
+import { approvedInternship, loadRequirementInput, requirementsForStage, type RequirementPlan } from '../utils/stageRequirements'
 
 export function StageRequirementsCard() {
   const { colors, isDark } = useTheme()
   const { width, fontScale } = useWindowDimensions()
   const cardWidth = Math.max(0, Math.min(520, width - (width < 360 ? 32 : 40)))
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(true)
-  const [result, setResult] = useState<{ revision: number; plan: RequirementPlan | null; error: boolean } | null>(null)
+  const [result, setResult] = useState<{ revision: number; plan: RequirementPlan | null; approved?: ReturnType<typeof approvedInternship>; error: boolean } | null>(null)
   const plan = result?.plan || null, error = result?.revision === revision && result.error
   useFocusEffect(useCallback(() => {
     let active = true
     const controller = new AbortController()
     setLoading(true)
     loadRequirementInput(<T,>(path: string) => api.get<T>(path, { signal: controller.signal, timeout: 15000 }).then(result => result.data))
-      .then(input => { if (active) setResult({ revision, plan: requirementsForStage(input), error: false }) })
+      .then(input => { if (active) setResult({ revision, plan: requirementsForStage(input), approved: approvedInternship(input), error: false }) })
       .catch(() => { if (active) setResult({ revision, plan: null, error: true }) })
       .finally(() => { if (active) setLoading(false) })
     const timer = setInterval(() => { if (AppState.currentState === 'active') setRevision(value => value + 1) }, 60000)
@@ -33,6 +34,24 @@ export function StageRequirementsCard() {
     const path = routes[action.path as keyof typeof routes]
     if (path) router.push(path)
   }
+  const approved = result?.approved
+  if (approved) return <View style={[styles.card, { width: cardWidth, backgroundColor: colors.card, borderColor: colors.border, borderTopColor: '#D9A723' }]}>
+    <Ionicons name="ribbon-outline" size={26} color={colors.approved} accessible={false} />
+    <Text accessibilityRole="header" style={[styles.successTitle, { color: colors.textPrimary }]}>Congratulations! Your internship is complete.</Text>
+    <View style={styles.successDetails}>{[
+      ['Company', approved.company],
+      ['Approved hours', approved.hours.toLocaleString('en-PH', { maximumFractionDigits: 2 })],
+      ['Completion date', approved.date],
+    ].map(([label, value]) => <View key={label} style={styles.successDetail}>
+      <Text style={{ color: colors.textSecondary }}>{label}</Text>
+      <Text style={{ color: colors.textPrimary, fontWeight: '700' }}>{value}</Text>
+    </View>)}</View>
+    <TouchableOpacity accessibilityRole="button"
+      onPress={() => router.push({ pathname: '/(student)/completion', params: { id: approved.id } })}
+      style={[styles.action, { backgroundColor: isDark ? colors.accent : colors.primary }]}>
+      <Text style={[styles.actionText, isDark && { color: colors.onAccent }]}>View archive</Text>
+    </TouchableOpacity>
+  </View>
   return <View style={[styles.card, { width: cardWidth, padding: fontScale > 1.2 ? 14 : 18, backgroundColor: colors.card, borderColor: colors.border, borderTopColor: '#0B0B2F' }]}>
     {loading && !plan ? <View style={styles.loading}><ActivityIndicator color={colors.accent} /><Text style={{ color: colors.textSecondary }}>Checking your requirements…</Text></View> : error ? <>
       <Text accessibilityRole="alert" style={{ color: colors.textPrimary, lineHeight: 22 }}>Your requirements could not be loaded.</Text>
@@ -58,4 +77,7 @@ const styles = StyleSheet.create({
   action: { minHeight: 48, borderRadius: 10, padding: 14, marginTop: 18, alignItems: 'center', justifyContent: 'center' },
   actionText: { color: '#FFFFFF', fontSize: 14, lineHeight: 22, fontWeight: '700', textAlign: 'center' },
   secondary: { minHeight: 44, justifyContent: 'center', marginTop: 10 },
+  successTitle: { fontSize: 21, lineHeight: 29, fontWeight: '800', marginVertical: 12 },
+  successDetails: { gap: 10 },
+  successDetail: { gap: 3 },
 })

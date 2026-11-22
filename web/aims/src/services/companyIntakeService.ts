@@ -17,6 +17,8 @@ export interface CompanyIntake extends IntakeSummary {
 }
 export const intakeLabel = (value?: IntakeSummary | null) => ({
   accepting: 'Accepting interns', closed: 'Not accepting interns', full: 'Capacity reached',
+  moa_expired: 'Applications paused — MOA renewal required',
+  moa_unavailable: 'Applications paused — valid MOA required',
   not_configured: 'Capacity not set', unavailable: 'Availability unavailable',
 }[value?.status || 'unavailable'] || 'Availability unavailable')
 const base = (id: string) => `/api/v1/companies/${encodeURIComponent(id)}/intake`

@@ -1054,7 +1054,7 @@ export function CompaniesPage({
                         <input type="number" min="1" max="100000" step="1" required value={form.intern_capacity} onChange={event => updateForm('intern_capacity', event.target.value)} />
                       </label>
                     </div>
-                    {dialog === 'edit' && selected?.intake && <label className="cc-toggle-row">
+                    {dialog === 'edit' && selected?.intake && <label className="cc-toggle-row cc-intake-toggle">
                       <span>
                         <strong>Accepting new applications</strong>
                         <small>Turn off to pause new applications for this term.</small>

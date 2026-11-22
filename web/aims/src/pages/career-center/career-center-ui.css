@@ -773,6 +773,10 @@
   cursor: pointer;
 }
 
+.cc-intake-toggle {
+  margin-top: 16px;
+}
+
 .cc-toggle-row strong {
   display: block;
   font-size: 13px;

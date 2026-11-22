@@ -1,5 +1,6 @@
 import { ActivityBadges, ActivityViewed } from '../../components/ActivityIndicators'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { FormEvent } from 'react'
 import type { UserRole } from '../../types/auth'
 import { completionService as service } from '../../services/completionService'
@@ -11,7 +12,9 @@ const date = (text?: string | null) => text ? new Date(text.endsWith('Z') || !te
 const errorText = (error: unknown) => error instanceof Error ? error.message : 'Unable to load completion records.'
 
 export function CompletionPage({ role }: { role: UserRole }) {
-  const [filter, setFilter] = useState('all')
+  const [params] = useSearchParams()
+  const archiveId = role === 'student' ? params.get('id') : null
+  const [filter, setFilter] = useState(archiveId ? 'completed' : 'all')
   const [page, setPage] = useState(1)
   const [list, setList] = useState<CompletionList | null>(null)
   const [selected, setSelected] = useState<CompletionRecord | null>(null)
@@ -38,7 +41,7 @@ export function CompletionPage({ role }: { role: UserRole }) {
     return () => { active = false }
   }, [filter, page, revision])
 
-  async function select(id: string) {
+  const select = useCallback(async (id: string) => {
     const request = ++detailRequest.current
     setDetailLoading(true); setSelected(null); setError(''); setSuccess(''); setReason('')
     if (certificateRef.current) URL.revokeObjectURL(certificateRef.current)
@@ -49,7 +52,14 @@ export function CompletionPage({ role }: { role: UserRole }) {
       setSelected(record)
     } catch (e) { if (request === detailRequest.current) setError(errorText(e)) }
     finally { if (request === detailRequest.current) setDetailLoading(false) }
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!archiveId) return
+    setFilter('completed')
+    setPage(1)
+    void select(archiveId)
+  }, [archiveId, select])
 
   async function act(action: string, extras: Record<string, unknown> = {}) {
     if (!selected || busy) return

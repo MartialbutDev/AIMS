@@ -16,6 +16,7 @@ from app.models.document import Document, DocumentType
 from app.models.internship_deployment import InternshipDeployment
 from app.models.user import User, UserRole
 from app.services import company_intake as service
+from app.services.partnership_service import MOA_RENEWAL_REQUIRED
 
 
 class CompanyIntakeTests(unittest.TestCase):
@@ -197,6 +198,71 @@ class CompanyIntakeTests(unittest.TestCase):
         response=self.client.post('/applications/',json=body)
         self.assertEqual(response.status_code,201,response.text)
         self.assertEqual(service.accepted_counts(self.db,['partner'],'2026-2027','1'),{})
+
+    def test_expiry_blocks_each_handoff_and_renewal_resumes_the_same_application(self):
+        today = self.f.today
+        body = self.application_body()
+
+        def set_expiry(days):
+            self.db.get(Company, 'partner').moa_expires_at = today + timedelta(days=days)
+            self.db.commit()
+
+        def assert_paused(response):
+            self.assertEqual(response.status_code, 409, response.text)
+            self.assertEqual(response.json()['detail'], MOA_RENEWAL_REQUIRED)
+
+        set_expiry(-1)
+        self.actor('s1')
+        companies = self.client.get('/companies/').json()
+        partner = next(company for company in companies if company['id'] == 'partner')
+        self.assertEqual(partner['intake']['status'], 'moa_expired')
+        self.assertFalse(partner['intake']['can_apply'])
+        assert_paused(self.client.post('/applications/', json=body))
+        self.assertEqual(self.db.query(Application).count(), 0)
+
+        set_expiry(60)
+        submitted = self.client.post('/applications/', json=body)
+        self.assertEqual(submitted.status_code, 201, submitted.text)
+        application_id = submitted.json()['id']
+        path = '/applications/' + application_id
+
+        set_expiry(-1)
+        self.actor('c1')
+        assert_paused(self.client.put(path, json={'status': 'endorsed'}))
+        self.assertEqual(self.db.get(Application, application_id).status, ApplicationStatus.PENDING)
+        self.assertIsNone(self.db.get(Application, application_id).endorsed_at)
+
+        set_expiry(60)
+        self.policy().accepting = False
+        self.db.commit()
+        forwarded = self.client.put(path, json={'status': 'endorsed'})
+        self.assertEqual(forwarded.status_code, 200, forwarded.text)
+
+        set_expiry(-1)
+        self.actor('hte')
+        assert_paused(self.client.put(path, json={'status': 'accepted'}))
+        self.assertEqual(self.db.get(Application, application_id).status, ApplicationStatus.ENDORSED)
+        self.assertEqual(self.db.query(InternshipDeployment).count(), 0)
+
+        set_expiry(60)
+        accepted = self.client.put(path, json={'status': 'accepted'})
+        self.assertEqual(accepted.status_code, 200, accepted.text)
+        deployment = self.db.query(InternshipDeployment).one()
+        self.f.documents()
+        self.actor('c1')
+        approval_path = f'/deployments/{deployment.id}/confirm'
+        date = {'deployment_date': today.isoformat()}
+        set_expiry(-1)
+        assert_paused(self.client.post(approval_path, json=date))
+        self.assertIsNone(deployment.confirmed_at)
+
+        set_expiry(0)
+        confirmed = self.client.post(approval_path, json=date)
+        self.assertEqual(confirmed.status_code, 200, confirmed.text)
+        self.db.refresh(deployment)
+        self.assertEqual(deployment.application_id, application_id)
+        self.assertIsNotNone(deployment.confirmed_at)
+        self.assertFalse(self.policy().accepting)
 
     def test_direct_placement_cannot_bypass_closed_intake(self):
         self.assertEqual(self.save({'accepting':False}).status_code,200)

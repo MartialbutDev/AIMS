@@ -51,12 +51,15 @@ const DOCUMENT_TYPES = [
   { value: "requirements", label: "Other" },
 ];
 
-const intakeText = (company: Company) => {
-  const intake = company.intake;
-  const label = ({ accepting: 'Accepting interns', closed: 'Not accepting interns', full: 'Capacity reached',
-    not_configured: 'Capacity not set', unavailable: 'Availability unavailable' } as Record<string, string>)[intake?.status || 'unavailable'] || 'Availability unavailable';
-  return label + (intake?.capacity != null ? ` · ${intake.remaining} of ${intake.capacity} slots available` : '');
-};
+const intakeLabel = (intake?: Company['intake']) => ({
+  accepting: 'Accepting interns', closed: 'Not accepting interns', full: 'Capacity reached',
+  moa_expired: 'Applications paused — MOA renewal required',
+  moa_unavailable: 'Applications paused — valid MOA required',
+  not_configured: 'Capacity not set', unavailable: 'Availability unavailable',
+} as Record<string, string>)[intake?.status || 'unavailable'] || 'Availability unavailable';
+
+const intakeText = ({ intake }: Company) =>
+  intakeLabel(intake) + (intake?.capacity != null ? ` · ${intake.remaining} of ${intake.capacity} slots available` : '');
 
 // Normalize the many shape variations we might get from the backend
 const normalizeDoc = (raw: any): Document => ({
@@ -427,7 +430,8 @@ export default function NewApplicationScreen() {
       return Alert.alert('Application unavailable', eligibility?.reason || 'Checking application eligibility.');
     }
     if (!selectedCompany) return Alert.alert("Error", "Please select a company");
-    if (!companies.find(company => company.id === selectedCompany)?.intake?.can_apply) return Alert.alert('Applications unavailable', 'This company is not accepting new applications. Refresh the company list.');
+    const intake = companies.find(company => company.id === selectedCompany)?.intake;
+    if (!intake?.can_apply) return Alert.alert('Applications unavailable', intakeLabel(intake));
     if (!position.trim()) return Alert.alert("Error", "Please enter a position");
     if (!selectedResume)
       return Alert.alert("Error", "Please select a verified Resume/CV");
@@ -487,7 +491,7 @@ export default function NewApplicationScreen() {
     !loading;
 
   const disabledReason = checkingEligibility ? 'Checking eligibility…' : !eligibility?.allowed ? eligibility?.reason || 'Complete onboarding first.'
-    : !selectedCompany ? 'Choose a company.' : !selectedCompanyData?.intake?.can_apply ? 'This company is not accepting applications.'
+    : !selectedCompany ? 'Choose a company.' : !selectedCompanyData?.intake?.can_apply ? intakeLabel(selectedCompanyData?.intake)
     : !selectedResume || !selectedAppLetter ? 'Select your current approved resume and application letter.' : !position.trim() ? 'Enter your internship position.' : '';
 
   // -------- render --------
