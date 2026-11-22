@@ -1,4 +1,4 @@
-import type { StudentDocumentFeedback } from "../../../src/utils/documentFeedback";
+import { documentTypeName, type StudentDocumentFeedback } from "../../../src/utils/documentFeedback";
 // app/(student)/documents/index.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
@@ -59,6 +59,7 @@ const TYPE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   acceptance_letter: "checkmark-done-outline",
   certificate_of_completion: "trophy-outline",
   requirements: "list-outline",
+  internship_contract: "document-text-outline",
   document: "document-outline",
   transcript: "school-outline",
   user_id: "card-outline",
@@ -219,7 +220,7 @@ export default function DocumentsScreen() {
   };
 
   const confirmDelete = (document: Document) => {
-    Alert.alert("Delete document?", `Remove ${document.original_filename || document.type.replace(/_/g, " ")}? This cannot be undone. Documents already used or reviewed must be retained.`, [
+    Alert.alert("Delete document?", `Remove ${document.original_filename || documentTypeName(document.type)}? This cannot be undone. Documents already used or reviewed must be retained.`, [
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: () => void deleteDocument(document) },
     ]);
@@ -255,7 +256,7 @@ export default function DocumentsScreen() {
   const renderDocument = ({ item }: { item: Document }) => {
     const displayStatus = item.version_status?.startsWith("pending") ? "pending" : item.verification_status;
     const statusColor = item.version_status === "superseded" ? colors.textSecondary : getStatusColor(displayStatus);
-    const displayName = item.type.replace(/_/g, " ").toUpperCase();
+    const displayName = documentTypeName(item.type).toUpperCase();
     const subtitle = item.original_filename || item.description || null;
     const typeIcon = getTypeIcon(item.type);
 
@@ -317,7 +318,7 @@ export default function DocumentsScreen() {
         <View style={styles.documentActions}>
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel={`Options for ${item.original_filename || item.type.replace(/_/g, " ")}`}
+            accessibilityLabel={`Options for ${item.original_filename || documentTypeName(item.type)}`}
             accessibilityState={{ disabled: deletingId !== null, expanded: actionDocument?.id === item.id, busy: deletingId === item.id }}
             disabled={deletingId !== null}
             style={[styles.optionsButton, { opacity: deletingId !== null ? 0.5 : 1 }]}
@@ -492,7 +493,7 @@ export default function DocumentsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text accessibilityRole="header" style={[styles.menuTitle, { color: colors.textPrimary }]}>Document options</Text>
                   <Text numberOfLines={2} style={[styles.menuFilename, { color: colors.textSecondary }]}>
-                    {actionDocument?.original_filename || actionDocument?.type.replace(/_/g, " ")}
+                    {actionDocument?.original_filename || (actionDocument && documentTypeName(actionDocument.type))}
                   </Text>
                   {retainedVersion && <Text style={[styles.menuFilename, { color: colors.textSecondary }]}>This version is retained for review history.</Text>}
                 </View>

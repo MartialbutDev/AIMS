@@ -39,6 +39,7 @@ import AppLogo from "../../src/components/common/AppLogo";
 import AuthLegalLinks from "../../src/components/auth/AuthLegalLinks";
 
 import { APP_NAME, APP_VERSION } from "../../src/constants/app";
+import { GENDER_OPTIONS, type StudentGender } from "../../src/constants/profile";
 
 import { useTheme } from "../../src/context/ThemeContext";
 
@@ -61,7 +62,7 @@ export default function SignUpScreen() {
 
   const [studentId, setStudentId] = useState("");
 
-  const [gender, setGender] = useState<"male" | "female" | "other" | "prefer_not_to_say" | null>(null);
+  const [gender, setGender] = useState<StudentGender | null>(null);
 
   const [email, setEmail] = useState("");
 
@@ -81,6 +82,7 @@ export default function SignUpScreen() {
   const [lastNameError, setLastNameError] = useState("");
 
   const [studentIdError, setStudentIdError] = useState("");
+  const [genderError, setGenderError] = useState("");
 
   const [emailError, setEmailError] = useState("");
 
@@ -114,6 +116,9 @@ export default function SignUpScreen() {
   const validateForm = (): boolean => {
 
     let isValid = true;
+
+    setGenderError(gender ? "" : "Select Male or Female.");
+    if (!gender) isValid = false;
 
     if (!firstName.trim()) {
       setFirstNameError("First name is required");
@@ -214,7 +219,7 @@ export default function SignUpScreen() {
   const handleSignUp = async () => {
     if (submittingRef.current || registeredRef.current) return;
 
-    if (!validateForm()) {
+    if (!validateForm() || !gender) {
 
       return;
 
@@ -242,7 +247,7 @@ export default function SignUpScreen() {
 
         student_id: studentId.trim(),
 
-        gender: gender ?? undefined,
+        gender,
 
       });
 
@@ -717,21 +722,11 @@ export default function SignUpScreen() {
 
                   <View style={styles.fieldWrapper}>
 
-                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Gender (optional)</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Gender</Text>
 
-                    <View style={styles.genderOptions}>
+                    <View style={styles.genderOptions} accessibilityRole="radiogroup" accessibilityLabel="Gender">
 
-                      {([
-
-                        ["male", "Male"],
-
-                        ["female", "Female"],
-
-                        ["other", "Other"],
-
-                        ["prefer_not_to_say", "Prefer not to say"],
-
-                      ] as const).map(([value, label]) => {
+                      {GENDER_OPTIONS.map(([value, label]) => {
 
                         const selected = gender === value;
 
@@ -751,7 +746,10 @@ export default function SignUpScreen() {
 
                             ]}
 
-                            onPress={() => setGender(selected ? null : value)}
+                            onPress={() => {
+                              setGender(value);
+                              setGenderError("");
+                            }}
 
                             disabled={loading || success}
 
@@ -775,11 +773,7 @@ export default function SignUpScreen() {
 
                     </View>
 
-                    <Text style={[styles.genderNote, { color: colors.textTertiary }]}>
-
-                      Used only for aggregate internship program reporting. Leave unselected if you prefer not to provide it.
-
-                    </Text>
+                    {genderError ? <Text accessibilityLiveRegion="polite" style={[styles.errorText, { color: colors.error }]}>{genderError}</Text> : null}
 
                   </View>
 
@@ -1529,16 +1523,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
 
     borderRadius: 10,
-
-  },
-
-  genderNote: {
-
-    marginTop: 7,
-
-    fontSize: 11,
-
-    lineHeight: 16,
 
   },
 

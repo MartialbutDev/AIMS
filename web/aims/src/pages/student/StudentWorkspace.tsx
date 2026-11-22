@@ -15,7 +15,7 @@ import { NotificationCenter } from '../../components/NotificationCenter'
 import { WorkspaceSettings } from '../shared/WorkspaceSettings'
 import { CompletionPage } from '../shared/CompletionPage'
 import type { UserSession } from '../../types/auth'
-import { studentApi, studentWrite } from '../../services/studentService'
+import { studentApi, studentWrite, type Onboarding } from '../../services/studentService'
 import { StudentApplications, StudentCompanies, StudentPlacements } from './StudentApplications'
 import { StudentDocuments, StudentForms } from './StudentDocuments'
 import { StudentAttendance } from './StudentAttendance'
@@ -84,10 +84,16 @@ function RelatedPages({ section, parent }: { section: string; parent: string }) 
 }
 
 export function StudentWorkspace(props: { session: UserSession; onLogout: () => void }) {
-  return <StudentOnboardingGate session={props.session} onLogout={props.onLogout}>{approved => <ActivityProvider key={props.session.accessToken} session={props.session}><StudentWorkspaceShell {...props} onboardingRequired={!approved} /></ActivityProvider>}</StudentOnboardingGate>
+  return <StudentOnboardingGate session={props.session} onLogout={props.onLogout}>
+    {(approved, assignment) => <ActivityProvider key={props.session.accessToken} session={props.session}>
+      <StudentWorkspaceShell {...props} onboardingRequired={!approved} assignment={assignment} />
+    </ActivityProvider>}
+  </StudentOnboardingGate>
 }
 
-function StudentWorkspaceShell({ session, onLogout, onboardingRequired }: { session: UserSession; onLogout: () => void; onboardingRequired: boolean }) {
+type CoordinatorAssignment = Onboarding['coordinator_assignment']
+
+function StudentWorkspaceShell({ session, onLogout, onboardingRequired, assignment }: { session: UserSession; onLogout: () => void; onboardingRequired: boolean; assignment?: CoordinatorAssignment }) {
   const { section = 'dashboard' } = useParams(), [open, setOpen] = useState(false), [notifications, setNotifications] = useState(false)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -109,7 +115,7 @@ function StudentWorkspaceShell({ session, onLogout, onboardingRequired }: { sess
     case 'journals': content = <StudentJournals />; break
     case 'reports': content = <StudentReports />; break
     case 'completion': content = <CompletionPage role="student" />; break
-    case 'profile': content = <StudentProfile session={session} onboardingRequired={onboardingRequired} />; break
+    case 'profile': content = <StudentProfile session={session} onboardingRequired={onboardingRequired} assignment={assignment} />; break
     case 'settings': content = <WorkspaceSettings session={session} onLogout={onLogout} />; break
     case 'help-center': content = <StudentHelp />; break
     default: content = <StudentOverview />
@@ -159,7 +165,20 @@ function StudentWorkspaceShell({ session, onLogout, onboardingRequired }: { sess
       </main><footer className="sw-footer">Academic Internship Management System · CITC, USTP Cagayan de Oro</footer></div></div>
 }
 interface Profile { first_name: string; middle_name?: string; last_name: string; email: string; student_id: string; phone?: string; gender?: Gender | null; avatar_url?: string }
-function StudentProfile({ session, onboardingRequired }: { session: UserSession; onboardingRequired: boolean }) {
+function StudentCoordinatorCard({ assignment }: { assignment?: CoordinatorAssignment }) {
+  const name = assignment?.status === 'assigned' ? assignment.coordinator_name?.trim() : undefined
+  const pending = assignment?.status === 'pending_assignment'
+  const awaitingOnboarding = assignment?.status === 'not_eligible'
+  const label = name || (pending ? 'Assignment pending' : awaitingOnboarding ? 'Not assigned yet' : 'Assignment unavailable')
+
+  return <section className="sw-card" aria-labelledby="student-profile-coordinator">
+    <h2 id="student-profile-coordinator">Internship coordinator</h2>
+    <p><strong>{label}</strong></p>
+    {awaitingOnboarding && <StudentLink to="onboarding">Check orientation &amp; COR status</StudentLink>}
+  </section>
+}
+
+function StudentProfile({ session, onboardingRequired, assignment }: { session: UserSession; onboardingRequired: boolean; assignment?: CoordinatorAssignment }) {
   const state = useStudentLoad(() => studentApi<Profile>('/auth/me')), action = useStudentAction(state.refresh)
   useEffect(() => {
     if (state.data) updateCurrentSession(session.accessToken, { avatarPath: state.data.avatar_url ?? null })
@@ -175,6 +194,6 @@ function StudentProfile({ session, onboardingRequired }: { session: UserSession;
       if (!(error instanceof ApiResponseError) || error.status !== 404) throw error
     }
     updateCurrentSession(session.accessToken, { avatarPath: null })
-  }, 'Profile photo removed.')}>Remove photo</button>}</div></form><div className="sw-profile-account-link"><StudentLink to="settings">Edit profile & account security</StudentLink></div></section><section className="sw-card">{!onboardingRequired && <><p className="sw-eyebrow">YOUR ACADEMIC RECORD</p><h2>Completion & archive</h2><p>Review your completion checklist, request final confirmation and access your archived internship records.</p><StudentLink to="completion">Open completion & archive <ActivityBadges categories={['completion']} /></StudentLink><hr /></>}<h2>Account & preferences</h2><StudentLink to="settings">Password, sessions & notification settings</StudentLink><StudentLink to="onboarding">Orientation & COR review status <ActivityBadges categories={['onboarding','assignments']} /></StudentLink><StudentLink to="help-center">Help & about AIMS</StudentLink></section></div></>
+  }, 'Profile photo removed.')}>Remove photo</button>}</div></form><div className="sw-profile-account-link"><StudentLink to="settings">Edit profile & account security</StudentLink></div></section><div><StudentCoordinatorCard assignment={assignment} /><section className="sw-card">{!onboardingRequired && <><p className="sw-eyebrow">YOUR ACADEMIC RECORD</p><h2>Completion & archive</h2><p>Review your completion checklist, request final confirmation and access your archived internship records.</p><StudentLink to="completion">Open completion & archive <ActivityBadges categories={['completion']} /></StudentLink><hr /></>}<h2>Account & preferences</h2><StudentLink to="settings">Password, sessions & notification settings</StudentLink><StudentLink to="onboarding">Orientation & COR review status <ActivityBadges categories={['onboarding','assignments']} /></StudentLink><StudentLink to="help-center">Help & about AIMS</StudentLink></section></div></div></>
 }
 function StudentHelp() { return <><Heading title="Help & about AIMS" description="A guide to your internship journey at CITC, USTP Cagayan de Oro." /><section className="sw-card"><h2>Your journey, step by step</h2><ol className="sw-timeline"><li><strong>Get eligible</strong><p>Upload your orientation certificate and current-term COR. Wait for approval and coordinator assignment.</p></li><li><strong>Prepare and apply</strong><p>Upload your resume and application letter. Use approved versions when applying to a company.</p></li><li><strong>Get endorsed</strong><p>Upload the school-issued endorsement letter. Your coordinator reviews it before forwarding the application to the company.</p></li><li><strong>Get accepted and deployed</strong><p>The company decides on your application. After acceptance, complete the pre-deployment checklist. Your coordinator authorizes deployment.</p></li><li><strong>Record your internship</strong><p>Clock in and out with photos, submit weekly journals and check review feedback. Time corrections go to the company, then coordinator.</p></li><li><strong>Complete and archive</strong><p>Request completion after satisfying your checklist. The company confirms completion; the coordinator approves completion. Check USTP PRISM for your official internship grade.</p></li></ol></section><div className="sw-two-col"><section className="sw-card"><h2>When something needs attention</h2><details><summary>My document is pending or rejected</summary><p>Read the review notes in Documents. Uncertain documents need human review. A new upload does not replace a current approved version until approved.</p></details><details><summary>A submission failed or the connection dropped</summary><p>Refresh the relevant record list before retrying. Your submission may have reached the server even when the browser could not confirm it.</p></details><details><summary>Who can help?</summary><p>Your assigned coordinator handles requirements, endorsement, attendance reviews and completion. The career center handles company partnerships. Contact the administrator for account access problems.</p></details></section><section className="sw-card"><h2>About AIMS</h2><p>The Academic Internship Management System connects students, coordinators, companies, the career center, dean and administrator throughout the internship process.</p><p>Your web and mobile accounts share the same backend records. Student pages show your own records; approval actions remain with the responsible stakeholder.</p><p>Document text extraction assists validation and classification. It does not verify the authenticity of signatures.</p><StudentLink to="settings">Privacy, active sessions & notifications</StudentLink></section></div></> }

@@ -22,7 +22,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../../src/context/ThemeContext";
 import { useDocumentPicker } from "../../../src/hooks/useDocumentPicker";
 import api from "../../../src/services/api";
-import { documentFeedback } from "../../../src/utils/documentFeedback";
+import { documentFeedback, documentUploadError, feedbackMessage } from "../../../src/utils/documentFeedback";
 
 interface DocumentType {
   value: string;
@@ -43,10 +43,11 @@ const DOCUMENT_TYPES: DocumentType[] = [
   // ── Post-selection ──
   { value: "endorsement_letter", label: "Endorsement Letter" },
   { value: "acceptance_letter", label: "Acceptance Letter" },
+  { value: "internship_contract", label: "Internship Contract" },
   { value: "certificate_of_completion", label: "Certificate of Completion" },
 
   // ── Misc ──
-  { value: "requirements", label: "Requirements" },
+  { value: "requirements", label: "Other" },
 ];
 
 export default function UploadDocumentScreen() {
@@ -252,22 +253,19 @@ export default function UploadDocumentScreen() {
 
       const statusTitle = documentLabel(response.data.status, response.data.document?.version_status, response.data.document?.is_current_approved);
       const feedback = documentFeedback(response.data.status, response.data.student_feedback, response.data.document?.version_status);
-      Alert.alert(statusTitle, `${feedback.reason}\n${feedback.next_action}`, buttons);
+      Alert.alert(statusTitle, feedbackMessage(feedback), buttons);
       if (response.data.status !== 'rejected') {
         resetFile(); setSelectedType(presetType);
       }
     } catch (error: any) {
       if (error instanceof SubmissionUnconfirmedError) {
         unknownSubmission.current = true; setUnconfirmed(true);
-        showSubmissionRecovery(error, () => router.replace("/(student)/documents")); return;
+        showSubmissionRecovery(error, () => router.replace("/(student)/documents"),
+          "We couldn’t confirm your upload. Check Documents before trying again."); return;
       }
       const detail = submissionErrorMessage(error, "Couldn’t upload the document. Please try again.");
-      const reupload = typeof detail === "string" && detail.startsWith("Re-upload required: ");
-      Alert.alert(
-        reupload ? "Re-upload required" : "Upload failed",
-        reupload ? detail.slice("Re-upload required: ".length) :
-          typeof detail === "string" ? detail : "Failed to upload document. Please try again."
-      );
+      const alert = documentUploadError(detail);
+      Alert.alert(alert.title, alert.message);
     } finally {
       if (!unknownSubmission.current) uploadGuard.current = false;
       setUploading(false);

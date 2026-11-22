@@ -1,4 +1,4 @@
-from app.services.student_document_feedback import feedback
+from app.services.student_document_feedback import FILE_FORMATS, FILE_UNREADABLE, UNCONFIRMED, feedback, onboarding_reason
 from app.services.academic_requirements import rules as academic_rules, required_hours as academic_hours
 from app.services.academic_requirements import guard_cor_approval
 
@@ -180,14 +180,20 @@ def _submission_data(
     if submission is None:
         return None
 
+    review_notes = submission.review_notes if submission.reviewed_by not in (None, "", "system") else None
+    kind = submission.document_kind
     return {
         "id": submission.id,
         "document_kind": submission.document_kind,
         "original_filename": submission.original_filename,
         "review_status": submission.review_status,
         **({"validation_result": submission.validation_result} if include_diagnostics else {}),
-        "student_feedback": feedback(submission.review_status),
-        "review_notes": submission.review_notes if include_diagnostics or submission.reviewed_by not in (None, "", "system") else None,
+        "student_feedback": feedback(
+            submission.review_status, kind=kind,
+            reason=onboarding_reason(kind, validation=submission.validation_result),
+            review_notes=review_notes,
+        ),
+        "review_notes": submission.review_notes if include_diagnostics else review_notes,
         "submitted_at": submission.created_at,
         "reviewed_at": submission.reviewed_at,
     }
@@ -369,7 +375,7 @@ async def _save_private_upload(
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             400,
-            "Upload a PDF, JPG, or PNG document",
+            FILE_FORMATS,
         )
 
     path = PRIVATE_DIR / (
@@ -428,7 +434,7 @@ async def _save_private_upload(
         if not valid_signature:
             raise HTTPException(
                 400,
-                "File contents do not match its extension",
+                FILE_UNREADABLE,
             )
 
         if extension == ".pdf":
@@ -451,7 +457,7 @@ async def _save_private_upload(
             ) as exc:
                 raise HTTPException(
                     400,
-                    "Image cannot be opened",
+                    FILE_UNREADABLE,
                 ) from exc
 
         return path, ALLOWED_EXTENSIONS[extension]
@@ -562,7 +568,8 @@ async def _upload(
         extracted = inspection['text']
         ocr_error = inspection['ocr_error']
         if inspection['identification']['status'] == 'mismatch':
-            raise HTTPException(422, 'Document rejected: Upload the requested document type. Check that you selected the correct, complete file.')
+            reason = onboarding_reason(kind, term=get_current_academic_term(), mismatch=True)
+            raise HTTPException(422, f'Document rejected: {reason}')
 
         if _is_test_fixture(extracted):
             raise HTTPException(
@@ -627,12 +634,8 @@ async def _upload(
             guard_cor_approval(db)
 
         if outcome == "mismatch":
-            raise HTTPException(
-                422,
-                "Document rejected: Required information could not be confirmed. "
-                "Upload a clear, complete copy of the requested document that belongs to you, "
-                "or ask your coordinator for help.",
-            )
+            reason = onboarding_reason(kind, validation=validation, term=get_current_academic_term()) or UNCONFIRMED
+            raise HTTPException(422, f'Document rejected: {reason}')
 
         if outcome == "matched":
             review_status = "verified"

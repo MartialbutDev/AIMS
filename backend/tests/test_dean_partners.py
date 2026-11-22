@@ -49,7 +49,9 @@ class DeanPartnersTests(unittest.TestCase):
         fields = ('is_active','is_moa_signed','moa_reference','moa_signed_at','moa_effective_at','moa_expires_at')
         original = {field:getattr(company,field) for field in fields}
         scenarios = [
-            ({'moa_expires_at':self.f.today+timedelta(days=30)},'expiring'),
+            ({'moa_expires_at':self.f.today+timedelta(days=91)},'current'),
+            ({'moa_expires_at':self.f.today+timedelta(days=90)},'expiring'),
+            ({'moa_expires_at':self.f.today+timedelta(days=60)},'expiring'),
             ({'moa_expires_at':self.f.today},'expiring'),
             ({'moa_signed_at':self.f.today,'moa_effective_at':self.f.today},'current'),
             ({'moa_expires_at':self.f.today-timedelta(days=1)},None),
@@ -72,6 +74,7 @@ class DeanPartnersTests(unittest.TestCase):
                 if status:
                     self.assertEqual(len(matches),1)
                     self.assertEqual(matches[0]['moa_status'],status)
+                    self.assertEqual(matches[0]['days_to_expiry'], (company.moa_expires_at - self.f.today).days)
                     self.assertTrue(matches[0]['moa_ready'])
                     self.assertEqual(data['total'],2)
                 else:

@@ -46,8 +46,9 @@ const DOCUMENT_TYPES = [
   { value: "application_letter", label: "Application Letter" },
   { value: "endorsement_letter", label: "Endorsement Letter" },
   { value: "acceptance_letter", label: "Acceptance Letter" },
+  { value: "internship_contract", label: "Internship Contract" },
   { value: "certificate_of_completion", label: "Certificate of Completion" },
-  { value: "requirements", label: "Requirements" },
+  { value: "requirements", label: "Other" },
 ];
 
 const intakeText = (company: Company) => {

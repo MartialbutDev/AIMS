@@ -18,6 +18,7 @@ from pytesseract import TesseractError
 from app.core.config import settings
 from app.core.file_storage import STORAGE_UNAVAILABLE, staged_file
 from app.core.document_upload_limits import MAX_UPLOAD_BYTES, UPLOAD_SIZE_MESSAGE
+from app.services.student_document_feedback import FILE_UNREADABLE
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,6 @@ def check_pdf_limits(document) -> None:
 
 @contextmanager
 def open_readable_pdf(path):
-    damaged = "This PDF could not be read. Export a new copy of the original document and upload it."
     try:
         try:
             pdf = fitz.open(stream=Path(path).read_bytes(), filetype="pdf")
@@ -81,15 +81,15 @@ def open_readable_pdf(path):
             raise HTTPException(503, STORAGE_UNAVAILABLE) from exc
         with pdf:
             if not pdf.is_pdf:
-                raise DocumentInputError(422, damaged)
+                raise DocumentInputError(422, FILE_UNREADABLE)
             if pdf.needs_pass:
-                raise DocumentInputError(422, "This PDF is password-protected. Upload an unlocked copy.")
+                raise DocumentInputError(422, FILE_UNREADABLE)
             if not pdf.page_count:
-                raise DocumentInputError(422, damaged)
+                raise DocumentInputError(422, FILE_UNREADABLE)
             check_pdf_limits(pdf)
             yield pdf
     except (fitz.FileDataError, fitz.mupdf.FzErrorFormat, fitz.mupdf.FzErrorSyntax) as exc:
-        raise DocumentInputError(422, damaged) from exc
+        raise DocumentInputError(422, FILE_UNREADABLE) from exc
 
 
 def check_image_limits(image: Image.Image) -> None:
@@ -132,7 +132,7 @@ class OCRService:
 
         raise HTTPException(
             status_code=400,
-            detail="Unsupported file type. Allowed: JPG, JPEG, PNG, HEIC, BMP, TIFF, PDF",
+            detail="Choose a file in one of these formats: PDF, JPG, JPEG, PNG, HEIC, BMP or TIFF.",
         )
 
     @staticmethod
@@ -271,10 +271,7 @@ class OCRService:
             raise DocumentLimitError(413, "Image exceeds the allowed dimensions.") from exc
         except (UnidentifiedImageError, OSError, ValueError) as exc:
             logger.exception("Image decoding failed")
-            raise HTTPException(
-                status_code=400,
-                detail="Image cannot be opened or decoded",
-            ) from exc
+            raise DocumentInputError(400, FILE_UNREADABLE) from exc
         except HTTPException:
             raise
         except Exception as exc:

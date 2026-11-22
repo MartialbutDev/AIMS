@@ -125,12 +125,14 @@ def detail(db, partner, year, semester):
             supporting_document=document_metadata(json.loads(e.snapshot).get('supporting_file'))) for e in history])
 
 
-def record_capacity(db, partner, actor, capacity, expected_version=None):
-    """Save the current term's capacity in the same transaction as company details."""
+def record_capacity(db, partner, actor, capacity, expected_version=None, *, accepting=None, expected_term=None):
+    """Save current-term intake settings in the same transaction as company details."""
     from app.models.company_intake import utcnow
     require_schema(db)
     partner = company(db, partner.id, lock=True)
     year, semester = term(db)
+    if expected_term is not None and expected_term != (year, semester):
+        raise HTTPException(409, 'The active term changed. Reload the company before saving.')
     row = policy(db, partner.id, year, semester)
     if expected_version is not None and expected_version != (row.version if row else 0):
         raise HTTPException(409, 'Company capacity changed. Reload the company before saving.')
@@ -139,18 +141,23 @@ def record_capacity(db, partner, actor, capacity, expected_version=None):
         raise HTTPException(409, f'Intern capacity cannot be below {count} accepted students.')
     if row is None:
         row = CompanyIntake(company_id=partner.id, academic_year=year, semester=semester,
-            capacity=capacity, accepting=True, confirmation_date=today(), version=1)
+            capacity=capacity, accepting=True if accepting is None else accepting, confirmation_date=today(), version=1)
         db.add(row)
-    elif row.capacity == capacity:
-        return row
+        action = 'capacity_set'
     else:
+        status_changed = accepting is not None and row.accepting != accepting
+        if row.capacity == capacity and not status_changed:
+            return row
         row.capacity = capacity
+        if status_changed:
+            row.accepting = accepting
+        action = 'intake_updated' if status_changed else 'capacity_updated'
         row.version += 1
     row.updated_by, row.updated_at = actor.id, utcnow()
     db.flush()
     db.add(CompanyIntakeEvent(intake_id=row.id, actor_id=actor.id,
         actor_name=' '.join(filter(None, (actor.first_name, getattr(actor, 'middle_name', None), actor.last_name))),
-        action='capacity_set' if row.version == 1 else 'capacity_updated',
+        action=action,
         snapshot=json.dumps(dict(company_id=partner.id, academic_year=year, semester=semester,
             capacity=row.capacity, accepting=row.accepting, version=row.version))))
     return row

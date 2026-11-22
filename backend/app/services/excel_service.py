@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List
 from sqlalchemy.orm import Session
 from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import io
@@ -10,10 +11,70 @@ import math
 
 from app.models.user import User
 from app.models.dtr import DTR
+from app.models.company import Company
 
 
 class ExcelExportService:
-    """Generate Excel reports for DTR records"""
+    """Generate AIMS Excel reports."""
+
+    @staticmethod
+    def generate_company_directory(companies: list[Company]) -> io.BytesIO:
+        workbook = Workbook(iso_dates=True)
+        sheet = workbook.active
+        sheet.title = "Registered Companies"
+        headers = (
+            "Company/Agency Name", "Nature of Business", "USTP Coverage",
+            "Nature of Partnership", "Address", "MOA Notarized",
+            "Year Notarized", "Effectivity (Years)", "CONTACT PERSON",
+        )
+        sheet.merge_cells("A1:I1")
+        title = sheet["A1"]
+        title.value = "Registered Partner Companies"
+        title.font = Font(bold=True, size=18, color="FFFFFF")
+        title.fill = PatternFill(fill_type="solid", fgColor="0B0B2F")
+        title.alignment = Alignment(horizontal="center", vertical="center")
+        sheet.row_dimensions[1].height = 36
+
+        sheet.append(headers)
+        header_fill = PatternFill(fill_type="solid", fgColor="F5C343")
+        header_font = Font(bold=True, color="0B0B2F")
+        for column, width in enumerate((32, 24, 26, 28, 36, 20, 18, 22, 25), start=1):
+            sheet.column_dimensions[get_column_letter(column)].width = width
+            cell = sheet.cell(row=2, column=column)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+        sheet.row_dimensions[2].height = 30
+
+        alternate_fill = PatternFill(fill_type="solid", fgColor="F4F5F9")
+        text_alignment = Alignment(vertical="top", wrap_text=True)
+        for row_number, company in enumerate(companies, start=3):
+            notarized_date = company.moa_notarized_at
+            values = (
+                company.name, company.industry, company.ustp_coverage,
+                company.nature_of_partnership, company.address, notarized_date,
+                notarized_date.year if notarized_date else company.moa_notarized_year,
+                company.moa_effectivity_years, company.contact_person,
+            )
+            for column, value in enumerate(values, start=1):
+                cell = sheet.cell(row=row_number, column=column)
+                if isinstance(value, str):
+                    cell.value = ILLEGAL_CHARACTERS_RE.sub("", value)
+                    # Company-entered text must stay literal, including a leading "=".
+                    cell.data_type = "s"
+                else:
+                    cell.value = value
+                cell.alignment = text_alignment
+                if row_number % 2 == 0:
+                    cell.fill = alternate_fill
+            sheet.cell(row=row_number, column=6).number_format = "dd mmm yyyy"
+
+        sheet.freeze_panes = "A3"
+        sheet.auto_filter.ref = f"A2:I{sheet.max_row}"
+        output = io.BytesIO()
+        workbook.save(output)
+        output.seek(0)
+        return output
     
     @staticmethod
     def generate_dtr_report(

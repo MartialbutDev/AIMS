@@ -47,8 +47,8 @@ class DocumentLimitTests(unittest.TestCase):
             pdf.new_page()
             locked = pdf.tobytes(encryption=pymupdf.PDF_ENCRYPT_AES_256,
                                  owner_pw="fixture-owner", user_pw="fixture-reader")
-        cases = [(b"%PDF-1.7 truncated", 422, "Export a new copy"),
-                 (b"this is not a PDF", 422, "Export a new copy"),
+        cases = [(b"%PDF-1.7 truncated", 422, "AIMS couldn’t open this file"),
+                 (b"this is not a PDF", 422, "AIMS couldn’t open this file"),
                  (locked, 422, "unlocked copy"), (b"", 400, "empty")]
         for payload, status, message in cases:
             with self.subTest(message=message):
@@ -57,6 +57,10 @@ class DocumentLimitTests(unittest.TestCase):
                 self.assertEqual(preview.status_code, status, preview.text)
                 self.assertIn(message, preview.json()["detail"])
                 self.assertEqual(self.fixture.current().id, "current-resume")
+
+    def test_unsupported_and_damaged_uploads_show_actionable_alerts(self):
+        self.assert_rejected_without_persisting("candidate.txt", b"test", 400, "Choose a file in one of these formats")
+        self.assert_rejected_without_persisting("candidate.png", b"not an image", 400, "AIMS couldn’t open this file")
 
     def test_ocr_outage_is_retryable_without_saving_a_replacement(self):
         self.fixture.doc("current-resume")
@@ -89,6 +93,28 @@ class DocumentLimitTests(unittest.TestCase):
                 self.assertEqual(result.json()["status"], "pending")
                 self.assertEqual(result.json()["document"]["version_status"], "pending_replacement")
                 self.assertEqual(self.fixture.current(kind).id, old.id)
+
+    def test_internship_contract_is_identified_and_requires_coordinator_review(self):
+        with pymupdf.open() as pdf:
+            page = pdf.new_page()
+            content = ("INTERNSHIP CONTRACT\nStudent: Alex M. Rivera\n"
+                       "This internship agreement identifies the student, host company, workplace supervisor, "
+                       "placement dates, training duties, work hours and responsibilities for the placement. "
+                       "Copies are provided to the student and coordinator.")
+            page.insert_textbox(pymupdf.Rect(35, 35, 555, 300), content)
+            payload = pdf.tobytes()
+        identified = self.client.post("/documents/identify", files={"file": ("contract.pdf", payload)})
+        self.assertEqual(identified.status_code, 200, identified.text)
+        kind = DocumentType.INTERNSHIP_CONTRACT
+        self.assertEqual(identified.json()["suggested_type"], kind.value)
+        response = self.upload("contract.pdf", payload, kind.value)
+        self.assertEqual(response.status_code, 200, response.text)
+        document = response.json()["document"]
+        self.assertEqual((document["type"], response.json()["status"]), (kind.value, "pending"))
+        self.assertFalse(document["is_current_approved"])
+        approved = self.fixture.review(document["id"])
+        self.assertEqual(approved.status_code, 200, approved.text)
+        self.assertEqual(self.fixture.current(kind).id, document["id"])
 
     def test_too_many_pdf_pages_rejected_before_ocr(self):
         with pymupdf.open() as pdf:

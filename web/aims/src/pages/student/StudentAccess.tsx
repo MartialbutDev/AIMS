@@ -1,4 +1,5 @@
 import { GenderField } from '../../components/GenderField'
+import { isStudentGender } from '../../types/profile'
 import { StudentSignupPolicies } from './StudentSignupPolicies'
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
@@ -17,10 +18,12 @@ export function StudentAccess({ mode }: { mode: 'signup' | 'reset' }) {
     event.preventDefault()
     if (action.busy) return
     const data = new FormData(event.currentTarget)
+    const gender = data.get('gender')
+    if (!isStudentGender(gender)) { action.setError('Select Male or Female.'); return }
     if (!policiesAccepted || data.get('terms_accepted') !== 'on' || data.get('privacy_acknowledged') !== 'on') { action.setError('Read the Terms and Conditions and Privacy Policy, then select both checkboxes.'); return }
     if (data.get('password') !== data.get('confirm')) { action.setError('The passwords do not match.'); return }
     await action.run(async () => {
-      await studentWrite('/auth/register/student', { email: String(data.get('email')).trim(), first_name: String(data.get('first_name')).trim(), middle_name: String(data.get('middle_name')).trim() || null, last_name: String(data.get('last_name')).trim(), student_id: String(data.get('student_id')).trim(), password: data.get('password'), gender: data.get('gender') || null })
+      await studentWrite('/auth/register/student', { email: String(data.get('email')).trim(), first_name: String(data.get('first_name')).trim(), middle_name: String(data.get('middle_name')).trim() || null, last_name: String(data.get('last_name')).trim(), student_id: String(data.get('student_id')).trim(), password: data.get('password'), gender })
       setRegistered(true)
     }, 'Your account is ready. Sign in to submit your orientation certificate and COR for review.')
   }

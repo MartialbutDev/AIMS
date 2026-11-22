@@ -43,7 +43,8 @@ function documentName(type: string): string {
     endorsement_letter: 'Endorsement Letter',
     acceptance_letter: 'Acceptance Letter',
     certificate_of_completion: 'Certificate of Completion',
-    requirements: 'Requirements',
+    requirements: 'Other',
+    internship_contract: 'Internship Contract',
   }
 
   return (
@@ -179,6 +180,11 @@ export function InternshipDocumentReviewPage() {
     if (!decision || busy) return
 
     const cleanNotes = notes.trim()
+
+    if (decision.action === 'rejected' && /\{required (?:signature|dates|document)\}/.test(cleanNotes)) {
+      setError('Fill in the details in the review note before rejecting.')
+      return
+    }
 
     if (
       decision.action !== 'verified' &&
@@ -478,6 +484,19 @@ export function InternshipDocumentReviewPage() {
             </p>
 
             {decision.action === 'revoked' && <p role="note">Revoking removes this approval and prevents older versions from becoming active automatically. Existing application attachments and review history are retained.</p>}
+            {decision.action === 'rejected' && !notes && <label>
+              Use a confirmed rejection reason
+              <select value="" disabled={busy} onChange={event => setNotes(event.target.value)}>
+                <option value="">Choose a reason or write your own</option>
+                <option value="Your coordinator found that {required signature} is missing. Ask the signer to sign the document, then upload the complete copy.">Missing signature</option>
+                {['endorsement_letter', 'acceptance_letter'].includes(decision.document.type.toLowerCase()) &&
+                  <option value="This letter is for a different company. Upload the letter for the company in your application.">Wrong company</option>}
+                {decision.document.type.toLowerCase() === 'insurance' &&
+                  <option value="Your insurance does not cover the required internship dates. Upload proof of coverage for {required dates}.">Insurance dates do not cover the internship</option>}
+                {['requirements', 'document'].includes(decision.document.type.toLowerCase()) &&
+                  <option value="This file doesn’t match the requested requirement. Upload {required document} and check your coordinator’s review note.">Wrong supporting document</option>}
+              </select>
+            </label>}
             <label htmlFor="internship-review-notes">
               Review notes{' '}
               {decision.action !== 'verified'

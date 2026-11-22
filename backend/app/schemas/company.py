@@ -34,6 +34,9 @@ class CompanyCreate(CompanyBase):
 class CompanyUpdate(BaseModel):
     intern_capacity: int | None = Field(default=None, gt=0, le=100000, strict=True)
     intake_version: int | None = Field(default=None, ge=0, strict=True)
+    accepting_interns: bool | None = Field(default=None, strict=True)
+    intake_academic_year: str | None = Field(default=None, pattern=r"^\d{4}-\d{4}$")
+    intake_semester: str | None = Field(default=None, pattern=r"^[12]$")
     name: Optional[str] = Field(None, min_length=2, max_length=255)
     description: Optional[str] = None
     address: Optional[str] = Field(None, max_length=500)

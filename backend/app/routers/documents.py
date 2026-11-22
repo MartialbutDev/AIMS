@@ -382,7 +382,7 @@ async def identify_document_type(
             detected = result['detected_type']
             supported = {'resume', 'application_letter', 'waiver', 'medical_certificate',
                          'internship_plan', 'insurance', 'endorsement_letter',
-                         'acceptance_letter', 'certificate_of_completion'}
+                         'acceptance_letter', 'certificate_of_completion', 'internship_contract'}
             if detected in supported:
                 return {'status': 'suggested', 'suggested_type': detected,
                         'message': 'Suggested from the document. Confirm the type before uploading.',

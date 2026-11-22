@@ -12,6 +12,7 @@ from app.models.document import Document
 from app.models.student_onboarding import StudentOnboardingSubmission
 from app.models.user import User, UserRole
 from app.services import document_service
+from app.services.student_document_feedback import COPY, CURRENT_REMAINS, WRONG_OWNER_DECISION, WRONG_STUDENT, feedback, onboarding_reason, student_document_payload
 from app.routers import documents
 
 INTERNAL = 'diagnostic-marker SCORE: 83 threshold: 70 matched_keywords: alpha beta'
@@ -125,6 +126,37 @@ class StudentDocumentFeedbackTests(unittest.TestCase):
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.json()['review_notes'], 'Please provide the complete signed form.')
         self.assert_safe(result.json())
+
+    def test_specific_copy_and_replacement_alerts_exclude_diagnostics(self):
+        for kind in COPY:
+            pending = feedback('pending', kind=kind)
+            self.assertEqual(pending['reason'], COPY[kind][1])
+            self.assertTrue(feedback('verified', kind=kind)['reason'].endswith('is approved.'))
+        payload = {'type': 'waiver', 'verification_status': 'rejected',
+                   'validation_message': INTERNAL + ' The readable text does not match the selected document type.',
+                   'current_approved_id': 'current-copy'}
+        rejected = student_document_payload(payload)
+        self.assertEqual(rejected['student_feedback']['reason'], COPY['waiver'][2])
+        self.assertEqual(rejected['student_feedback']['next_action'], CURRENT_REMAINS)
+        self.assert_safe(rejected)
+        confirmed = 'Your coordinator found that the student signature is missing. Ask the signer to sign the document, then upload the complete copy.'
+        reviewed = student_document_payload({**payload, 'review_notes': confirmed, 'reviewed_by': 'c1'})
+        self.assertEqual(reviewed['student_feedback']['reason'], confirmed)
+        self.assertEqual(reviewed['student_feedback']['next_action'], CURRENT_REMAINS)
+        identity = student_document_payload({**payload, 'validation_message': WRONG_OWNER_DECISION})
+        self.assertEqual(identity['student_feedback']['reason'], WRONG_STUDENT)
+
+    def test_onboarding_alerts_only_include_confirmed_term_details(self):
+        cor = {'automatic_result': 'mismatch', 'checks': {'semester_matches': False},
+               'details': {'detected_semester': '1', 'detected_academic_year': '2026-2027'}}
+        self.assertEqual(onboarding_reason('cor', validation=cor, term=('2026-2027', '2')),
+                         'This COR is for Semester 1, AY 2026-2027. Upload your COR for Semester 2, AY 2026-2027.')
+        orientation = {'automatic_result': 'needs_review',
+                       'details': {'detected_academic_year': '2025-2026', 'detected_academic_years': ['2025-2026']}}
+        self.assertIn('A reviewer will check', onboarding_reason('orientation', validation=orientation, term=('2026-2027', '2')))
+        orientation['details']['detected_academic_years'].append('2026-2027')
+        self.assertIsNone(onboarding_reason('orientation', validation=orientation, term=('2026-2027', '2')))
+        self.assertNotIn(INTERNAL, onboarding_reason('cor', term=(INTERNAL, '2'), mismatch=True))
 
     def test_student_history_hides_machine_notes_and_preserves_human_feedback(self):
         from app.models.document_review import DocumentReview

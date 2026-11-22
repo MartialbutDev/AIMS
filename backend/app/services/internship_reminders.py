@@ -224,7 +224,7 @@ def _still_needed(db, deployment, kind, period):
         if not application or application.status != ApplicationStatus.ACCEPTED:
             return False
         checklist = DeploymentService.get_checklist(db, deployment)
-        return any(item["status"] == "missing" for item in checklist["items"])
+        return any(item["required"] and item["status"] == "missing" for item in checklist["items"])
 
     term = dict(student_id=deployment.student_id, academic_year=deployment.academic_year, semester=deployment.semester)
     if kind == "weekly_journal":

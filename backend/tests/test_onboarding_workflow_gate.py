@@ -279,7 +279,7 @@ class OnboardingWorkflowGateTests(unittest.TestCase):
         password = 'Isolated-regression-fixture-123!'
         response = self.client.post('/auth/register/student', json={
             'email': 'new-student@example.com', 'first_name': 'New', 'last_name': 'Fixture',
-            'student_id': '2099000011', 'password': password})
+            'student_id': '2099000011', 'password': password, 'gender': 'female'})
         self.assertEqual(response.status_code, 201)
         self.assertFalse(response.json()['is_verified'])
         response = self.client.post('/auth/login/student', json={'email': 'new-student@example.com', 'password': password})

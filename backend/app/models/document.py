@@ -27,6 +27,7 @@ class DocumentType(str, PyEnum):
     WAIVER = "waiver"
     MEDICAL_CERTIFICATE = "medical_certificate"
     INTERNSHIP_PLAN = "internship_plan"
+    INTERNSHIP_CONTRACT = "internship_contract"
     INSURANCE = "insurance"
     ENDORSEMENT_LETTER = "endorsement_letter"
 

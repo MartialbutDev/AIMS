@@ -1,6 +1,6 @@
 
 import { getDashboardAnalytics } from './analyticsService'
-import { apiRequest } from './apiClient'
+import { apiRequest, apiRequestBlob } from './apiClient'
 import type { DashboardData } from '../types/dashboard'
 
 import type { IntakeSummary } from './companyIntakeService'
@@ -37,6 +37,9 @@ export interface CareerCompany {
 export interface CareerCompanyPayload {
   intern_capacity?: number
   intake_version?: number
+  accepting_interns?: boolean
+  intake_academic_year?: string
+  intake_semester?: string
   name: string
   description?: string | null
   address?: string | null
@@ -86,6 +89,20 @@ export async function getCareerCompanies(): Promise<CareerCompany[]> {
   }
 
   return companies
+}
+
+export async function exportCareerCompanies(companyIds: string[]): Promise<void> {
+  const file = await apiRequestBlob('/api/v1/companies/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ company_ids: companyIds }),
+  })
+  const url = URL.createObjectURL(file)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'Registered Partner Companies.xlsx'
+  link.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
 }
 
 export function createCareerCompany(

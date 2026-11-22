@@ -29,13 +29,30 @@
 .dean-oversight__section-heading h2{font-size:19px;margin-bottom:7px;letter-spacing:-.3px}
 .dean-oversight__section-heading p,.dean-oversight__section-heading>span{font-size:12px;color:var(--dean-muted);line-height:1.7}
 .dean-oversight__section-heading>span{white-space:nowrap;background:#f4f4f9;border-radius:6px;padding:5px 10px}
-.dean-oversight__chart{display:grid;gap:19px}
-.dean-oversight__bar-row{display:grid;grid-template-columns:220px minmax(50px,1fr) 36px;gap:16px;align-items:center;font-size:12px}
-.dean-oversight__bar-row>strong{text-align:right;font-size:15px}
-.dean-oversight__track{height:18px;border-radius:4px;background:#f0f1f6;overflow:hidden}
-.dean-oversight__track>span{display:block;background:var(--dean-navy);height:100%;border-radius:4px}
-.dean-oversight__bar-row:nth-child(4) .dean-oversight__track>span{background:#b38a00}
-.dean-oversight__bar-row:nth-child(5) .dean-oversight__track>span{background:#306752}
+.dean-oversight__stage-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 32px;
+  margin: 0;
+}
+.dean-oversight__stage-counts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #edeef4;
+  padding: 10px 0;
+  font-size: 13px;
+}
+.dean-oversight__stage-counts dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 900px) {
+  .dean-oversight__stage-counts { grid-template-columns: 1fr; }
+}
 .dean-oversight__footnote{margin-top:22px!important;font-size:11px;color:var(--dean-muted);line-height:1.8;border-top:1px solid #eef0f5;padding-top:14px}
 .dean-oversight__table-wrap{overflow-x:auto}
 .dean-oversight table{width:100%;border-collapse:collapse;font-size:12px;min-width:820px}
@@ -62,4 +79,4 @@
 .dean-oversight__pagination{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px;font-size:12px}
 .dean-oversight__sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(max-width:1000px){.dean-oversight__attention{grid-template-columns:1fr}.dean-oversight__metric{padding:18px}}
-@media(max-width:640px){.dean-oversight{gap:16px}.dean-oversight__hero{padding:24px;align-items:start;flex-direction:column}.dean-oversight__cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.dean-oversight__metric>strong{font-size:30px}.dean-oversight__panel{padding:18px}.dean-oversight__term{gap:12px;padding:18px}.dean-oversight__term>div{width:100%}.dean-oversight__term label{flex:1}.dean-oversight__bar-row{grid-template-columns:minmax(0,1fr) 30px;gap:8px}.dean-oversight__bar-row>span{grid-column:1/-1}.dean-oversight__attention article{padding:16px}.dean-oversight__section-heading{flex-direction:column}.dean-oversight__dialog{padding:20px}.dean-oversight__dialog-header{gap:10px}}
+@media(max-width:640px){.dean-oversight{gap:16px}.dean-oversight__hero{padding:24px;align-items:start;flex-direction:column}.dean-oversight__cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.dean-oversight__metric>strong{font-size:30px}.dean-oversight__panel{padding:18px}.dean-oversight__term{gap:12px;padding:18px}.dean-oversight__term>div{width:100%}.dean-oversight__term label{flex:1}.dean-oversight__attention article{padding:16px}.dean-oversight__section-heading{flex-direction:column}.dean-oversight__dialog{padding:20px}.dean-oversight__dialog-header{gap:10px}}

@@ -3,6 +3,7 @@ import { randomUUID } from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { Alert } from "react-native";
 import api from "./api";
+import { feedbackMessage, type StudentDocumentFeedback } from "../utils/documentFeedback";
 
 function outcomeUnknown(error: unknown) {
   if (!isAxiosError(error)) return false;
@@ -48,20 +49,22 @@ export async function submitWithRecovery<T>(path: string, form: FormData, config
   }
 }
 
-export function showSubmissionRecovery(error: unknown, openRecords: () => void) {
+export function showSubmissionRecovery(error: unknown, openRecords: () => void, message?: string) {
   if (!(error instanceof SubmissionUnconfirmedError)) return false;
-  Alert.alert("Submission unconfirmed", error.message, [
+  Alert.alert("Submission unconfirmed", message ?? error.message, [
     { text: "View records", style: "cancel", onPress: openRecords },
     {
       text: "Retry submission",
       onPress: () => {
         void error.retry().then(({ data }) => {
           const rejected = typeof data === "object" && data !== null && "status" in data && data.status === "rejected";
-          Alert.alert(rejected ? "Document rejected" : "Submission recorded",
-            rejected ? "Check Documents for the review result." : "AIMS has saved this submission.",
+          const feedback = typeof data === "object" && data !== null && "student_feedback" in data
+            ? data.student_feedback as StudentDocumentFeedback | undefined : undefined;
+          Alert.alert(feedback?.status_label ?? (rejected ? "Document rejected" : "Submission recorded"),
+            feedback ? feedbackMessage(feedback) : rejected ? "Check Documents for the review result." : "AIMS has saved this submission.",
             [{ text: "View records", onPress: openRecords }]);
         }).catch(nextError => {
-          if (!showSubmissionRecovery(nextError, openRecords)) {
+          if (!showSubmissionRecovery(nextError, openRecords, message)) {
             Alert.alert("Couldn’t retry submission", submissionErrorMessage(nextError, "Refresh your records before trying again."),
               [{ text: "View records", onPress: openRecords }]);
           }

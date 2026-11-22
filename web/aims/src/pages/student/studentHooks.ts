@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { SubmissionUnconfirmedError } from '../../services/studentService'
+import { SubmissionUnconfirmedError, type StudentFeedback } from '../../services/studentService'
+import { ApiResponseError } from '../../services/apiClient'
 
 export const human = (value?: string | null) => (value || 'Not available').replace(/_/g, ' ')
 export const errorText = (error: unknown) => error instanceof Error ? error.message : 'The request could not be completed. Please try again.'
@@ -21,9 +22,11 @@ export function useStudentLoad<T>(loader: () => Promise<T>, dependencies: unknow
 export function useStudentAction(refresh?: () => void) {
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('')
   const pending = useRef(false)
+  const documentUpload = useRef<'documents' | 'onboarding' | undefined>(undefined)
   const [unconfirmed, setUnconfirmed] = useState<SubmissionUnconfirmedError | null>(null)
-  async function run(action: () => Promise<unknown>, success = 'Saved successfully.') {
+  async function run(action: () => Promise<unknown>, success = 'Saved successfully.', upload?: 'documents' | 'onboarding') {
     if (pending.current || unconfirmed) return false
+    documentUpload.current = upload
     return execute(action, success)
   }
 
@@ -34,12 +37,27 @@ export function useStudentAction(refresh?: () => void) {
       const result = await action()
       setUnconfirmed(null)
       const rejected = typeof result === 'object' && result !== null && 'status' in result && result.status === 'rejected'
-      setMessage(rejected ? 'Document rejected. Check its review result.' : success)
+      const feedback = documentUpload.current && result && typeof result === 'object' && 'student_feedback' in result
+        ? result.student_feedback as StudentFeedback | undefined : undefined
+      if (feedback?.reason) {
+        const message = [feedback.status_label, feedback.reason, feedback.next_action].filter(Boolean).join(' ')
+        if (rejected) setError(message)
+        else setMessage(message)
+      } else {
+        setMessage(rejected ? 'Document rejected. Check its review result.' : success)
+      }
       refresh?.()
       return true
     } catch (error) {
       setUnconfirmed(error instanceof SubmissionUnconfirmedError ? error : null)
-      setError(error instanceof TypeError ? 'Connection lost. Refresh the record list before retrying; the server may already have received your submission.' : errorText(error))
+      if (documentUpload.current && (error instanceof SubmissionUnconfirmedError || error instanceof TypeError ||
+        (error instanceof ApiResponseError && [408, 500, 502, 504].includes(error.status)))) {
+        setError(documentUpload.current === 'documents'
+          ? 'We couldn’t confirm your upload. Check Documents before trying again.'
+          : 'We couldn’t confirm your upload. Check your onboarding status before trying again.')
+      } else {
+        setError(error instanceof TypeError ? 'Connection lost. Refresh the record list before retrying; the server may already have received your submission.' : errorText(error))
+      }
       return false
     } finally { pending.current = false; setBusy(false) }
   }

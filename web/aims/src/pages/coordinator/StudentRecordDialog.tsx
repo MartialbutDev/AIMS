@@ -11,7 +11,7 @@ import { DtrExport } from './DtrExport'
 import './student-record-dialog.css'
 
 export const recordTitles = { documents: 'Required documents', dtr: 'DTR summary & photos', journals: 'Internship journals' }
-const documentLabels: Record<string, string> = { resume: 'Resume', application_letter: 'Application letter', waiver: 'Waiver', medical_certificate: 'Medical certificate', internship_plan: 'Internship plan', insurance: 'Insurance', endorsement_letter: 'Endorsement letter', acceptance_letter: 'Acceptance letter', certificate_of_completion: 'Certificate of completion' }
+const documentLabels: Record<string, string> = { resume: 'Resume', application_letter: 'Application letter', waiver: 'Waiver', medical_certificate: 'Medical certificate', internship_plan: 'Internship plan', internship_contract: 'Internship Contract', requirements: 'Other', insurance: 'Insurance', endorsement_letter: 'Endorsement letter', acceptance_letter: 'Acceptance letter', certificate_of_completion: 'Certificate of completion' }
 function dateLabel(value: string) { const d = new Date(value); return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-PH', { dateStyle: 'medium' }) }
 function documentLabel(value: string) { return documentLabels[value] || value.replaceAll('_', ' ') }
 function Status({ value, label }: { value: string; label?: string }) { return <span className={`sr-status sr-status--${value}`}>{label || value.replaceAll('_', ' ')}</span> }

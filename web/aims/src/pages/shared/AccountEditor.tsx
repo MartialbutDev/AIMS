@@ -1,4 +1,5 @@
 import { GenderField } from '../../components/GenderField'
+import { isStudentGender } from '../../types/profile'
 import { updateCurrentSession } from '../../services/sessionStorage'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { changeAccountPassword, getAccount, requestVerification, saveAccount, type AccountProfile } from '../../services/accountService'
@@ -14,7 +15,27 @@ export function AccountEditor({session,onLogout}:{session:UserSession;onLogout:(
   const [current,setCurrent]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState('')
   useEffect(()=>{let active=true;getAccount().then(p=>{if(active)setProfile(p)}).catch(e=>{if(active)setError(String(e.message))});return()=>{active=false}},[])
   async function perform(action:()=>Promise<void>){if(pending.current)return;pending.current=true;setBusy(true);setError('');setMessage('');try{await action()}catch(e){setError(e instanceof Error?e.message:'Could not save changes.')}finally{pending.current=false;setBusy(false)}}
-  function save(e:FormEvent){e.preventDefault();if(!profile)return;void perform(async()=>{const updated=await saveAccount({first_name:profile.first_name.trim(),middle_name:profile.middle_name?.trim()||null,last_name:profile.last_name.trim(),phone:profile.phone?.trim()||null,...(session.role==='student'?{gender:profile.gender??null}:{})});setProfile(updated);updateCurrentSession(session.accessToken,{name:formatAccountName(updated)});setMessage('Your account details were saved.')})}
+  function save(e: FormEvent) {
+    e.preventDefault()
+    if (!profile) return
+    const { gender } = profile
+    if (session.role === 'student' && !isStudentGender(gender)) {
+      setError('Select Male or Female.')
+      return
+    }
+    void perform(async () => {
+      const updated = await saveAccount({
+        first_name: profile.first_name.trim(),
+        middle_name: profile.middle_name?.trim() || null,
+        last_name: profile.last_name.trim(),
+        phone: profile.phone?.trim() || null,
+        ...(session.role === 'student' ? { gender } : {}),
+      })
+      setProfile(updated)
+      updateCurrentSession(session.accessToken, { name: formatAccountName(updated) })
+      setMessage('Your account details were saved.')
+    })
+  }
   function change(e:FormEvent){e.preventDefault();if(password!==confirm){setError('The new passwords do not match.');return}void perform(async()=>{await changeAccountPassword(current,password);setCurrent('');setPassword('');setConfirm('');setMessage('Your password was changed. Sign in again.');onLogout()})}
   return <section className="workspace-page"><header className="workspace-page-heading"><div><h1>Account settings</h1></div></header>
     {error&&<p className="account-error" role="alert">{error}</p>}{message&&<p className="account-success" role="status">{message}</p>}

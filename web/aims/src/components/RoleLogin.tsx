@@ -7,11 +7,12 @@ import type { UserRole } from '../types/auth'
 interface RoleLoginProps {
   role: UserRole
   isSigningIn: boolean
+  reauthenticate?: boolean
   onBack: () => void
   onLogin: (loginIdentifier: string, password: string, keepSignedIn: boolean) => Promise<void>
 }
 
-export function RoleLogin({ role, isSigningIn, onBack, onLogin }: RoleLoginProps) {
+export function RoleLogin({ role, isSigningIn, reauthenticate, onBack, onLogin }: RoleLoginProps) {
   const [loginIdentifier, setLoginIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -40,6 +41,7 @@ export function RoleLogin({ role, isSigningIn, onBack, onLogin }: RoleLoginProps
           <p className="citc-overline">{roleLabels[role]} sign-in</p>
           <h1 id="login-heading">Welcome back<span>.</span></h1>
           <p className="citc-intro">{roleDescriptions[role]}</p>
+          {reauthenticate && <p className="citc-login-error" role="status">Your session ended. Sign in again to return to your page.</p>}
           <form className="citc-login-form" onSubmit={handleSubmit} aria-busy={isSigningIn}>
             <label htmlFor="login-identifier">{role === 'student' ? 'Email or student number' : 'Email or username'}</label>
             <input id="login-identifier" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder={role === 'company' ? 'Your company email or username' : 'Your email or username'} value={loginIdentifier} onChange={(event) => setLoginIdentifier(event.target.value)} required disabled={isSigningIn} />

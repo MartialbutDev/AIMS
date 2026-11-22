@@ -1,15 +1,17 @@
 
-from typing import List
+from typing import Annotated, List
 from datetime import datetime, timezone, timedelta
 from app.services.direct_placement_service import moa_state
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
+from pydantic import Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.services import company_intake as intake_service
+from app.services.excel_service import ExcelExportService
 from app.models.company import Company
 from app.models.user import User
 from app.schemas.company import (
@@ -27,6 +29,7 @@ def with_intakes(db, rows):
 
 
 COMPANY_MANAGER_ROLES = {"admin", "career_center"}
+MOA_EXPIRING_WITHIN_DAYS = 90
 
 
 # ============================================================
@@ -229,6 +232,32 @@ async def get_all_companies_admin(
     return with_intakes(db, rows)
 
 
+@router.post("/export")
+def export_company_directory(
+    company_ids: Annotated[list[Annotated[str, Field(min_length=1, max_length=36)]], Body(embed=True, min_length=1)],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_company_manager),
+):
+    """Export the records selected by the Career Center directory filters."""
+    ids = list(dict.fromkeys(company_ids))
+    companies = {}
+    for start in range(0, len(ids), 500):
+        rows = db.query(Company).filter(Company.id.in_(ids[start:start + 500])).all()
+        companies.update((company.id, company) for company in rows)
+    if len(companies) != len(ids):
+        raise HTTPException(409, "The company directory changed. Refresh it and export again.")
+
+    workbook = ExcelExportService.generate_company_directory([companies[company_id] for company_id in ids])
+    return Response(
+        content=workbook.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="Registered Partner Companies.xlsx"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 # ============================================================
 # COMPANY DETAILS — PRIVACY PROTECTION
 # ============================================================
@@ -251,7 +280,7 @@ async def get_dean_partner_directory(
     for company in partners[skip:skip + limit]:
         state = moa_state(company)
         days = (company.moa_expires_at - today).days
-        status = 'expiring' if days <= 30 else 'current'
+        status = 'expiring' if days <= MOA_EXPIRING_WITHIN_DAYS else 'current'
         items.append({**CompanyResponse.model_validate(company).model_dump(mode='json'),
                       'moa_status': status, 'moa_ready': state['ready'],
                       'days_to_expiry': days, 'checks': state['checks']})
@@ -356,8 +385,14 @@ async def update_company(
     has_capacity = "intern_capacity" in updates
     capacity = updates.pop("intern_capacity", None)
     version = updates.pop("intake_version", None)
+    has_accepting = "accepting_interns" in updates
+    accepting = updates.pop("accepting_interns", None)
+    intake_year = updates.pop("intake_academic_year", None)
+    intake_semester = updates.pop("intake_semester", None)
     if has_capacity and (capacity is None or version is None):
         raise HTTPException(422, "Provide a positive intern capacity and its current version.")
+    if has_accepting and (accepting is None or not has_capacity or not intake_year or not intake_semester):
+        raise HTTPException(422, "Provide the intake term, capacity and version when changing application availability.")
 
     if "name" in updates:
         if updates["name"] is None:
@@ -390,7 +425,10 @@ async def update_company(
     try:
         if has_capacity:
             db.flush()
-            intake_service.record_capacity(db, company, current_user, capacity, version)
+            intake_service.record_capacity(
+                db, company, current_user, capacity, version, accepting=accepting,
+                expected_term=(intake_year, intake_semester) if has_accepting else None,
+            )
         db.commit()
         db.refresh(company)
     except Exception:

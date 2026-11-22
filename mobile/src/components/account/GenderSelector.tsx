@@ -1,17 +1,16 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GENDER_OPTIONS, type Gender } from '../../constants/profile';
+import { GENDER_OPTIONS, type Gender, type StudentGender } from '../../constants/profile';
 import { useTheme } from '../../context/ThemeContext';
 
 export function GenderSelector({ value, onChange, disabled }: {
-  value: Gender | null; onChange: (value: Gender | null) => void; disabled?: boolean;
+  value: Gender | null; onChange: (value: StudentGender) => void; disabled?: boolean;
 }) {
   const { colors } = useTheme();
-  const options = [[null, 'Not specified'], ...GENDER_OPTIONS] as const;
   return <View style={styles.field}>
-    <Text style={[styles.label, { color: colors.textSecondary }]}>Gender (optional)</Text>
-    <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel="Gender (optional)">
-      {options.map(([key, label]) => <TouchableOpacity key={key ?? 'not-specified'}
+    <Text style={[styles.label, { color: colors.textSecondary }]}>Gender</Text>
+    <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel="Gender">
+      {GENDER_OPTIONS.map(([key, label]) => <TouchableOpacity key={key}
         accessibilityRole="radio" accessibilityLabel={label}
         accessibilityState={{ checked: value === key, disabled: !!disabled }} disabled={disabled}
         onPress={() => onChange(key)} style={[styles.option, { borderColor: value === key ? colors.accent : colors.border,
@@ -20,7 +19,7 @@ export function GenderSelector({ value, onChange, disabled }: {
         <Text style={[styles.optionLabel, { color: colors.textPrimary }]}>{label}</Text>
       </TouchableOpacity>)}
     </View>
-    <Text style={[styles.hint, { color: colors.textSecondary }]}>Optional. Used for aggregate internship reporting.</Text>
+    <Text style={[styles.hint, { color: colors.textSecondary }]}>Used for aggregate internship reporting.</Text>
   </View>;
 }
 const styles = StyleSheet.create({

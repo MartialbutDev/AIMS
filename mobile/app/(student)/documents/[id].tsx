@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { openPrivateFile } from "../../../src/services/privateFile.service";
 import { useTheme } from "../../../src/context/ThemeContext";
 import api from "../../../src/services/api";
-import { documentFeedback, type StudentDocumentFeedback } from "../../../src/utils/documentFeedback";
+import { documentFeedback, documentTypeName, type StudentDocumentFeedback } from "../../../src/utils/documentFeedback";
 
 interface DocumentDetail {
   id: string;
@@ -143,7 +143,7 @@ export default function DocumentDetailScreen() {
 
   const displayStatus = document.version_status?.startsWith("pending") ? "pending" : document.verification_status;
   const statusColor = document.version_status === "superseded" ? colors.textSecondary : getStatusColor(displayStatus);
-  const displayName = document.type.replace(/_/g, " ").toUpperCase();
+  const displayName = documentTypeName(document.type).toUpperCase();
   const feedback = documentFeedback(document.verification_status, document.student_feedback, document.version_status);
 
   const statusLabel = document.version_label || (
@@ -246,12 +246,12 @@ export default function DocumentDetailScreen() {
           <View style={[styles.validationCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionText, { color: statusColor, fontWeight: '700' }]}>{feedback.status_label}</Text>
             <Text style={[styles.sectionText, { color: colors.textSecondary, marginTop: 8 }]}>{feedback.reason}</Text>
-            <Text style={[styles.sectionText, { color: colors.textPrimary, marginTop: 10 }]}>{feedback.next_action}</Text>
+            {!!feedback.next_action && <Text style={[styles.sectionText, { color: colors.textPrimary, marginTop: 10 }]}>{feedback.next_action}</Text>}
             <Text style={[styles.sectionText, { color: colors.textSecondary, marginTop: 10 }]}>{feedback.notice}</Text>
           </View>
         </View>
 
-        {document.review_notes && <View style={styles.section}><Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Reviewer feedback</Text><Text style={[styles.sectionText, { color: colors.textSecondary }]}>{document.review_notes}</Text></View>}
+        {document.review_notes && document.review_notes !== feedback.reason && <View style={styles.section}><Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Reviewer feedback</Text><Text style={[styles.sectionText, { color: colors.textSecondary }]}>{document.review_notes}</Text></View>}
 
         {/* Description */}
         {document.description && (

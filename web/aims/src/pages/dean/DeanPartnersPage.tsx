@@ -1,9 +1,10 @@
 import { MoaFiles } from '../../components/MoaFiles'
 import { useEffect, useRef, useState } from 'react'
 import { getDeanPartners, type DeanPartner, type MoaStatus } from '../../services/deanPartnersService'
+import { MOA_EXPIRING_WITHIN_DAYS } from '../../services/moaExpiry'
 import './dean-partners.css'
 
-const labels: Record<MoaStatus, string> = { current: 'ACTIVE', expiring: 'Expires within 30 days' }
+const labels: Record<MoaStatus, string> = { current: 'ACTIVE', expiring: `Expires within ${MOA_EXPIRING_WITHIN_DAYS} days` }
 const date = (value: string | null) => value ? new Date(`${value}T00:00:00+08:00`).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', day: 'numeric', month: 'short', year: 'numeric' }) : 'Not recorded'
 function website(value: string | null) {
   if (!value) return null
@@ -32,7 +33,7 @@ export function DeanPartnersPage() {
   const visible = matches.slice((currentPage - 1) * 12, currentPage * 12)
   const cards = [
     ['Active MOAs', companies.length],
-    ['Expiring within 30 days', companies.filter(c => c.moa_status === 'expiring').length],
+    [`Expiring within ${MOA_EXPIRING_WITHIN_DAYS} days`, companies.filter(c => c.moa_status === 'expiring').length],
   ] as const
   return <div className="dean-partners">
     <header className="dean-partners__hero"><div><h1>Industry & MOA partners</h1><p>Partners with active internship agreements.</p></div><strong>Read-only directory</strong></header>

@@ -30,6 +30,8 @@ class DeploymentService:
         DocumentType.INTERNSHIP_PLAN: "Internship Plan",
     }
 
+    OPTIONAL_DOCUMENTS = {DocumentType.INTERNSHIP_CONTRACT: "Internship Contract"}
+
     @staticmethod
     def application_blocker(db: Session, student_id: str, year: str, semester: str,
                             exclude_application_id: str | None = None, *, lock_onboarding: bool = False) -> str | None:
@@ -71,13 +73,14 @@ class DeploymentService:
 
     @classmethod
     def get_checklist(cls, db: Session, deployment):
+        checklist_documents = cls.REQUIRED_DOCUMENTS | cls.OPTIONAL_DOCUMENTS
         documents = (
             db.query(Document)
             .filter(
                 Document.uploaded_by == deployment.student_id,
                 Document.academic_year == deployment.academic_year,
                 Document.semester == deployment.semester,
-                Document.type.in_(list(cls.REQUIRED_DOCUMENTS)),
+                Document.type.in_(list(checklist_documents)),
             )
             .order_by(
                 Document.created_at.desc(),
@@ -90,13 +93,13 @@ class DeploymentService:
 
         checklist = []
 
-        for document_type, label in cls.REQUIRED_DOCUMENTS.items():
+        for document_type, label in checklist_documents.items():
             document = latest.get(document_type)
 
             checklist.append({
                 "document_type": document_type.value,
                 "label": label,
-                "required": True,
+                "required": document_type in cls.REQUIRED_DOCUMENTS,
                 "document_id": document.id if document else None,
                 "status": (
                     cls._enum_value(document.verification_status)
@@ -107,7 +110,7 @@ class DeploymentService:
 
         ready = all(
             item["status"] == "verified"
-            for item in checklist
+            for item in checklist if item["required"]
         )
 
         return {

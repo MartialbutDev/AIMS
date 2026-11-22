@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { apiRequest } from '../services/apiClient'
+import { apiRequest, SESSION_REJECTED_EVENT } from '../services/apiClient'
 import { restoreBrowserSession, signIn } from '../services/authService'
 import type { UserRole, UserSession } from '../types/auth'
 import {
-  SESSION_EVENT_KEY, forgetLegacySession, isSignedOut, readLegacySession, readStoredSession,
+  SESSION_EVENT_KEY, forgetLegacySession, isSessionExpired, isSignedOut, readLegacySession, readStoredSession,
   sessionEvent, setCurrentSession, shareSessionChange,
 } from '../services/sessionStorage'
 
@@ -12,6 +12,7 @@ export function useAuthSession() {
   const [isSigningIn, setIsSigningIn] = useState(false)
   const [isRestoring, setIsRestoring] = useState(true)
   const [restoreError, setRestoreError] = useState(false)
+  const [needsSignIn, setNeedsSignIn] = useState(false)
   const pending = useRef<AbortController | null>(null)
 
   const restore = useCallback(async () => {
@@ -22,7 +23,7 @@ export function useAuthSession() {
     setRestoreError(false)
     setIsRestoring(true)
     try {
-      const restored = await restoreBrowserSession(controller.signal)
+      const restored = await restoreBrowserSession(AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]))
       if (controller.signal.aborted || marker !== sessionEvent()) return
       // Announce a legacy migration so older tabs drop stale account information.
       if (restored && readLegacySession()) shareSessionChange(restored)
@@ -42,20 +43,30 @@ export function useAuthSession() {
     const sync = (event: StorageEvent) => {
       if (event.key !== SESSION_EVENT_KEY && event.key !== null) return
       pending.current?.abort()
+      setNeedsSignIn(isSessionExpired())
       setCurrentSession(null)
       setRestoreError(false)
       if (isSignedOut()) setIsRestoring(false)
       else void restore()
     }
+    const expire = () => {
+      pending.current?.abort()
+      setNeedsSignIn(true)
+      shareSessionChange(null, true)
+      setRestoreError(false)
+      setIsRestoring(false)
+    }
     const pageShow = (event: PageTransitionEvent) => { if (event.persisted) void restore() }
     window.addEventListener('aims-session-updated', update)
     window.addEventListener('storage', sync)
+    window.addEventListener(SESSION_REJECTED_EVENT, expire)
     window.addEventListener('pageshow', pageShow)
     void restore()
     return () => {
       pending.current?.abort()
       window.removeEventListener('aims-session-updated', update)
       window.removeEventListener('storage', sync)
+      window.removeEventListener(SESSION_REJECTED_EVENT, expire)
       window.removeEventListener('pageshow', pageShow)
     }
   }, [restore])
@@ -65,6 +76,7 @@ export function useAuthSession() {
     try {
       const next = await signIn(role, identifier, password, remember)
       pending.current?.abort()
+      setNeedsSignIn(false)
       shareSessionChange(next)
       setRestoreError(false)
       setIsRestoring(false)
@@ -74,6 +86,7 @@ export function useAuthSession() {
   async function logout() {
     const token = readStoredSession()?.accessToken
     pending.current?.abort()
+    setNeedsSignIn(false)
     shareSessionChange(null)
     setRestoreError(false)
     setIsRestoring(false)
@@ -86,5 +99,5 @@ export function useAuthSession() {
     } catch { /* Sign-out in this browser also works offline. */ }
   }
 
-  return { session, isSigningIn, isRestoring, restoreError, retryRestore: restore, login, logout }
+  return { session, isSigningIn, isRestoring, restoreError, needsSignIn, retryRestore: restore, login, logout }
 }

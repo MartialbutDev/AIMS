@@ -33,7 +33,7 @@ STAGES = {
     'record_conflict': 'Record needs reconciliation',
 }
 CATEGORIES = {
-    'missing_requirements': 'Missing or unverified requirements',
+    'missing_requirements': 'Missing pre-deployment requirements',
     'returned_completion': 'Returned completion requests',
     'company_confirmation': 'Outstanding company confirmations',
     'coordinator_approval': 'Awaiting coordinator final approval',

@@ -25,7 +25,7 @@ from app.models.document_template import DocumentTemplateSeries as Series, Docum
 from app.models.user import User, UserRole
 
 MAX_BYTES = 10 * 1024 * 1024
-DocumentKind = Literal['waiver', 'medical_certificate', 'internship_plan', 'insurance', 'endorsement_letter', 'acceptance_letter', 'application_letter', 'resume', 'certificate_of_completion', 'requirements', 'document']
+DocumentKind = Literal['waiver', 'medical_certificate', 'internship_plan', 'internship_contract', 'insurance', 'endorsement_letter', 'acceptance_letter', 'application_letter', 'resume', 'certificate_of_completion', 'requirements', 'document']
 
 
 def schema_ready(db: Session = Depends(get_db)):

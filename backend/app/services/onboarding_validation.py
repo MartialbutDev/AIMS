@@ -703,6 +703,7 @@ def validate_cor(
     observed_hours = re.search(r"\b(\d+)\s*(?:HRS?\.?|HOURS?)\b", row or "")
     detected_hours = int(observed_hours.group(1)) if observed_hours else None
     hours_review_required = required_hours is not None and not hours_match
+    labeled_student_numbers = set(re.findall(r"(?m)^\s*STUDENT\s+(?:ID|NO\.?|NUMBER)\s*[:#]\s*([0-9]{6,12})\b", upper))
 
     layout = layout_details or {}
 
@@ -757,6 +758,8 @@ def validate_cor(
         {
 
             "document_kind": "cor",
+
+            "student_number_conflict": checks["student_id_matches"] is False and len(labeled_student_numbers) == 1,
             "academic_requirements": {k:policy[k] for k in ("id","version","required_hours","programs","year_levels","practicum_subject_codes")},
 
             "detected_program_code": detected_program,

@@ -1,4 +1,5 @@
-import { documentFeedback } from "../../src/utils/documentFeedback";
+import { documentFeedback, documentUploadError, feedbackMessage } from "../../src/utils/documentFeedback";
+import { uploadFileError } from "../../src/utils/applicationFlow";
 import { useNotificationRefresh } from '../../src/hooks/useNotificationRefresh';
 
 import React, {
@@ -43,8 +44,6 @@ import type {
 } from "../../src/services/onboarding.service";
 
 type DocumentKind = "orientation" | "cor";
-
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function getStatusLabel(
   submission: OnboardingSubmission | null
@@ -253,15 +252,9 @@ export default function StudentOnboardingScreen() {
 
       const asset = result.assets[0];
 
-      if (
-        asset.size !== undefined &&
-        asset.size > MAX_FILE_SIZE
-      ) {
-        Alert.alert(
-          "File Too Large",
-          "Please select a file smaller than 10 MB."
-        );
-
+      const invalid = uploadFileError({ name: asset.name, size: asset.size, type: asset.mimeType });
+      if (invalid) {
+        Alert.alert("Choose another file", invalid);
         return;
       }
 
@@ -291,16 +284,12 @@ export default function StudentOnboardingScreen() {
 
       setStatus(updated);
 
-      // In normal operation, manual review is still required.
-      if (updated.eligible === true) {
-        router.replace("/(student)/dashboard");
-        return;
-      }
-
-      Alert.alert(
-        "Upload Successful",
-        "Your document was submitted for verification."
-      );
+      const submission = updated[kind];
+      const feedback = documentFeedback(submission?.review_status ?? "pending_review", submission?.student_feedback);
+      const buttons = updated.eligible
+        ? [{ text: "Continue", onPress: () => router.replace("/(student)/dashboard") }]
+        : [{ text: "OK" }];
+      Alert.alert(feedback.status_label, feedbackMessage(feedback), buttons);
     } catch (error: unknown) {
       if (!mountedRef.current) {
         return;
@@ -314,13 +303,12 @@ export default function StudentOnboardingScreen() {
         return;
       }
 
-      Alert.alert(
-        "Upload Failed",
-        getErrorMessage(
-          error,
-          "Unable to upload your document."
-        )
-      );
+      if (!(error instanceof OnboardingApiError) || [408, 500, 502, 504].includes(error.status)) {
+        Alert.alert("Upload unconfirmed", "We couldn’t confirm your upload. Check your onboarding status before trying again.");
+      } else {
+        const alert = documentUploadError(getErrorMessage(error, "Unable to upload your document."));
+        Alert.alert(alert.title, alert.message);
+      }
     } finally {
       uploadingRef.current = false;
 
@@ -394,6 +382,7 @@ export default function StudentOnboardingScreen() {
     disabled: boolean
   ) => {
     const statusColor = getStatusColor(submission);
+    const feedback = submission && documentFeedback(submission.review_status, submission.student_feedback);
 
     const canUpload =
       !disabled &&
@@ -511,56 +500,9 @@ export default function StudentOnboardingScreen() {
           </View>
         )}
 
-        {submission && <View style={{ gap: 6, marginTop: 10 }}><Text style={[styles.helperText, { color: colors.textSecondary }]}>{documentFeedback(submission.review_status, submission.student_feedback).reason}</Text><Text style={[styles.helperText, { color: colors.textPrimary }]}>{documentFeedback(submission.review_status, submission.student_feedback).next_action}</Text></View>}
-
-        {/* Rejection notes */}
-        {submission?.review_status ===
-          "rejected" && (
-          <View style={styles.rejectionBox}>
-            <Ionicons
-              name="alert-circle-outline"
-              size={20}
-              color="#DC2626"
-            />
-
-            <Text style={styles.rejectionText}>
-              {submission.review_notes ||
-                "Your document was rejected. Please upload a corrected copy."}
-            </Text>
-          </View>
-        )}
-
-        {/* Pending review */}
-        {submission?.review_status ===
-          "pending_review" && (
-          <Text
-            style={[
-              styles.helperText,
-              {
-                color: colors.textSecondary,
-              },
-            ]}
-          >
-            Your document is awaiting review by an
-            authorized Coordinator or Administrator.
-          </Text>
-        )}
-
-        {/* Approved */}
-        {submission?.review_status ===
-          "verified" && (
-          <View style={styles.approvedRow}>
-            <Ionicons
-              name="checkmark-circle"
-              size={18}
-              color="#16A34A"
-            />
-
-            <Text style={styles.approvedText}>
-              This document has been approved.
-            </Text>
-          </View>
-        )}
+        {feedback && <Text style={[styles.helperText, { color: submission?.review_status === "rejected" ? colors.error : colors.textSecondary, marginTop: 10 }]}>{feedbackMessage(feedback)}</Text>}
+        {submission?.review_notes && submission.review_notes !== feedback?.reason &&
+          <Text style={[styles.helperText, { color: colors.textPrimary }]}>{submission.review_notes}</Text>}
 
         {/* Upload button */}
         {canUpload && (
@@ -1110,33 +1052,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  rejectionBox: {
-    backgroundColor: "#FEF2F2",
-    borderRadius: 10,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-  },
 
-  rejectionText: {
-    color: "#991B1B",
-    fontSize: 12,
-    lineHeight: 18,
-    flex: 1,
-  },
 
-  approvedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
 
-  approvedText: {
-    color: "#16A34A",
-    fontSize: 12,
-    fontWeight: "600",
-  },
 
   verificationCard: {
     borderRadius: 18,

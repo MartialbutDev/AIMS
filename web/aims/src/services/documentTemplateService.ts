@@ -1,9 +1,9 @@
 import { apiRequest, apiRequestBlob } from './apiClient'
 
 export const formTypes = {
-  waiver: 'Waiver', medical_certificate: 'Medical certificate', internship_plan: 'Internship plan', insurance: 'Insurance',
+  waiver: 'Waiver', medical_certificate: 'Medical certificate', internship_plan: 'Internship plan', internship_contract: 'Internship Contract', insurance: 'Insurance',
   endorsement_letter: 'Endorsement letter', acceptance_letter: 'Acceptance letter', application_letter: 'Application letter',
-  resume: 'Resume', certificate_of_completion: 'Completion certificate', requirements: 'Requirements checklist', document: 'Other official form',
+  resume: 'Resume', certificate_of_completion: 'Completion certificate', requirements: 'Other', document: 'Other official form',
 } as const
 export interface PublishedForm {
   id: string; series_id: string; title: string; document_type: keyof typeof formTypes; version: string;

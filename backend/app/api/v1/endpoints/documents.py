@@ -79,6 +79,7 @@ VALID_TYPES = {
     "waiver",
     "medical_certificate",
     "internship_plan",
+    "internship_contract",
     "insurance",
     "endorsement_letter",
     "acceptance_letter",

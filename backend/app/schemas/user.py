@@ -13,6 +13,7 @@ from pydantic import (
 
 from app.models.user import UserRole
 
+StudentGender = Literal["male", "female"]
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -56,12 +57,18 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
+    gender: StudentGender | None = None
+
     password: str = Field(
         min_length=8,
         max_length=128
     )
 
     role: Optional[UserRole] = UserRole.STUDENT
+
+
+class StudentCreate(UserCreate):
+    gender: StudentGender
 
 
 class AdminUserCreate(BaseModel):
@@ -136,14 +143,7 @@ class UserUpdate(BaseModel):
         max_length=50
     )
 
-    gender: Optional[
-        Literal[
-            "male",
-            "female",
-            "other",
-            "prefer_not_to_say"
-        ]
-    ] = None
+    gender: StudentGender | None = None
 
     avatar_url: Optional[str] = None
 

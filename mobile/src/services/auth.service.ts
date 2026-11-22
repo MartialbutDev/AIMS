@@ -1,4 +1,4 @@
-import type { Gender } from '../constants/profile';
+import type { StudentGender } from '../constants/profile';
 import { unregisterPushDevice } from "./push.service";
 import api from './api';
 import * as SecureStore from 'expo-secure-store';
@@ -31,7 +31,7 @@ export interface RegisterData {
   middle_name?: string | null;
   last_name: string;
   student_id: string;
-  gender?: Gender;
+  gender: StudentGender;
 }
 
 // ============================================================
@@ -313,7 +313,7 @@ export const authService = {
     middle_name?: string | null;
     last_name?: string;
     phone?: string | null;
-    gender?: Gender | null;
+    gender?: StudentGender | null;
   }): Promise<any> {
     try {
       console.log('📝 Updating student profile');

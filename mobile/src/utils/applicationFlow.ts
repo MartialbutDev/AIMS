@@ -24,9 +24,9 @@ export function documentLabel(status: string, version?: string, current = false)
   return 'Pending review';
 }
 export function uploadFileError(file: { name: string; size?: number; type?: string }) {
-  if (!/\.(pdf|jpe?g|png)$/i.test(file.name)) return 'Choose a PDF, JPG or PNG.';
-  if (file.size != null && file.size > 10 * 1024 * 1024) return 'Choose a file of 10 MB or smaller.';
+  if (!/\.(pdf|jpe?g|png)$/i.test(file.name)) return 'Choose a file in one of these formats: PDF, JPG or PNG.';
+  if (file.size != null && file.size > 10 * 1024 * 1024) return 'This file exceeds the 10 MB upload limit. Choose a smaller copy.';
   if (file.size === 0) return 'This file is empty. Choose another copy.';
-  if (file.type && !['application/pdf', 'image/jpeg', 'image/png', 'application/octet-stream'].includes(file.type)) return 'Choose a PDF, JPG or PNG.';
+  if (file.type && !['application/pdf', 'image/jpeg', 'image/png', 'application/octet-stream'].includes(file.type)) return 'Choose a file in one of these formats: PDF, JPG or PNG.';
   return '';
 }

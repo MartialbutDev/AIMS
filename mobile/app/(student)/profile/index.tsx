@@ -19,7 +19,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { AccountHeader, AccountHero, ActionButton } from "../../../src/components/account/AccountUI";
 import { GenderSelector } from "../../../src/components/account/GenderSelector";
-import { genderLabel, type Gender } from "../../../src/constants/profile";
+import { genderLabel, isStudentGender, type Gender } from "../../../src/constants/profile";
 import { APP_VERSION } from "../../../src/constants/app";
 
 import { useTheme } from "../../../src/context/ThemeContext";
@@ -168,6 +168,10 @@ export default function ProfileScreen() {
     if (!profile || savingRef.current) return;
     if (!editFirstName.trim() || !editLastName.trim()) {
       Alert.alert("Name required", "Enter your first and last name before saving.");
+      return;
+    }
+    if (!isStudentGender(editGender)) {
+      Alert.alert("Gender required", "Select Male or Female before saving.");
       return;
     }
 

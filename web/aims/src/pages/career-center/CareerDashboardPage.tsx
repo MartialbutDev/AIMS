@@ -7,29 +7,13 @@ import {
   getCareerCompanies,
   type CareerCompany,
 } from '../../services/careerCenterService'
+import { daysUntilMoaExpiry, formatMoaDate, getMoaStatus, moaDaysLeftLabel, MOA_EXPIRING_WITHIN_DAYS } from '../../services/moaExpiry'
 import type { DashboardData } from '../../types/dashboard'
 import './career-center-ui.css'
 
 interface CareerDashboardPageProps {
   data: DashboardData
   onNavigate: (section: string) => void
-}
-
-function todayString() {
-  const date = new Date()
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-')
-}
-
-function daysRemaining(date: string) {
-  return Math.round(
-    (Date.parse(`${date}T00:00:00Z`) -
-      Date.parse(`${todayString()}T00:00:00Z`)) /
-      86400000
-  )
 }
 
 export function CareerDashboardPage({
@@ -67,37 +51,16 @@ export function CareerDashboardPage({
 
   const stats = useMemo(() => {
     const active = companies.filter((company) => company.is_active)
-
-    const expiring = active.filter((company) => {
-      if (!company.is_moa_signed || !company.moa_expires_at) {
-        return false
-      }
-
-      const days = daysRemaining(company.moa_expires_at)
-      return days >= 0 && days <= 30
-    })
-
-    const expired = active.filter(
-      (company) =>
-        company.is_moa_signed &&
-        company.moa_expires_at !== null &&
-        daysRemaining(company.moa_expires_at) < 0
-    )
-
-    return {
-      total: active.length,
-      signed: active.filter(
-        (company) =>
-          company.is_moa_signed &&
-          (!company.moa_expires_at ||
-            daysRemaining(company.moa_expires_at) > 30)
-      ).length,
-      pending: active.filter(
-        (company) => !company.is_moa_signed
-      ).length,
-      expiring,
-      expired: expired.length,
+    const counts = { signed: 0, expired: 0, pending: 0 }
+    const expiring: CareerCompany[] = []
+    const now = new Date()
+    for (const company of active) {
+      const status = getMoaStatus(company, now)
+      if (status === 'expiring') expiring.push(company)
+      else counts[status]++
     }
+    expiring.sort((left, right) => (left.moa_expires_at ?? '').localeCompare(right.moa_expires_at ?? ''))
+    return { ...counts, total: active.length, expiring }
   }, [companies])
 
   return (
@@ -139,7 +102,7 @@ export function CareerDashboardPage({
             View companies <Icon name="arrow" size={17} />
           </button>
         </div>
-        <div className="stake-renewal-brief"><span>MOA status</span><strong>{loading || error ? '—' : stats.expiring.length}<small>expiring within 30 days</small></strong><p>{loading ? 'Loading MOAs…' : error ? 'MOA data unavailable.' : (stats.expired + ' expired · ' + stats.pending + ' unsigned')}</p><button type="button" onClick={() => onNavigate('companies')}>Review agreements <Icon name="arrow" size={16} /></button></div>
+        <div className="stake-renewal-brief"><span>MOA status</span><strong>{loading || error ? '—' : stats.expiring.length}<small>expiring within {MOA_EXPIRING_WITHIN_DAYS} days</small></strong><p>{loading ? 'Loading MOAs…' : error ? 'MOA data unavailable.' : (stats.expired + ' expired · ' + stats.pending + ' unsigned')}</p><button type="button" onClick={() => onNavigate('companies')}>Review agreements <Icon name="arrow" size={16} /></button></div>
       </section>
 
       {error && (
@@ -151,9 +114,9 @@ export function CareerDashboardPage({
       <section className="cc-stats">
         {[
           ['Active partners', stats.total, 'All terms'],
-          ['Current MOAs', stats.signed, 'No expiry within 30 days'],
+          ['Current MOAs', stats.signed, `No expiry within ${MOA_EXPIRING_WITHIN_DAYS} days`],
           ['Unsigned MOAs', stats.pending, ''],
-          ['Expiring soon', stats.expiring.length, 'Within 30 days'],
+          ['Expiring soon', stats.expiring.length, `Within ${MOA_EXPIRING_WITHIN_DAYS} days`],
           ['Expired MOAs', stats.expired, ''],
         ].map(([label, value, detail]) => (
           <article className="cc-stat-card" key={String(label)}>
@@ -162,13 +125,6 @@ export function CareerDashboardPage({
               {loading || error ? '—' : value}
             </strong>
             {detail && <span className="cc-stat-detail">{detail}</span>}
-          </article>
-        ))}
-        {internshipMetrics(data).map(metric => (
-          <article className="cc-stat-card" key={metric.label}>
-            <span className="cc-stat-label">{metric.label}</span>
-            <strong className="cc-stat-value">{metric.value}</strong>
-            <span className="cc-stat-detail">{metric.change}</span>
           </article>
         ))}
         {internshipMetrics(data).map(metric => (
@@ -231,7 +187,7 @@ export function CareerDashboardPage({
           <div className="cc-section-header">
             <div>
               <h2>MOA Monitoring</h2>
-              <p>Expiring within 30 days.</p>
+              <p>Expiring within {MOA_EXPIRING_WITHIN_DAYS} days.</p>
             </div>
           </div>
 
@@ -241,7 +197,7 @@ export function CareerDashboardPage({
             </div>
           ) : stats.expiring.length === 0 ? (
             <div className="cc-mini-empty">
-              No MOAs expiring within 30 days.
+              No MOAs expire within {MOA_EXPIRING_WITHIN_DAYS} days.
             </div>
           ) : (
             <div className="cc-watch-list">
@@ -255,11 +211,11 @@ export function CareerDashboardPage({
                   <span>
                     <strong>{company.name}</strong>
                     <small>
-                      MOA expiration: {company.moa_expires_at}
+                      Expires {formatMoaDate(company.moa_expires_at)}
                     </small>
                   </span>
                   <span className="cc-watch-days">
-                    {daysRemaining(company.moa_expires_at!)}d
+                    {moaDaysLeftLabel(daysUntilMoaExpiry(company.moa_expires_at!))}
                   </span>
                 </button>
               ))}
@@ -305,3 +261,4 @@ export function CareerDashboardPage({
     </main>
   )
 }
+

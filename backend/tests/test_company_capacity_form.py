@@ -1,4 +1,5 @@
 """Company creation/editing saves capacity atomically without confirmation fields."""
+from datetime import timedelta
 import unittest
 import test_company_intake as fixtures
 from app.models.company import Company
@@ -79,6 +80,35 @@ class CompanyCapacityFormTests(unittest.TestCase):
         self.assertEqual(response.json()['intake']['capacity'],7)
         self.db.expire_all(); self.assertEqual(self.db.get(Company,'partner').name,'SYNTHETIC Renamed Company')
         self.assertEqual(self.f.policy().capacity,7)
+
+    def test_career_center_can_pause_and_resume_new_applications_for_the_current_term(self):
+        company = self.db.get(Company, 'partner')
+        company.moa_expires_at = self.f.f.today + timedelta(days=60)
+        self.db.commit()
+        body = self.f.application_body()
+        settings = {'intern_capacity': 50, 'intake_version': 1, 'accepting_interns': False, 'intake_academic_year': '2026-2027', 'intake_semester': '1'}
+        stale = self.client.put('/companies/partner', json={**settings, 'intake_semester': '2'})
+        self.assertEqual(stale.status_code, 409)
+        self.assertTrue(self.f.policy().accepting)
+
+        paused = self.client.put('/companies/partner', json=settings)
+        self.assertEqual(paused.status_code, 200, paused.text)
+        self.assertEqual(paused.json()['intake']['status'], 'closed')
+        self.assertEqual(paused.json()['intake']['capacity'], 50)
+        self.assertEqual(paused.json()['intake']['version'], 2)
+        self.f.actor('s1')
+        blocked = self.client.post('/applications/', json=body)
+        self.assertEqual(blocked.status_code, 409)
+        self.assertIn('not accepting new internship applications', blocked.json()['detail'])
+        self.assertEqual(self.db.query(Application).count(), 0)
+
+        self.f.actor('career')
+        resumed = self.client.put('/companies/partner', json={**settings, 'intake_version': 2, 'accepting_interns': True})
+        self.assertEqual(resumed.status_code, 200, resumed.text)
+        self.assertTrue(resumed.json()['intake']['can_apply'])
+        self.f.actor('s1')
+        submitted = self.client.post('/applications/', json=body)
+        self.assertEqual(submitted.status_code, 201, submitted.text)
     def test_rejected_capacity_rolls_back_company_changes(self):
         for number in (1,2):
             self.db.add(Application(id=f'occupied-{number}',student_id=f's{number}',company_id='partner',position='Internship',academic_year='2026-2027',semester='1',status=ApplicationStatus.ACCEPTED))

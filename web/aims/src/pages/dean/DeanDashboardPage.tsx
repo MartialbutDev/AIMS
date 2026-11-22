@@ -84,7 +84,7 @@ export function DeanDashboardPage() {
   }
   const years = [...new Set(terms.map(item => item.academic_year))]
   const semesters = terms.filter(item => item.academic_year === term?.academic_year).map(item => item.semester).sort()
-  const maxStage = Math.max(1, ...(data?.stages.map(item => item.count) ?? []))
+  const stageTotal = data?.overview.students_in_oversight ?? 0
 
   return <div className="dean-oversight">
     <header className="dean-oversight__hero">
@@ -110,9 +110,22 @@ export function DeanDashboardPage() {
       </section>
       {!data.overview.students_in_oversight && <p className="dean-oversight__notice">No assigned students are available in your oversight scope for this term. Coordinator designations are managed by the administrator.</p>}
       <section className="dean-oversight__panel" aria-labelledby="dean-stage-heading">
-        <div className="dean-oversight__section-heading"><div><h2 id="dean-stage-heading">Internship stages</h2><p>Each student appears in one stage. The Active interns card includes students completing final review.</p></div><span>{data.overview.students_in_oversight} students</span></div>
-        <div className="dean-oversight__chart">{data.stages.map(stage => <div className="dean-oversight__bar-row" key={stage.key}><span>{stage.label}</span><div className="dean-oversight__track" role="img" aria-label={`${stage.label}: ${stage.count} students`}><span style={{ width: `${stage.count / maxStage * 100}%` }} /></div><strong>{stage.count}</strong></div>)}</div>
-        <p className="dean-oversight__footnote">Historical completed records without recorded coordinator approval are shown separately. Conflicting records require reconciliation before they count as active or approved.</p>
+        <div className="dean-oversight__section-heading">
+          <h2 id="dean-stage-heading">Students by internship stage</h2>
+          <span>{stageTotal.toLocaleString()} {stageTotal === 1 ? 'student' : 'students'}</span>
+        </div>
+        {stageTotal > 0 ? (
+          <dl className="dean-oversight__stage-counts">
+            {data.stages.map(stage => (
+              <div key={stage.key}>
+                <dt>{stage.label}</dt>
+                <dd>{stage.count.toLocaleString()}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <p>No students in this term’s oversight scope.</p>
+        )}
       </section>
       <DeanProgressChart key={data.academic_year + data.semester} progress={data.progress} />
       <DeanDemographics distribution={data.gender_distribution} studentCount={data.overview.students_in_oversight} />

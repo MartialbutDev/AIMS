@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_REQUEST_BYTES = MAX_UPLOAD_BYTES + 64 * 1024  # Multipart framing and form fields.
-UPLOAD_SIZE_MESSAGE = "Document must be 10 MB or smaller."
+UPLOAD_SIZE_MESSAGE = "This file exceeds the 10 MB upload limit. Choose a smaller copy."
 
 OCR_UPLOAD_PATHS = {
     "/api/v1/documents/identify",

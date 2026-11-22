@@ -1,15 +1,17 @@
 import { IntakeAvailability } from '../../components/CompanyIntakePanel'
 import { MoaFiles } from '../../components/MoaFiles'
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Icon } from '../../components/Icons'
 import {
   createCareerCompany,
+  exportCareerCompanies,
   getCareerCompanies,
   updateCareerCompany,
   type CareerCompany,
   type CareerCompanyPayload,
 } from '../../services/careerCenterService'
+import { daysUntilMoaExpiry, formatMoaDate as formatDate, getMoaStatus, moaDaysLeftLabel, MOA_EXPIRING_WITHIN_DAYS, type MoaExpiryStatus } from '../../services/moaExpiry'
 import './career-center-ui.css'
 
 interface CompaniesPageProps {
@@ -28,6 +30,7 @@ type CompanyFilter =
 type CompanyForm = {
   intern_capacity: string
   intake_version: number
+  accepting_interns: boolean
   name: string
   address: string
   contact_person: string
@@ -50,6 +53,7 @@ type CompanyForm = {
 const emptyForm: CompanyForm = {
   intern_capacity: '',
   intake_version: 0,
+  accepting_interns: true,
   name: '',
   address: '',
   contact_person: '',
@@ -69,35 +73,7 @@ const emptyForm: CompanyForm = {
   moa_expires_at: '',
 }
 
-function localToday(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function daysUntil(date: string): number {
-  const target = Date.parse(`${date}T00:00:00Z`)
-  const today = Date.parse(`${localToday()}T00:00:00Z`)
-  return Math.round((target - today) / 86400000)
-}
-
-type MoaStatus = 'signed' | 'expiring' | 'expired' | 'pending'
-
-function getMoaStatus(company: CareerCompany): MoaStatus {
-  if (!company.is_moa_signed) return 'pending'
-  if (!company.moa_expires_at) return 'signed'
-
-  const days = daysUntil(company.moa_expires_at)
-
-  if (days < 0) return 'expired'
-  if (days <= 30) return 'expiring'
-
-  return 'signed'
-}
-
-function statusLabel(status: MoaStatus): string {
+function statusLabel(status: MoaExpiryStatus): string {
   switch (status) {
     case 'signed':
       return 'Signed'
@@ -108,18 +84,6 @@ function statusLabel(status: MoaStatus): string {
     default:
       return 'Not signed'
   }
-}
-
-function formatDate(date: string | null): string {
-  if (!date) return 'Not specified'
-
-  const parsed = new Date(`${date}T00:00:00`)
-
-  if (Number.isNaN(parsed.getTime())) return date
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-  }).format(parsed)
 }
 
 function initials(name: string): string {
@@ -135,6 +99,7 @@ function companyToForm(company: CareerCompany): CompanyForm {
   return {
     intern_capacity: company.intake?.capacity == null ? "" : String(company.intake.capacity),
     intake_version: company.intake?.version || 0,
+    accepting_interns: company.intake?.capacity == null ? true : company.intake.accepting,
     name: company.name,
     address: company.address ?? '',
     contact_person: company.contact_person ?? '',
@@ -256,6 +221,8 @@ export function CompaniesPage({
   const [companies, setCompanies] = useState<CareerCompany[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const exportPending = useRef(false)
   const [error, setError] = useState('')
   const [formError, setFormError] = useState('')
   const [success, setSuccess] = useState('')
@@ -340,6 +307,21 @@ export function CompaniesPage({
       return getMoaStatus(company) === filter
     })
   }, [companies, search, filter])
+
+  async function exportCompanies() {
+    if (exportPending.current || loading || !filteredCompanies.length) return
+    exportPending.current = true
+    setExporting(true)
+    setError('')
+    try {
+      await exportCareerCompanies(filteredCompanies.map(company => company.id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to export company records.')
+    } finally {
+      exportPending.current = false
+      setExporting(false)
+    }
+  }
 
   const expiringCompanies = useMemo(
     () =>
@@ -436,6 +418,11 @@ export function CompaniesPage({
       const payload = toPayload(form)
 
       if (dialog === 'edit' && selected) {
+        if (selected.intake) {
+          payload.accepting_interns = form.accepting_interns
+          payload.intake_academic_year = selected.intake.academic_year
+          payload.intake_semester = selected.intake.semester
+        }
         const updated = await updateCareerCompany(selected.id, payload)
 
         setCompanies((current) =>
@@ -567,7 +554,7 @@ export function CompaniesPage({
         <StatCard
           label="Expiring Soon"
           value={stats.expiring}
-          detail="Expires within 30 days"
+          detail={`Expires within ${MOA_EXPIRING_WITHIN_DAYS} days`}
           variant="warning"
         />
         <StatCard
@@ -643,6 +630,15 @@ export function CompaniesPage({
               <option value="inactive">Inactive Companies</option>
             </select>
           </label>
+          <button
+            type="button"
+            className="cc-button cc-button-secondary"
+            disabled={loading || exporting || !filteredCompanies.length}
+            onClick={() => void exportCompanies()}
+          >
+            <Icon name="download" size={17} />
+            {exporting ? 'Exporting…' : 'Export companies (.xlsx)'}
+          </button>
         </div>
 
         {loading ? (
@@ -720,9 +716,11 @@ export function CompaniesPage({
                     </td>
 
                     <td>
-                      <span className="cc-date-cell">
-                        {formatDate(company.moa_expires_at)}
-                      </span>
+                      <div className="cc-cell-stack">
+                        <span className="cc-date-cell">{formatDate(company.moa_expires_at)}</span>
+                        {company.moa_expires_at && getMoaStatus(company) === 'expiring' &&
+                          <small>{moaDaysLeftLabel(daysUntilMoaExpiry(company.moa_expires_at))}</small>}
+                      </div>
                     </td>
 
                     <td>
@@ -767,13 +765,13 @@ export function CompaniesPage({
             <div>
               <span className="cc-section-kicker">AGREEMENT MONITORING</span>
               <h2>MOA Expiration Watch</h2>
-              <p>Agreements requiring attention within 30 days.</p>
+              <p>Signed MOAs expiring within {MOA_EXPIRING_WITHIN_DAYS} days.</p>
             </div>
           </div>
 
           {expiringCompanies.length === 0 ? (
             <div className="cc-mini-empty">
-              No signed agreements are currently expiring within 30 days.
+              No signed agreements expire within {MOA_EXPIRING_WITHIN_DAYS} days.
             </div>
           ) : (
             <div className="cc-watch-list">
@@ -791,7 +789,7 @@ export function CompaniesPage({
                     </small>
                   </span>
                   <span className="cc-watch-days">
-                    {daysUntil(company.moa_expires_at!)}d
+                    {moaDaysLeftLabel(daysUntilMoaExpiry(company.moa_expires_at!))}
                   </span>
                 </button>
               ))}
@@ -1056,6 +1054,14 @@ export function CompaniesPage({
                         <input type="number" min="1" max="100000" step="1" required value={form.intern_capacity} onChange={event => updateForm('intern_capacity', event.target.value)} />
                       </label>
                     </div>
+                    {dialog === 'edit' && selected?.intake && <label className="cc-toggle-row">
+                      <span>
+                        <strong>Accepting new applications</strong>
+                        <small>Turn off to pause new applications for this term.</small>
+                      </span>
+                      <input type="checkbox" checked={form.accepting_interns}
+                        onChange={event => updateForm('accepting_interns', event.target.checked)} />
+                    </label>}
                   </div>
 
                   <div className="cc-form-section">

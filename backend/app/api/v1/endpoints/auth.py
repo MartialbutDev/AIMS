@@ -33,6 +33,7 @@ from app.core.security import (
 from app.models.user import User, UserRole
 from app.services import login_throttle
 from app.schemas.user import (
+    StudentCreate,
     UserCreate,
     UserResponse,
     LoginRequest,
@@ -234,7 +235,7 @@ def _authenticate(
     status_code=status.HTTP_201_CREATED,
 )
 async def register_student(
-    user_data: UserCreate,
+    user_data: StudentCreate,
     db: Session = Depends(get_db),
 ):
     if not user_data.student_id or not user_data.student_id.strip():
@@ -424,6 +425,13 @@ async def update_current_user(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if (
+        current_user.role == UserRole.STUDENT
+        and "gender" in user_data.model_fields_set
+        and user_data.gender is None
+    ):
+        raise HTTPException(status_code=422, detail="Select Male or Female.")
+
     for field in (
         "first_name",
         "middle_name",

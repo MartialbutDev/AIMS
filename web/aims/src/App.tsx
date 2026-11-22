@@ -4,6 +4,7 @@ import {
   Navigate,
   Route,
   Routes,
+  useLocation,
   useNavigate,
   useParams,
 } from 'react-router-dom'
@@ -108,6 +109,20 @@ function getDashboardPath(role: UserRole): string {
     : `/${ROLE_PATHS[role]}/dashboard`
 }
 
+type SignInDestination = { pathname: string; search: string; hash: string }
+
+function signInDestination(value: unknown, role: UserRole): SignInDestination | undefined {
+  if (!value || typeof value !== 'object' || !('pathname' in value) ||
+      !('search' in value) || !('hash' in value)) return
+  const { pathname, search, hash } = value
+  if (typeof pathname !== 'string' || typeof search !== 'string' || typeof hash !== 'string') return
+  if (search && !search.startsWith('?') || hash && !hash.startsWith('#')) return
+  const [, workspace, section, ...rest] = pathname.split('/')
+  if (!pathname.startsWith('/') || workspace !== ROLE_PATHS[role] || rest.length) return
+  if (section && !ALLOWED_SECTIONS[role].includes(section)) return
+  return { pathname, search, hash }
+}
+
 interface LoginRouteProps {
   isSigningIn: boolean
   login: (
@@ -123,6 +138,7 @@ function LoginRoute({
   login,
 }: LoginRouteProps) {
   const { role: rolePath } = useParams<{ role: string }>()
+  const location = useLocation()
   const navigate = useNavigate()
   const role = getRoleFromPath(rolePath)
 
@@ -133,6 +149,7 @@ function LoginRoute({
   return (
     <RoleLogin
       role={role}
+      reauthenticate={!!signInDestination(location.state?.returnTo, role)}
       isSigningIn={isSigningIn}
       onBack={() => navigate('/')}
       onLogin={(identifier, password, keepSignedIn) =>
@@ -145,22 +162,29 @@ function LoginRoute({
 interface DashboardRouteProps {
   session: UserSession | null
   onLogout: () => void
+  needsSignIn: boolean
 }
 
 function DashboardRoute({
   session,
   onLogout,
+  needsSignIn,
 }: DashboardRouteProps) {
   const { workspace, section } = useParams<{
     workspace: string
     section?: string
   }>()
 
-  if (!session) {
-    return <Navigate to="/" replace />
-  }
-
+  const { pathname, search, hash } = useLocation()
   const requestedRole = getRoleFromPath(workspace)
+  if (!session) {
+    const returnTo = needsSignIn && requestedRole
+      ? signInDestination({ pathname, search, hash }, requestedRole)
+      : undefined
+    return returnTo && requestedRole
+      ? <Navigate to={`/login/${ROLE_PATHS[requestedRole]}`} state={{ returnTo }} replace />
+      : <Navigate to="/" replace />
+  }
 
   if (!requestedRole || requestedRole !== session.role) {
     return (
@@ -204,6 +228,7 @@ function App() {
     isSigningIn,
     isRestoring,
     restoreError,
+    needsSignIn,
     retryRestore,
     login,
     logout,
@@ -211,6 +236,7 @@ function App() {
 
   useUsageActivity(isRestoring ? undefined : session?.accessToken)
   const navigate = useNavigate()
+  const location = useLocation()
 
   if (isRestoring) {
     return (
@@ -233,6 +259,8 @@ function App() {
   const dashboardPath = session
     ? getDashboardPath(session.role)
     : '/'
+
+  const resumePath = session && signInDestination(location.state?.returnTo, session.role)
 
   return (
     <Routes>
@@ -265,7 +293,7 @@ function App() {
         path="/login/:role"
         element={
           session ? (
-            <Navigate to={dashboardPath} replace />
+            <Navigate to={resumePath || dashboardPath} replace />
           ) : (
             <LoginRoute
               isSigningIn={isSigningIn}
@@ -281,6 +309,7 @@ function App() {
           <DashboardRoute
             session={session}
             onLogout={logout}
+            needsSignIn={needsSignIn}
           />
         }
       />
@@ -291,6 +320,7 @@ function App() {
           <DashboardRoute
             session={session}
             onLogout={logout}
+            needsSignIn={needsSignIn}
           />
         }
       />

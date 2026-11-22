@@ -32,7 +32,7 @@ from app.services.ocr_service import OCRService
 from app.services.document_identification import inspect_upload
 from app.services.notification_service import NotificationService
 from app.services.submission_recovery import Submission
-from app.services.student_document_feedback import student_upload_payload
+from app.services.student_document_feedback import INSUFFICIENT_TEXT, WRONG_OWNER_DECISION, WRONG_TYPE_DECISION, student_upload_payload
 from app.core.config import settings
 from app.core.assignment_access import get_current_academic_term
 
@@ -172,6 +172,7 @@ class DocumentService:
         "waiver": validate_waiver,
         "medical_certificate": validate_medical_certificate,
         "internship_plan": validate_internship_plan,
+        "internship_contract": validate_generic_document,
         "insurance": validate_insurance,
         "endorsement_letter": validate_endorsement_letter,
         "acceptance_letter": validate_acceptance_letter,
@@ -188,6 +189,7 @@ class DocumentService:
         "waiver": "WAIVER",
         "medical_certificate": "MEDICAL_CERTIFICATE",
         "internship_plan": "INTERNSHIP_PLAN",
+        "internship_contract": "INTERNSHIP_CONTRACT",
         "insurance": "INSURANCE",
         "endorsement_letter": "ENDORSEMENT_LETTER",
         "acceptance_letter": "ACCEPTANCE_LETTER",
@@ -208,7 +210,8 @@ class DocumentService:
         DocumentType.ENDORSEMENT_LETTER: "Endorsement Letter",
         DocumentType.ACCEPTANCE_LETTER: "Acceptance Letter",
         DocumentType.CERTIFICATE_OF_COMPLETION: "Certificate of Completion",
-        DocumentType.REQUIREMENTS: "Requirements",
+        DocumentType.INTERNSHIP_CONTRACT: "Internship Contract",
+        DocumentType.REQUIREMENTS: "Other",
         DocumentType.DOCUMENT: "Document",
         DocumentType.TRANSCRIPT: "Transcript",
         DocumentType.USER_ID: "ID Document",
@@ -481,10 +484,7 @@ class DocumentService:
         ):
             return (
                 "rejected",
-                "The explicitly identified document owner does "
-                "not match the signed-in student. Upload your "
-                "own document or contact the coordinator if "
-                "this is incorrect.",
+                WRONG_OWNER_DECISION,
             )
 
         anchors = {
@@ -503,7 +503,7 @@ class DocumentService:
             and 'found_sections' in validation_result
             and int(validation_result.get('confidence', 0)) < REJECT_THRESHOLD
             and not (anchors[document_type] & found)):
-            return ('rejected', 'The readable text does not match the selected document type. Upload the correct file. Any current approved version remains active.')
+            return 'rejected', WRONG_TYPE_DECISION
 
         if document_type == 'endorsement_letter':
             return ('pending', 'OCR extracts text only; it does not authenticate signatures. Coordinator content review of the endorsement letter is required before forwarding an application to the company.')
@@ -531,7 +531,7 @@ class DocumentService:
         text_length = len((extracted_text or "").strip())
 
         if text_length < 120:
-            reason = "OCR extracted insufficient readable text."
+            reason = INSUFFICIENT_TEXT
 
         elif not validation_result.get("is_valid", False):
             reason = (
@@ -793,11 +793,10 @@ class DocumentService:
                 elif not plausible:
                     if ocr_error:
                         raise HTTPException(503, "Text recognition was unavailable. Please retry this upload.")
-                    label = type_key.replace("_", " ")
                     raise HTTPException(
                         422,
-                        f"Re-upload required: We could not identify the selected document ({label}). "
-                        "Choose a clear photo showing the complete page or upload the original PDF.",
+                        "Re-upload required: We couldn’t confirm the selected document type. "
+                        "Upload a clearer, complete copy or choose the correct document type.",
                     )
 
             # --------------------------------------------

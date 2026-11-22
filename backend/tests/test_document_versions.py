@@ -133,7 +133,13 @@ class DocumentVersionTests(unittest.TestCase):
         for kind in DeploymentService.REQUIRED_DOCUMENTS:self.doc(kind.value,kind)
         self.doc('new-waiver',DocumentType.WAIVER,'pending',days=0)
         deployment=type('Deployment',(),{'student_id':'s1','academic_year':YEAR,'semester':SEMESTER})()
-        self.assertTrue(DeploymentService.get_checklist(self.db,deployment)['ready_for_deployment'])
+        checklist = DeploymentService.get_checklist(self.db, deployment)
+        self.assertTrue(checklist['ready_for_deployment'])
+        contract = next(item for item in checklist['items'] if item['document_type'] == 'internship_contract')
+        self.assertFalse(contract['required'])
+        self.assertEqual(contract['status'], 'missing')
+        self.doc('optional-contract', DocumentType.INTERNSHIP_CONTRACT, status='pending')
+        self.assertTrue(DeploymentService.get_checklist(self.db, deployment)['ready_for_deployment'])
 
     def test_revocation_blocks_fallback_and_is_audited(self):
         old=self.doc('old',DocumentType.WAIVER)
